@@ -192,7 +192,7 @@ def generate_account_detail(protocol, user, uid, exp_date_str, is_trial=False):
     res += f"Expired On : {exp_date_str}"
     return res
 
-@app.route('/srpcom/add-<protocol>ws', methods=['POST'])
+@app.route('/user_legend/add-<protocol>ws', methods=['POST'])
 def add_user(protocol):
     if not check_auth(): return jsonify({"stdout": "Unauthorized"}), 401
     data = request.json or {}
@@ -220,7 +220,7 @@ def add_user(protocol):
     detail_msg = generate_account_detail(protocol, user, uid, dt_str)
     return jsonify({"stdout": detail_msg})
 
-@app.route('/srpcom/trial-<protocol>ws', methods=['POST'])
+@app.route('/user_legend/trial-<protocol>ws', methods=['POST'])
 def trial_user(protocol):
     if not check_auth(): return jsonify({"stdout": "Unauthorized"}), 401
     data = request.json or {}
@@ -246,7 +246,7 @@ def trial_user(protocol):
     detail_msg = generate_account_detail(protocol, user, uid, dt_str, True)
     return jsonify({"stdout": detail_msg})
 
-@app.route('/srpcom/del-<protocol>ws', methods=['DELETE'])
+@app.route('/user_legend/del-<protocol>ws', methods=['DELETE'])
 def del_user(protocol):
     if not check_auth(): return jsonify({"stdout": "Unauthorized"}), 401
     data = request.json or {}
@@ -267,7 +267,7 @@ def del_user(protocol):
     restart_xray()
     return jsonify({"stdout": f"Success: {user} deleted."})
 
-@app.route('/srpcom/renew-<protocol>ws', methods=['POST'])
+@app.route('/user_legend/renew-<protocol>ws', methods=['POST'])
 def renew_user(protocol):
     if not check_auth(): return jsonify({"stdout": "Unauthorized"}), 401
     data = request.json or {}
@@ -292,7 +292,7 @@ def renew_user(protocol):
     if updated: return jsonify({"stdout": f"Success: {user} renewed."})
     return jsonify({"stdout": f"Error: User {user} not found."})
 
-@app.route('/srpcom/detail-<protocol>ws', methods=['GET', 'POST'])
+@app.route('/user_legend/detail-<protocol>ws', methods=['GET', 'POST'])
 def detail_user(protocol):
     if not check_auth(): return jsonify({"stdout": "Unauthorized"}), 401
     data = request.json or {}
@@ -321,7 +321,7 @@ def detail_user(protocol):
         
     return jsonify({"stdout": "Error: User not found"})
 
-@app.route('/srpcom/change-uuid', methods=['POST'])
+@app.route('/user_legend/change-uuid', methods=['POST'])
 def change_uuid():
     if not check_auth(): return jsonify({"stdout": "Unauthorized"}), 401
     data = request.json or {}
@@ -345,13 +345,13 @@ def change_uuid():
         return jsonify({"stdout": "Success: UUID changed."})
     return jsonify({"stdout": "Error: Old UUID not found."})
 
-@app.route('/srpcom/cek-xray', methods=['GET', 'POST'])
+@app.route('/user_legend/cek-xray', methods=['GET', 'POST'])
 def cek_xray():
     if not check_auth(): return jsonify({"stdout": "Unauthorized"}), 401
     out = subprocess.run(['systemctl', 'is-active', 'xray'], capture_output=True, text=True).stdout.strip()
     return jsonify({"stdout": f"Xray status: {out}"})
 
-@app.route('/srpcom/lock-xray', methods=['GET', 'POST'])
+@app.route('/user_legend/lock-xray', methods=['GET', 'POST'])
 def lock_xray():
     if not check_auth(): return jsonify({"stdout": "Unauthorized"}), 401
     user = (request.json or {}).get('user')
@@ -375,7 +375,7 @@ def lock_xray():
         return jsonify({"stdout": f"Success: {user} locked."})
     return jsonify({"stdout": "Error: User not found."})
 
-@app.route('/srpcom/unlock-xray', methods=['GET', 'POST'])
+@app.route('/user_legend/unlock-xray', methods=['GET', 'POST'])
 def unlock_xray():
     if not check_auth(): return jsonify({"stdout": "Unauthorized"}), 401
     user = (request.json or {}).get('user')
@@ -430,7 +430,7 @@ apt update && apt install caddy -y
 
 cat > /etc/caddy/Caddyfile << EOF
 http://$DOMAIN, https://$DOMAIN {
-    handle /srpcom/* {
+    handle /user_legend/* {
         reverse_proxy localhost:5000
     }
     handle / {
