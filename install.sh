@@ -311,6 +311,102 @@ create_xray() {
     esac
 }
 
+delete_xray() {
+    clear
+    echo "======================================"
+    echo "          DELETE XRAY ACCOUNT         "
+    echo "======================================"
+    read -p "Masukkan Username yang akan dihapus: " user
+    
+    if [ -z "$user" ]; then
+        echo -e "\n=> Username tidak boleh kosong!"
+        sleep 1; menu_xray; return
+    fi
+
+    # Cek apakah user ada di dalam config
+    cek=$(jq -r '.inbounds[].settings.clients[] | select(.email=="'$user'") | .email' /usr/local/etc/xray/config.json 2>/dev/null | head -n 1)
+    
+    if [ "$cek" != "$user" ]; then
+        echo -e "\n=> User '$user' tidak ditemukan!"
+        sleep 2; menu_xray; return
+    fi
+
+    # Menghapus user dari semua inbound menggunakan jq
+    jq '(.inbounds[].settings.clients) |= map(select(.email != "'$user'"))' /usr/local/etc/xray/config.json > /tmp/config.json
+    mv /tmp/config.json /usr/local/etc/xray/config.json
+    systemctl restart xray
+
+    echo "======================================"
+    echo "   Akun '$user' berhasil dihapus!"
+    echo "======================================"
+    read -n 1 -s -r -p "Press any key to back..."
+    menu_xray
+}
+
+renew_xray() {
+    clear
+    echo "======================================"
+    echo "          RENEW XRAY ACCOUNT          "
+    echo "======================================"
+    echo "Catatan: Pada versi Basic ini, akun tidak "
+    echo "terhapus otomatis (Lifetime). Fitur ini "
+    echo "hanya formalitas perpanjangan UI."
+    echo "======================================"
+    read -p "Masukkan Username: " user
+    
+    cek=$(jq -r '.inbounds[].settings.clients[] | select(.email=="'$user'") | .email' /usr/local/etc/xray/config.json 2>/dev/null | head -n 1)
+    
+    if [ "$cek" != "$user" ]; then
+        echo -e "\n=> User '$user' tidak ditemukan!"
+        sleep 2; menu_xray; return
+    fi
+
+    read -p "Tambah Masa Aktif (Hari): " masaaktif
+    echo "======================================"
+    echo "   Akun '$user' diperpanjang $masaaktif Hari!"
+    echo "======================================"
+    read -n 1 -s -r -p "Press any key to back..."
+    menu_xray
+}
+
+list_xray() {
+    clear
+    echo "======================================"
+    echo "          LIST XRAY ACCOUNTS          "
+    echo "======================================"
+    
+    echo -e "\n\e[32m[ VMESS WS ]\e[0m"
+    echo "--------------------------------------"
+    vmess_users=$(jq -r '.inbounds[] | select(.protocol=="vmess") | .settings.clients[].email' /usr/local/etc/xray/config.json 2>/dev/null)
+    if [ -z "$vmess_users" ] || [ "$vmess_users" == "null" ]; then
+        echo "Tidak ada akun."
+    else
+        echo "$vmess_users" | awk '{print "- " $0}'
+    fi
+
+    echo -e "\n\e[32m[ VLESS WS ]\e[0m"
+    echo "--------------------------------------"
+    vless_users=$(jq -r '.inbounds[] | select(.protocol=="vless") | .settings.clients[].email' /usr/local/etc/xray/config.json 2>/dev/null)
+    if [ -z "$vless_users" ] || [ "$vless_users" == "null" ]; then
+        echo "Tidak ada akun."
+    else
+        echo "$vless_users" | awk '{print "- " $0}'
+    fi
+
+    echo -e "\n\e[32m[ TROJAN WS ]\e[0m"
+    echo "--------------------------------------"
+    trojan_users=$(jq -r '.inbounds[] | select(.protocol=="trojan") | .settings.clients[].email' /usr/local/etc/xray/config.json 2>/dev/null)
+    if [ -z "$trojan_users" ] || [ "$trojan_users" == "null" ]; then
+        echo "Tidak ada akun."
+    else
+        echo "$trojan_users" | awk '{print "- " $0}'
+    fi
+
+    echo -e "\n======================================"
+    read -n 1 -s -r -p "Press any key to back..."
+    menu_xray
+}
+
 menu_xray() {
     clear
     XRAY_VER=$(/usr/local/bin/xray version 2>/dev/null | head -n 1 | awk '{print $1" "$2}')
@@ -321,14 +417,17 @@ menu_xray() {
     echo "Xray Version: ${XRAY_VER}"
     echo "======================================"
     echo "1. Create XRAY Account"
-    echo "2. Delete XRAY Account (Coming Soon)"
-    echo "3. Renew XRAY Account (Coming Soon)"
+    echo "2. Delete XRAY Account"
+    echo "3. Renew XRAY Account"
+    echo "4. List XRAY Account"
     echo "0. Back to Main Menu"
     echo "======================================"
-    read -p "Please select an option [0-3]: " opt
+    read -p "Please select an option [0-4]: " opt
     case $opt in
         1) create_xray ;;
-        2|3) echo -e "\n=> Fitur XRAY (Opsi $opt) sedang dalam pengembangan..."; sleep 1; menu_xray ;;
+        2) delete_xray ;;
+        3) renew_xray ;;
+        4) list_xray ;;
         0) main_menu ;;
         *) echo -e "\n=> Pilihan tidak valid!"; sleep 1; menu_xray ;;
     esac
