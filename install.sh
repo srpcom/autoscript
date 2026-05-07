@@ -199,9 +199,6 @@ REG=$(curl -sS --max-time 3 ipinfo.io/city)
 TZ=$(cat /etc/timezone)
 
 DOMAIN="DOMAIN_PLACEHOLDER"
-SLOWDNS="157at"
-CLIENT_N="syam157"
-VER="1.3.0"
 
 load_bot_setting() {
     source /usr/local/etc/xray/bot_setting.conf
@@ -953,6 +950,27 @@ restore_xray() {
     menu_settings
 }
 
+menu_settings() {
+    clear
+    echo "▶ BACKUP & RESTORE / SETTINGS"
+    echo ""
+    echo " [1] AUTOBACKUP VIA BOT TELEGRAM"
+    echo " [2] AUTOSEND CREATED VPN VIA BOT"
+    echo " [3] BACKUP VIA BOT TELEGRAM (MANUAL)"
+    echo " [4] RESTORE DATA via VPS"
+    echo " [0/x] Back to Main Menu"
+    echo ""
+    read -p " Select option [0-4 or x]: " opt
+    case $opt in
+        1) menu_autobackup ;;
+        2) menu_autosend ;;
+        3) manual_backup_telegram ;;
+        4) restore_xray ;;
+        0|x|X) main_menu ;;
+        *) menu_settings ;;
+    esac
+}
+
 main_menu() {
     clear
     XRAY_C=$(jq '[.inbounds[].settings.clients | length] | add' /usr/local/etc/xray/config.json 2>/dev/null || echo 0)
@@ -1044,6 +1062,7 @@ if [ "$restart_required" = true ]; then systemctl restart xray; fi
 EOF
 chmod +x /usr/local/bin/xray-exp
 
+# Pasang cronjob agar berjalan setiap menit
 crontab -l 2>/dev/null | grep -v "xray-exp" | crontab -
 (crontab -l 2>/dev/null; echo "* * * * * /usr/local/bin/xray-exp") | crontab -
 
@@ -1058,9 +1077,10 @@ echo "======================================================"
 echo "- Domain terdaftar : $DOMAIN"
 echo "- Xray Port        : 10001 (VMESS), 10002 (VLESS), 10003 (TROJAN)"
 echo "- Reverse Proxy    : Caddy (Auto HTTPS Port 443 & 80)"
-echo "- Fitur Auto-Delete: Aktif (Mengecek Setiap Jam 00:00)"
+echo "- Fitur Auto-Delete: Aktif (Mengecek Setiap Menit)"
 echo "- Fitur Telegram   : Tersedia di menu SETTINGS"
 echo "- Menu Delete/Renew: Sekarang menggunakan nomor urut"
 echo "======================================================"
 echo "Silakan ketik 'menu' untuk membuat akun VPN."
 echo "======================================================"
+```
