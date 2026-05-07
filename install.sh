@@ -164,35 +164,37 @@ def restart_xray():
 
 def generate_account_detail(protocol, user, uid, exp_date_str, is_trial=False):
     trial_txt = " TRIAL" if is_trial else ""
-    res = f"━━━━━━━━━━━━━━━━━━━━\n[XRAY/{protocol.upper()} WS{trial_txt}]\n━━━━━━━━━━━━━━━━━━━━\n"
-    res += f"Remarks : {user}\n"
-    res += f"IP Address : {IP_ADD}\n"
-    res += f"Domain : {DOMAIN}\n"
-    res += f"Port TLS : 443\n"
+    # Menggunakan %0A sebagai ganti \n agar website yang mengirim string mentah ke telegram tetap menjadi baris baru.
+    # Mengganti [ ] menjadi ❖ agar tidak tertelan format Markdown Telegram.
+    res = f"━━━━━━━━━━━━━━━━━━━━%0A❖ XRAY/{protocol.upper()} WS{trial_txt} ❖%0A━━━━━━━━━━━━━━━━━━━━%0A"
+    res += f"Remarks : {user}%0A"
+    res += f"IP Address : {IP_ADD}%0A"
+    res += f"Domain : {DOMAIN}%0A"
+    res += f"Port TLS : 443%0A"
     
     if protocol == 'vmess':
-        res += f"Port NONE-TLS : 80\nID : {uid}\nNetwork : Websocket\nWebsocket Path : /vmessws\n━━━━━━━━━━━━━━━━━━━━\n"
+        res += f"Port NONE-TLS : 80%0AID : {uid}%0ANetwork : Websocket%0AWebsocket Path : /vmessws%0A━━━━━━━━━━━━━━━━━━━━%0A"
         tls_dict = {"v":"2","ps":user,"add":DOMAIN,"port":"443","id":uid,"aid":"0","net":"ws","type":"none","host":DOMAIN,"path":"/vmessws","tls":"tls","sni":DOMAIN}
         none_tls_dict = {"v":"2","ps":user,"add":DOMAIN,"port":"80","id":uid,"aid":"0","net":"ws","type":"none","host":DOMAIN,"path":"/vmessws","tls":"","sni":""}
         link_tls = "vmess://" + base64.b64encode(json.dumps(tls_dict, separators=(',', ':')).encode('utf-8')).decode('utf-8')
         link_none = "vmess://" + base64.b64encode(json.dumps(none_tls_dict, separators=(',', ':')).encode('utf-8')).decode('utf-8')
-        res += f"LINK WS TLS : {link_tls}\n━━━━━━━━━━━━━━━━━━━━\nLINK WS NONE-TLS : {link_none}\n━━━━━━━━━━━━━━━━━━━━\n"
+        res += f"LINK WS TLS : {link_tls}%0A━━━━━━━━━━━━━━━━━━━━%0ALINK WS NONE-TLS : {link_none}%0A━━━━━━━━━━━━━━━━━━━━%0A"
         
     elif protocol == 'vless':
-        res += f"Port NONE-TLS : 80\nID : {uid}\nNetwork : Websocket\nWebsocket Path : /vlessws\n━━━━━━━━━━━━━━━━━━━━\n"
+        res += f"Port NONE-TLS : 80%0AID : {uid}%0ANetwork : Websocket%0AWebsocket Path : /vlessws%0A━━━━━━━━━━━━━━━━━━━━%0A"
         link_tls = f"vless://{uid}@{DOMAIN}:443?path=/vlessws&security=tls&encryption=none&host={DOMAIN}&type=ws&sni={DOMAIN}#{user}"
         link_none = f"vless://{uid}@{DOMAIN}:80?path=/vlessws&security=none&encryption=none&host={DOMAIN}&type=ws#{user}"
-        res += f"LINK WS TLS : {link_tls}\n━━━━━━━━━━━━━━━━━━━━\nLINK WS NONE-TLS : {link_none}\n━━━━━━━━━━━━━━━━━━━━\n"
+        res += f"LINK WS TLS : {link_tls}%0A━━━━━━━━━━━━━━━━━━━━%0ALINK WS NONE-TLS : {link_none}%0A━━━━━━━━━━━━━━━━━━━━%0A"
         
     elif protocol == 'trojan':
-        res += f"Password : {uid}\nNetwork : Websocket\nWebsocket Path : /trojanws\n━━━━━━━━━━━━━━━━━━━━\n"
+        res += f"Password : {uid}%0ANetwork : Websocket%0AWebsocket Path : /trojanws%0A━━━━━━━━━━━━━━━━━━━━%0A"
         link_tls = f"trojan://{uid}@{DOMAIN}:443?path=/trojanws&security=tls&host={DOMAIN}&type=ws&sni={DOMAIN}#{user}"
-        res += f"LINK WS TLS : {link_tls}\n━━━━━━━━━━━━━━━━━━━━\n"
+        res += f"LINK WS TLS : {link_tls}%0A━━━━━━━━━━━━━━━━━━━━%0A"
         
     res += f"Expired On : {exp_date_str}"
     return res
 
-@app.route('/user_legend/add-<protocol>ws', methods=['POST'])
+@app.route('/srpcom/add-<protocol>ws', methods=['POST'])
 def add_user(protocol):
     if not check_auth(): return jsonify({"stdout": "Unauthorized"}), 401
     data = request.json or {}
@@ -220,7 +222,7 @@ def add_user(protocol):
     detail_msg = generate_account_detail(protocol, user, uid, dt_str)
     return jsonify({"stdout": detail_msg})
 
-@app.route('/user_legend/trial-<protocol>ws', methods=['POST'])
+@app.route('/srpcom/trial-<protocol>ws', methods=['POST'])
 def trial_user(protocol):
     if not check_auth(): return jsonify({"stdout": "Unauthorized"}), 401
     data = request.json or {}
@@ -246,7 +248,7 @@ def trial_user(protocol):
     detail_msg = generate_account_detail(protocol, user, uid, dt_str, True)
     return jsonify({"stdout": detail_msg})
 
-@app.route('/user_legend/del-<protocol>ws', methods=['DELETE'])
+@app.route('/srpcom/del-<protocol>ws', methods=['DELETE'])
 def del_user(protocol):
     if not check_auth(): return jsonify({"stdout": "Unauthorized"}), 401
     data = request.json or {}
@@ -267,7 +269,7 @@ def del_user(protocol):
     restart_xray()
     return jsonify({"stdout": f"Success: {user} deleted."})
 
-@app.route('/user_legend/renew-<protocol>ws', methods=['POST'])
+@app.route('/srpcom/renew-<protocol>ws', methods=['POST'])
 def renew_user(protocol):
     if not check_auth(): return jsonify({"stdout": "Unauthorized"}), 401
     data = request.json or {}
@@ -292,7 +294,7 @@ def renew_user(protocol):
     if updated: return jsonify({"stdout": f"Success: {user} renewed."})
     return jsonify({"stdout": f"Error: User {user} not found."})
 
-@app.route('/user_legend/detail-<protocol>ws', methods=['GET', 'POST'])
+@app.route('/srpcom/detail-<protocol>ws', methods=['GET', 'POST'])
 def detail_user(protocol):
     if not check_auth(): return jsonify({"stdout": "Unauthorized"}), 401
     data = request.json or {}
@@ -321,7 +323,7 @@ def detail_user(protocol):
         
     return jsonify({"stdout": "Error: User not found"})
 
-@app.route('/user_legend/change-uuid', methods=['POST'])
+@app.route('/srpcom/change-uuid', methods=['POST'])
 def change_uuid():
     if not check_auth(): return jsonify({"stdout": "Unauthorized"}), 401
     data = request.json or {}
@@ -345,13 +347,13 @@ def change_uuid():
         return jsonify({"stdout": "Success: UUID changed."})
     return jsonify({"stdout": "Error: Old UUID not found."})
 
-@app.route('/user_legend/cek-xray', methods=['GET', 'POST'])
+@app.route('/srpcom/cek-xray', methods=['GET', 'POST'])
 def cek_xray():
     if not check_auth(): return jsonify({"stdout": "Unauthorized"}), 401
     out = subprocess.run(['systemctl', 'is-active', 'xray'], capture_output=True, text=True).stdout.strip()
     return jsonify({"stdout": f"Xray status: {out}"})
 
-@app.route('/user_legend/lock-xray', methods=['GET', 'POST'])
+@app.route('/srpcom/lock-xray', methods=['GET', 'POST'])
 def lock_xray():
     if not check_auth(): return jsonify({"stdout": "Unauthorized"}), 401
     user = (request.json or {}).get('user')
@@ -375,7 +377,7 @@ def lock_xray():
         return jsonify({"stdout": f"Success: {user} locked."})
     return jsonify({"stdout": "Error: User not found."})
 
-@app.route('/user_legend/unlock-xray', methods=['GET', 'POST'])
+@app.route('/srpcom/unlock-xray', methods=['GET', 'POST'])
 def unlock_xray():
     if not check_auth(): return jsonify({"stdout": "Unauthorized"}), 401
     user = (request.json or {}).get('user')
@@ -430,7 +432,7 @@ apt update && apt install caddy -y
 
 cat > /etc/caddy/Caddyfile << EOF
 http://$DOMAIN, https://$DOMAIN {
-    handle /user_legend/* {
+    handle /srpcom/* {
         reverse_proxy localhost:5000
     }
     handle / {
@@ -551,7 +553,7 @@ add_vmess_ws() {
     link_none_tls="vmess://$(echo -n "$none_tls_json" | jq -c . | base64 -w 0)"
     
     msg_terminal="━━━━━━━━━━━━━━━━━━━━
-[XRAY/VMESS WS]
+❖ XRAY/VMESS WS ❖
 ━━━━━━━━━━━━━━━━━━━━
 Remarks : ${user}
 Limit Quota : No Limit Quota User
@@ -571,7 +573,7 @@ LINK WS NONE-TLS : ${link_none_tls}
 EXPIRED ON : ${exp_date} ${exp_time} (${masaaktif} days)"
 
     msg_telegram="━━━━━━━━━━━━━━━━━━━━
-[XRAY/VMESS WS]
+❖ XRAY/VMESS WS ❖
 ━━━━━━━━━━━━━━━━━━━━
 Remarks : \`${user}\`
 Limit Quota : No Limit Quota User
@@ -622,7 +624,7 @@ add_vless_ws() {
     link_none_tls="vless://${uuid}@${DOMAIN}:80?path=/vlessws&security=none&encryption=none&host=${DOMAIN}&type=ws#${user}"
     
     msg_terminal="━━━━━━━━━━━━━━━━━━━━
-[XRAY/VLESS WS]
+❖ XRAY/VLESS WS ❖
 ━━━━━━━━━━━━━━━━━━━━
 Remarks : ${user}
 Limit Quota : No Limit Quota User
@@ -642,7 +644,7 @@ LINK WS NONE-TLS : ${link_none_tls}
 EXPIRED ON : ${exp_date} ${exp_time} (${masaaktif} days)"
 
     msg_telegram="━━━━━━━━━━━━━━━━━━━━
-[XRAY/VLESS WS]
+❖ XRAY/VLESS WS ❖
 ━━━━━━━━━━━━━━━━━━━━
 Remarks : \`${user}\`
 Limit Quota : No Limit Quota User
@@ -692,7 +694,7 @@ add_trojan_ws() {
     link_tls="trojan://${uuid}@${DOMAIN}:443?path=/trojanws&security=tls&host=${DOMAIN}&type=ws&sni=${DOMAIN}#${user}"
     
     msg_terminal="━━━━━━━━━━━━━━━━━━━━
-[XRAY/TROJAN WS]
+❖ XRAY/TROJAN WS ❖
 ━━━━━━━━━━━━━━━━━━━━
 Remarks : ${user}
 Limit Quota : No Limit Quota User
@@ -709,7 +711,7 @@ LINK WS TLS : ${link_tls}
 EXPIRED ON : ${exp_date} ${exp_time} (${masaaktif} days)"
 
     msg_telegram="━━━━━━━━━━━━━━━━━━━━
-[XRAY/TROJAN WS]
+❖ XRAY/TROJAN WS ❖
 ━━━━━━━━━━━━━━━━━━━━
 Remarks : \`${user}\`
 Limit Quota : No Limit Quota User
@@ -791,7 +793,7 @@ add_trial() {
     fi
     
     msg_terminal="━━━━━━━━━━━━━━━━━━━━
-[XRAY/${prot^^} WS TRIAL]
+❖ XRAY/${prot^^} WS TRIAL ❖
 ━━━━━━━━━━━━━━━━━━━━
 Remarks : ${user}
 IP Address : ${IP_ADD}
@@ -809,7 +811,7 @@ LINK WS TLS : ${link_tls}
     fi
     msg_terminal="${msg_terminal}\nEXPIRED ON : ${exp_date} ${exp_time} (${masaaktif})"
 
-    msg_telegram="━━━━━━━━━━━━━━━━━━━━\n[XRAY/${prot^^} WS TRIAL]\n━━━━━━━━━━━━━━━━━━━━\nRemarks : \`${user}\`\nIP Address : ${IP_ADD}\nDomain : ${DOMAIN}\nPort TLS : 443\nPort NONE-TLS : ${port_none}\nID/PW : \`${uuid}\`\nNetwork : Websocket\nWebsocket Path : ${path}\n━━━━━━━━━━━━━━━━━━━━\nLINK WS TLS : \`${link_tls}\`\n━━━━━━━━━━━━━━━━━━━━"
+    msg_telegram="━━━━━━━━━━━━━━━━━━━━\n❖ XRAY/${prot^^} WS TRIAL ❖\n━━━━━━━━━━━━━━━━━━━━\nRemarks : \`${user}\`\nIP Address : ${IP_ADD}\nDomain : ${DOMAIN}\nPort TLS : 443\nPort NONE-TLS : ${port_none}\nID/PW : \`${uuid}\`\nNetwork : Websocket\nWebsocket Path : ${path}\n━━━━━━━━━━━━━━━━━━━━\nLINK WS TLS : \`${link_tls}\`\n━━━━━━━━━━━━━━━━━━━━"
     if [[ "$prot" != "trojan" ]]; then
         msg_telegram="${msg_telegram}\nLINK WS NONE-TLS : \`${link_none_tls}\`\n━━━━━━━━━━━━━━━━━━━━"
     fi
@@ -1023,7 +1025,7 @@ show_detail() {
     from_menu=$3
     clear
     echo "━━━━━━━━━━━━━━━━━━━━"
-    echo "[XRAY/${prot^^} WS]"
+    echo "❖ XRAY/${prot^^} WS ❖"
     echo "━━━━━━━━━━━━━━━━━━━━"
     echo "Remarks : ${user}"
     echo "IP Address : ${IP_ADD}"
