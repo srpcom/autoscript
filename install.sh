@@ -164,32 +164,30 @@ def restart_xray():
 
 def generate_account_detail(protocol, user, uid, exp_date_str, is_trial=False):
     trial_txt = " TRIAL" if is_trial else ""
-    # Menggunakan %0A sebagai ganti \n agar website yang mengirim string mentah ke telegram tetap menjadi baris baru.
-    # Mengganti [ ] menjadi ❖ agar tidak tertelan format Markdown Telegram.
-    res = f"━━━━━━━━━━━━━━━━━━━━%0A❖ XRAY/{protocol.upper()} WS{trial_txt} ❖%0A━━━━━━━━━━━━━━━━━━━━%0A"
-    res += f"Remarks : {user}%0A"
-    res += f"IP Address : {IP_ADD}%0A"
-    res += f"Domain : {DOMAIN}%0A"
-    res += f"Port TLS : 443%0A"
+    res = f"━━━━━━━━━━━━━━━━━━━━\n❖ XRAY/{protocol.upper()} WS{trial_txt} ❖\n━━━━━━━━━━━━━━━━━━━━\n"
+    res += f"Remarks : {user}\n"
+    res += f"IP Address : {IP_ADD}\n"
+    res += f"Domain : {DOMAIN}\n"
+    res += f"Port TLS : 443\n"
     
     if protocol == 'vmess':
-        res += f"Port NONE-TLS : 80%0AID : {uid}%0ANetwork : Websocket%0AWebsocket Path : /vmessws%0A━━━━━━━━━━━━━━━━━━━━%0A"
+        res += f"Port NONE-TLS : 80\nID : {uid}\nNetwork : Websocket\nWebsocket Path : /vmessws\n━━━━━━━━━━━━━━━━━━━━\n"
         tls_dict = {"v":"2","ps":user,"add":DOMAIN,"port":"443","id":uid,"aid":"0","net":"ws","type":"none","host":DOMAIN,"path":"/vmessws","tls":"tls","sni":DOMAIN}
         none_tls_dict = {"v":"2","ps":user,"add":DOMAIN,"port":"80","id":uid,"aid":"0","net":"ws","type":"none","host":DOMAIN,"path":"/vmessws","tls":"","sni":""}
         link_tls = "vmess://" + base64.b64encode(json.dumps(tls_dict, separators=(',', ':')).encode('utf-8')).decode('utf-8')
         link_none = "vmess://" + base64.b64encode(json.dumps(none_tls_dict, separators=(',', ':')).encode('utf-8')).decode('utf-8')
-        res += f"LINK WS TLS : {link_tls}%0A━━━━━━━━━━━━━━━━━━━━%0ALINK WS NONE-TLS : {link_none}%0A━━━━━━━━━━━━━━━━━━━━%0A"
+        res += f"LINK WS TLS : {link_tls}\n━━━━━━━━━━━━━━━━━━━━\nLINK WS NONE-TLS : {link_none}\n━━━━━━━━━━━━━━━━━━━━\n"
         
     elif protocol == 'vless':
-        res += f"Port NONE-TLS : 80%0AID : {uid}%0ANetwork : Websocket%0AWebsocket Path : /vlessws%0A━━━━━━━━━━━━━━━━━━━━%0A"
+        res += f"Port NONE-TLS : 80\nID : {uid}\nNetwork : Websocket\nWebsocket Path : /vlessws\n━━━━━━━━━━━━━━━━━━━━\n"
         link_tls = f"vless://{uid}@{DOMAIN}:443?path=/vlessws&security=tls&encryption=none&host={DOMAIN}&type=ws&sni={DOMAIN}#{user}"
         link_none = f"vless://{uid}@{DOMAIN}:80?path=/vlessws&security=none&encryption=none&host={DOMAIN}&type=ws#{user}"
-        res += f"LINK WS TLS : {link_tls}%0A━━━━━━━━━━━━━━━━━━━━%0ALINK WS NONE-TLS : {link_none}%0A━━━━━━━━━━━━━━━━━━━━%0A"
+        res += f"LINK WS TLS : {link_tls}\n━━━━━━━━━━━━━━━━━━━━\nLINK WS NONE-TLS : {link_none}\n━━━━━━━━━━━━━━━━━━━━\n"
         
     elif protocol == 'trojan':
-        res += f"Password : {uid}%0ANetwork : Websocket%0AWebsocket Path : /trojanws%0A━━━━━━━━━━━━━━━━━━━━%0A"
+        res += f"Password : {uid}\nNetwork : Websocket\nWebsocket Path : /trojanws\n━━━━━━━━━━━━━━━━━━━━\n"
         link_tls = f"trojan://{uid}@{DOMAIN}:443?path=/trojanws&security=tls&host={DOMAIN}&type=ws&sni={DOMAIN}#{user}"
-        res += f"LINK WS TLS : {link_tls}%0A━━━━━━━━━━━━━━━━━━━━%0A"
+        res += f"LINK WS TLS : {link_tls}\n━━━━━━━━━━━━━━━━━━━━\n"
         
     res += f"Expired On : {exp_date_str}"
     return res
@@ -521,10 +519,13 @@ setup_autobackup_cron() {
     systemctl restart cron
 }
 
+# Fungsi kirim telegram yang jauh lebih aman menggunakan JQ untuk membungkus payload JSON (Mencegah terpotong simbol &)
 send_telegram() {
     local text="$1"
     if [[ "$AUTOSEND_STATUS" == "ON" && -n "$BOT_TOKEN" && -n "$CHAT_ID" ]]; then
-        curl -s -X POST "https://api.telegram.org/bot${BOT_TOKEN}/sendMessage" -d chat_id="${CHAT_ID}" -d text="$text" -d parse_mode="Markdown" >/dev/null 2>&1
+        curl -s -X POST "https://api.telegram.org/bot${BOT_TOKEN}/sendMessage" \
+            -H "Content-Type: application/json" \
+            -d "$(jq -n --arg chat_id "$CHAT_ID" --arg text "$text" --arg pm "Markdown" '{chat_id: $chat_id, text: $text, parse_mode: $pm}')" >/dev/null 2>&1
     fi
 }
 
@@ -807,15 +808,34 @@ Websocket Path : ${path}
 LINK WS TLS : ${link_tls}
 ━━━━━━━━━━━━━━━━━━━━"
     if [[ "$prot" != "trojan" ]]; then
-        msg_terminal="${msg_terminal}\nLINK WS NONE-TLS : ${link_none_tls}\n━━━━━━━━━━━━━━━━━━━━"
+        msg_terminal="${msg_terminal}
+LINK WS NONE-TLS : ${link_none_tls}
+━━━━━━━━━━━━━━━━━━━━"
     fi
-    msg_terminal="${msg_terminal}\nEXPIRED ON : ${exp_date} ${exp_time} (${masaaktif})"
+    msg_terminal="${msg_terminal}
+EXPIRED ON : ${exp_date} ${exp_time} (${masaaktif})"
 
-    msg_telegram="━━━━━━━━━━━━━━━━━━━━\n❖ XRAY/${prot^^} WS TRIAL ❖\n━━━━━━━━━━━━━━━━━━━━\nRemarks : \`${user}\`\nIP Address : ${IP_ADD}\nDomain : ${DOMAIN}\nPort TLS : 443\nPort NONE-TLS : ${port_none}\nID/PW : \`${uuid}\`\nNetwork : Websocket\nWebsocket Path : ${path}\n━━━━━━━━━━━━━━━━━━━━\nLINK WS TLS : \`${link_tls}\`\n━━━━━━━━━━━━━━━━━━━━"
+    msg_telegram="━━━━━━━━━━━━━━━━━━━━
+❖ XRAY/${prot^^} WS TRIAL ❖
+━━━━━━━━━━━━━━━━━━━━
+Remarks : \`${user}\`
+IP Address : ${IP_ADD}
+Domain : ${DOMAIN}
+Port TLS : 443
+Port NONE-TLS : ${port_none}
+ID/PW : \`${uuid}\`
+Network : Websocket
+Websocket Path : ${path}
+━━━━━━━━━━━━━━━━━━━━
+LINK WS TLS : \`${link_tls}\`
+━━━━━━━━━━━━━━━━━━━━"
     if [[ "$prot" != "trojan" ]]; then
-        msg_telegram="${msg_telegram}\nLINK WS NONE-TLS : \`${link_none_tls}\`\n━━━━━━━━━━━━━━━━━━━━"
+        msg_telegram="${msg_telegram}
+LINK WS NONE-TLS : \`${link_none_tls}\`
+━━━━━━━━━━━━━━━━━━━━"
     fi
-    msg_telegram="${msg_telegram}\nEXPIRED ON : ${exp_date} ${exp_time} (${masaaktif})"
+    msg_telegram="${msg_telegram}
+EXPIRED ON : ${exp_date} ${exp_time} (${masaaktif})"
 
     clear
     echo -e "$msg_terminal"
