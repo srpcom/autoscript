@@ -458,23 +458,37 @@ delete_xray() {
     echo "======================================"
     echo "          DELETE XRAY ACCOUNT         "
     echo "======================================"
-    read -p "Masukkan Username (Ketik 'x' untuk Batal): " user
-    if [ -z "$user" ]; then echo -e "\n=> Username tidak boleh kosong!"; sleep 1; menu_xray; return; fi
-    if [[ "$user" == "x" || "$user" == "X" ]]; then main_menu; return; fi
+    mapfile -t users < <(jq -r '.inbounds[].settings.clients[].email' /usr/local/etc/xray/config.json | sort -u)
+    
+    if [ ${#users[@]} -eq 0 ]; then
+        echo "Tidak ada akun untuk dihapus."
+        read -n 1 -s -r -p "Press any key to back..."
+        menu_xray; return
+    fi
 
-    cek=$(jq -r '.inbounds[].settings.clients[] | select(.email=="'$user'") | .email' /usr/local/etc/xray/config.json 2>/dev/null | head -n 1)
-    if [ "$cek" != "$user" ]; then echo -e "\n=> User '$user' tidak ditemukan!"; sleep 2; menu_xray; return; fi
-
-    jq '(.inbounds[].settings.clients) |= map(select(.email != "'$user'"))' /usr/local/etc/xray/config.json > /tmp/config.json
-    mv /tmp/config.json /usr/local/etc/xray/config.json
-    sed -i "/^$user /d" /usr/local/etc/xray/expiry.txt
-    systemctl restart xray
-
+    for i in "${!users[@]}"; do
+        echo "$((i+1)). ${users[$i]}"
+    done
+    echo " ————————————————————————————————————"
+    echo "0. Back to XRAY Menu"
+    echo "x. Back to Main Menu"
     echo "======================================"
-    echo "   Akun '$user' berhasil dihapus!"
-    echo "======================================"
-    read -n 1 -s -r -p "Press any key to back..."
-    menu_xray
+    read -p "Pilih nomor akun untuk dihapus [1-${#users[@]}]: " choice
+    
+    if [[ "$choice" == "0" ]]; then menu_xray; return; fi
+    if [[ "$choice" == "x" || "$choice" == "X" ]]; then main_menu; return; fi
+
+    if [[ "$choice" -gt 0 && "$choice" -le "${#users[@]}" ]]; then
+        user="${users[$((choice-1))]}"
+        jq '(.inbounds[].settings.clients) |= map(select(.email != "'$user'"))' /usr/local/etc/xray/config.json > /tmp/config.json
+        mv /tmp/config.json /usr/local/etc/xray/config.json
+        sed -i "/^$user /d" /usr/local/etc/xray/expiry.txt
+        systemctl restart xray
+        echo -e "\n=> Akun '$user' berhasil dihapus!"
+        sleep 2; menu_xray
+    else
+        echo -e "\n=> Pilihan tidak valid!"; sleep 1; delete_xray
+    fi
 }
 
 renew_xray() {
@@ -482,27 +496,42 @@ renew_xray() {
     echo "======================================"
     echo "          RENEW XRAY ACCOUNT          "
     echo "======================================"
-    read -p "Masukkan Username (Ketik 'x' untuk Batal): " user
-    if [ -z "$user" ]; then echo -e "\n=> Username tidak boleh kosong!"; sleep 1; menu_xray; return; fi
-    if [[ "$user" == "x" || "$user" == "X" ]]; then main_menu; return; fi
-
-    cek=$(jq -r '.inbounds[].settings.clients[] | select(.email=="'$user'") | .email' /usr/local/etc/xray/config.json 2>/dev/null | head -n 1)
-    if [ "$cek" != "$user" ]; then echo -e "\n=> User '$user' tidak ditemukan!"; sleep 2; menu_xray; return; fi
-
-    read -p "Tambah Masa Aktif (Hari): " masaaktif
-    current_exp=$(grep "^$user " /usr/local/etc/xray/expiry.txt | awk '{print $2}')
-    if [ -z "$current_exp" ]; then current_exp=$(date +"%Y-%m-%d"); fi
-    new_exp=$(date -d "$current_exp + $masaaktif days" +"%Y-%m-%d")
+    mapfile -t users < <(jq -r '.inbounds[].settings.clients[].email' /usr/local/etc/xray/config.json | sort -u)
     
-    sed -i "/^$user /d" /usr/local/etc/xray/expiry.txt
-    echo "$user $new_exp" >> /usr/local/etc/xray/expiry.txt
+    if [ ${#users[@]} -eq 0 ]; then
+        echo "Tidak ada akun untuk diperpanjang."
+        read -n 1 -s -r -p "Press any key to back..."
+        menu_xray; return
+    fi
 
+    for i in "${!users[@]}"; do
+        echo "$((i+1)). ${users[$i]}"
+    done
+    echo " ————————————————————————————————————"
+    echo "0. Back to XRAY Menu"
+    echo "x. Back to Main Menu"
     echo "======================================"
-    echo "   Akun '$user' diperpanjang $masaaktif Hari!"
-    echo "   Expired Baru: $new_exp"
-    echo "======================================"
-    read -n 1 -s -r -p "Press any key to back..."
-    menu_xray
+    read -p "Pilih nomor akun [1-${#users[@]}]: " choice
+    
+    if [[ "$choice" == "0" ]]; then menu_xray; return; fi
+    if [[ "$choice" == "x" || "$choice" == "X" ]]; then main_menu; return; fi
+
+    if [[ "$choice" -gt 0 && "$choice" -le "${#users[@]}" ]]; then
+        user="${users[$((choice-1))]}"
+        read -p "Tambah Masa Aktif (Hari): " masaaktif
+        current_exp=$(grep "^$user " /usr/local/etc/xray/expiry.txt | awk '{print $2}')
+        if [ -z "$current_exp" ]; then current_exp=$(date +"%Y-%m-%d"); fi
+        new_exp=$(date -d "$current_exp + $masaaktif days" +"%Y-%m-%d")
+        
+        sed -i "/^$user /d" /usr/local/etc/xray/expiry.txt
+        echo "$user $new_exp" >> /usr/local/etc/xray/expiry.txt
+        
+        echo -e "\n=> Akun '$user' diperpanjang $masaaktif Hari!"
+        echo "=> Expired Baru: $new_exp"
+        sleep 2; menu_xray
+    else
+        echo -e "\n=> Pilihan tidak valid!"; sleep 1; renew_xray
+    fi
 }
 
 list_xray() {
@@ -779,27 +808,20 @@ restore_xray() {
             ;;
         2)
             echo -e "\nMenggabungkan data (Merging)..."
-            # Buat folder sementara untuk ekstraksi
             mkdir -p /tmp/restore_temp
             tar -xzf "/root/$backup_name" -C /tmp/restore_temp 2>/dev/null
             
-            # 1. Merge Config JSON (VMESS clients)
-            # Menggunakan jq untuk menggabungkan array clients dan memastikan email unik
             jq -s '.[0].inbounds[0].settings.clients = (.[0].inbounds[0].settings.clients + .[1].inbounds[0].settings.clients | unique_by(.email)) | .[0]' \
                /usr/local/etc/xray/config.json /tmp/restore_temp/usr/local/etc/xray/config.json > /tmp/merged_v1.json
             
-            # 2. Merge Config JSON (VLESS clients)
             jq -s '.[0].inbounds[1].settings.clients = (.[0].inbounds[1].settings.clients + .[1].inbounds[1].settings.clients | unique_by(.email)) | .[0]' \
                /tmp/merged_v1.json /tmp/restore_temp/usr/local/etc/xray/config.json > /tmp/merged_v2.json
             
-            # 3. Merge Config JSON (TROJAN clients)
             jq -s '.[0].inbounds[2].settings.clients = (.[0].inbounds[2].settings.clients + .[1].inbounds[2].settings.clients | unique_by(.email)) | .[0]' \
                /tmp/merged_v2.json /tmp/restore_temp/usr/local/etc/xray/config.json > /tmp/merged_v3.json
             
             mv /tmp/merged_v3.json /usr/local/etc/xray/config.json
             
-            # 4. Merge Expiry.txt
-            # Menggabungkan, mengurutkan, dan hanya menyimpan nama unik (paling baru)
             cat /usr/local/etc/xray/expiry.txt /tmp/restore_temp/usr/local/etc/xray/expiry.txt | sort -k1,1 -k2,2r | sort -u -k1,1 > /tmp/merged_exp.txt
             mv /tmp/merged_exp.txt /usr/local/etc/xray/expiry.txt
             
@@ -917,19 +939,12 @@ fi
 echo -e "\n[8/9] Memasang Auto-Delete Cronjob..."
 cat > /usr/local/bin/xray-exp << 'EOF'
 #!/bin/bash
-# Script untuk mengecek dan menghapus user expired
 today_epoch=$(date +%s)
 restart_required=false
-
-if [ ! -f /usr/local/etc/xray/expiry.txt ]; then
-    exit 0
-fi
-
+if [ ! -f /usr/local/etc/xray/expiry.txt ]; then exit 0; fi
 while read -r user exp; do
     if [ -z "$user" ] || [ -z "$exp" ]; then continue; fi
-    
     exp_epoch=$(date -d "$exp 00:00:00" +%s 2>/dev/null)
-    
     if [[ -n "$exp_epoch" ]] && [[ $today_epoch -ge $exp_epoch ]]; then
         if jq '(.inbounds[].settings.clients) |= map(select(.email != "'$user'"))' /usr/local/etc/xray/config.json > /tmp/config.json; then
             mv /tmp/config.json /usr/local/etc/xray/config.json
@@ -938,10 +953,7 @@ while read -r user exp; do
         fi
     fi
 done < /usr/local/etc/xray/expiry.txt
-
-if [ "$restart_required" = true ]; then
-    systemctl restart xray
-fi
+if [ "$restart_required" = true ]; then systemctl restart xray; fi
 EOF
 chmod +x /usr/local/bin/xray-exp
 
@@ -962,6 +974,7 @@ echo "- Xray Port        : 10001 (VMESS), 10002 (VLESS), 10003 (TROJAN)"
 echo "- Reverse Proxy    : Caddy (Auto HTTPS Port 443 & 80)"
 echo "- Fitur Auto-Delete: Aktif (Mengecek Setiap Jam 00:00)"
 echo "- Fitur Telegram   : Tersedia di menu SETTINGS"
+echo "- Menu Delete/Renew: Sekarang menggunakan nomor urut"
 echo "======================================================"
 echo "Silakan ketik 'menu' untuk membuat akun VPN."
 echo "======================================================"
