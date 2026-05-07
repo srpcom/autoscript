@@ -167,7 +167,10 @@ if [ -z "$BOT_TOKEN" ] || [ -z "$CHAT_ID" ] || [ "$AUTOBACKUP_STATUS" == "OFF" ]
 MYIP=$(curl -sS --max-time 10 ipv4.icanhazip.com || curl -sS --max-time 10 ifconfig.me)
 XRAY_C=$(jq '[.inbounds[].settings.clients | length] | add' /usr/local/etc/xray/config.json 2>/dev/null || echo 0)
 
-BACKUP_FILE="/root/xray-backup-$(date +"%Y%m%d").tar.gz"
+# Nama file dengan format: xray-backup-YYYYMMDD HHMMSS.tar.gz
+BACKUP_NAME="xray-backup-$(date +"%Y%m%d %H%M%S").tar.gz"
+BACKUP_FILE="/root/$BACKUP_NAME"
+
 tar -czf "$BACKUP_FILE" -C / usr/local/etc/xray/config.json usr/local/etc/xray/expiry.txt usr/local/etc/xray/bot_setting.conf 2>/dev/null
 curl -s -F chat_id="${CHAT_ID}" -F document=@"${BACKUP_FILE}" -F caption="Auto Backup XRAY | $XRAY_C account | Server IP: $MYIP | Date: $(date)" "https://api.telegram.org/bot${BOT_TOKEN}/sendDocument" >/dev/null
 EOF
@@ -775,7 +778,10 @@ manual_backup_telegram() {
     MYIP=$(curl -sS --max-time 10 ipv4.icanhazip.com || curl -sS --max-time 10 ifconfig.me)
     XRAY_C=$(jq '[.inbounds[].settings.clients | length] | add' /usr/local/etc/xray/config.json 2>/dev/null || echo 0)
     
-    BACKUP_FILE="/root/xray-backup-$(date +"%Y%m%d").tar.gz"
+    # Nama file dengan format waktu: xray-backup-YYYYMMDD HHMMSS.tar.gz
+    BACKUP_NAME="xray-backup-$(date +"%Y%m%d %H%M%S").tar.gz"
+    BACKUP_FILE="/root/$BACKUP_NAME"
+
     tar -czf "$BACKUP_FILE" -C / usr/local/etc/xray/config.json usr/local/etc/xray/expiry.txt usr/local/etc/xray/bot_setting.conf 2>/dev/null
     
     echo "Sedang mengirim file backup ke Telegram..."
