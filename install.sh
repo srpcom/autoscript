@@ -163,9 +163,13 @@ cat > /usr/local/bin/xray-backup-bot << 'EOF'
 source /usr/local/etc/xray/bot_setting.conf
 if [ -z "$BOT_TOKEN" ] || [ -z "$CHAT_ID" ] || [ "$AUTOBACKUP_STATUS" == "OFF" ]; then exit 0; fi
 
+# Mengambil IP dan jumlah akun
+MYIP=$(curl -sS --max-time 10 ipv4.icanhazip.com || curl -sS --max-time 10 ifconfig.me)
+XRAY_C=$(jq '[.inbounds[].settings.clients | length] | add' /usr/local/etc/xray/config.json 2>/dev/null || echo 0)
+
 BACKUP_FILE="/root/xray-backup-$(date +"%Y%m%d").tar.gz"
 tar -czf "$BACKUP_FILE" -C / usr/local/etc/xray/config.json usr/local/etc/xray/expiry.txt usr/local/etc/xray/bot_setting.conf 2>/dev/null
-curl -s -F chat_id="${CHAT_ID}" -F document=@"${BACKUP_FILE}" -F caption="Auto Backup XRAY | Server IP: $(curl -sS ipv4.icanhazip.com) | Date: $(date)" "https://api.telegram.org/bot${BOT_TOKEN}/sendDocument" >/dev/null
+curl -s -F chat_id="${CHAT_ID}" -F document=@"${BACKUP_FILE}" -F caption="Auto Backup XRAY | $XRAY_C account | Server IP: $MYIP | Date: $(date)" "https://api.telegram.org/bot${BOT_TOKEN}/sendDocument" >/dev/null
 EOF
 chmod +x /usr/local/bin/xray-backup-bot
 
@@ -767,11 +771,15 @@ manual_backup_telegram() {
         sleep 3; menu_settings; return
     fi
     
+    # Mengambil IP dan jumlah akun untuk caption manual
+    MYIP=$(curl -sS --max-time 10 ipv4.icanhazip.com || curl -sS --max-time 10 ifconfig.me)
+    XRAY_C=$(jq '[.inbounds[].settings.clients | length] | add' /usr/local/etc/xray/config.json 2>/dev/null || echo 0)
+    
     BACKUP_FILE="/root/xray-backup-$(date +"%Y%m%d").tar.gz"
     tar -czf "$BACKUP_FILE" -C / usr/local/etc/xray/config.json usr/local/etc/xray/expiry.txt usr/local/etc/xray/bot_setting.conf 2>/dev/null
     
     echo "Sedang mengirim file backup ke Telegram..."
-    curl -s -F chat_id="${CHAT_ID}" -F document=@"${BACKUP_FILE}" -F caption="Manual Backup XRAY | Server IP: $VPS_IP | Date: $(date)" "https://api.telegram.org/bot${BOT_TOKEN}/sendDocument" > /dev/null
+    curl -s -F chat_id="${CHAT_ID}" -F document=@"${BACKUP_FILE}" -F caption="Manual Backup XRAY | $XRAY_C account | Server IP: $MYIP | Date: $(date)" "https://api.telegram.org/bot${BOT_TOKEN}/sendDocument" > /dev/null
     
     echo -e "\n\e[32m[SUCCESS]\e[0m Backup berhasil dikirim ke Telegram!"
     read -n 1 -s -r -p "Press any key to back..."
