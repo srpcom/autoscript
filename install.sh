@@ -14,12 +14,37 @@ clear
 echo "=========================================="
 echo "    MEMULAI INSTALASI XRAY & CADDY"
 echo "=========================================="
-# Meminta input domain dari user
-read -p "Masukkan Domain VPS Anda (contoh: sg1.srpcom.cloud): " DOMAIN
-if [ -z "$DOMAIN" ]; then
-    echo "Domain tidak boleh kosong!"
-    exit 1
+
+# Mendapatkan IP Publik VPS saat ini
+echo "Mendeteksi IP Publik VPS..."
+VPS_IP=$(curl -sS --max-time 5 ipv4.icanhazip.com)
+if [ -z "$VPS_IP" ]; then
+    VPS_IP=$(curl -sS --max-time 5 ifconfig.me)
 fi
+
+# Looping Validasi Domain
+while true; do
+    read -p "Masukkan Domain VPS Anda (contoh: sg1.srpcom.cloud): " DOMAIN
+    if [ -z "$DOMAIN" ]; then
+        echo -e "\e[31m[ERROR]\e[0m Domain tidak boleh kosong!\n"
+        continue
+    fi
+
+    echo -e "Memverifikasi resolusi DNS untuk \e[33m$DOMAIN\e[0m..."
+    # Mengecek kemana domain diarahkan (A Record)
+    DOMAIN_IP=$(getent ahostsv4 "$DOMAIN" | awk '{ print $1 }' | head -n 1)
+
+    if [ "$DOMAIN_IP" == "$VPS_IP" ]; then
+        echo -e "\e[32m[SUCCESS]\e[0m Domain valid! ($DOMAIN -> $VPS_IP)"
+        break
+    else
+        echo -e "\e[31m[ERROR] VERIFIKASI DOMAIN GAGAL!\e[0m"
+        echo -e "IP dari Domain : \e[31m${DOMAIN_IP:-TIDAK DITEMUKAN}\e[0m"
+        echo -e "IP VPS Asli    : \e[32m$VPS_IP\e[0m"
+        echo -e "\e[33m[Solusi]\e[0m Pastikan A Record di DNS Management mengarah ke IP $VPS_IP dan Proxy Cloudflare (ikon awan) berstatus ABU-ABU (DNS Only)."
+        echo -e "Tunggu sekitar 1-2 menit setelah merubah DNS, lalu coba masukkan lagi...\n"
+    fi
+done
 
 echo -e "\n[1/7] Memperbarui sistem & menginstal dependensi..."
 apt update && apt upgrade -y
