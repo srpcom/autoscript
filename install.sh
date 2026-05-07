@@ -247,7 +247,27 @@ add_vmess_ws() {
     link_tls="vmess://$(echo -n "$tls_json" | jq -c . | base64 -w 0)"
     link_none_tls="vmess://$(echo -n "$none_tls_json" | jq -c . | base64 -w 0)"
     
-    msg_format="━━━━━━━━━━━━━━━━━━━━
+    msg_terminal="━━━━━━━━━━━━━━━━━━━━
+[XRAY/VMESS WS]
+━━━━━━━━━━━━━━━━━━━━
+Remarks : ${user}
+Limit Quota : No Limit Quota User
+Limit IP : Not Active
+IP Address : ${IP_ADD}
+Domain : ${DOMAIN}
+Port TLS : 443
+Port NONE-TLS : 80
+ID : ${uuid}
+Network : Websocket
+Websocket Path : /vmessws
+━━━━━━━━━━━━━━━━━━━━
+LINK WS TLS : ${link_tls}
+━━━━━━━━━━━━━━━━━━━━
+LINK WS NONE-TLS : ${link_none_tls}
+━━━━━━━━━━━━━━━━━━━━
+EXPIRED ON : ${exp_date} (${masaaktif} days)"
+
+    msg_telegram="━━━━━━━━━━━━━━━━━━━━
 [XRAY/VMESS WS]
 ━━━━━━━━━━━━━━━━━━━━
 Remarks : \`${user}\`
@@ -268,8 +288,8 @@ LINK WS NONE-TLS : \`${link_none_tls}\`
 EXPIRED ON : ${exp_date} (${masaaktif} days)"
 
     clear
-    echo "$msg_format"
-    send_telegram "$msg_format"
+    echo "$msg_terminal"
+    send_telegram "$msg_telegram"
     
     echo ""
     read -n 1 -s -r -p "Press any key to back..."
@@ -297,7 +317,27 @@ add_vless_ws() {
     link_tls="vless://${uuid}@${DOMAIN}:443?path=/vlessws&security=tls&encryption=none&host=${DOMAIN}&type=ws&sni=${DOMAIN}#${user}"
     link_none_tls="vless://${uuid}@${DOMAIN}:80?path=/vlessws&security=none&encryption=none&host=${DOMAIN}&type=ws#${user}"
     
-    msg_format="━━━━━━━━━━━━━━━━━━━━
+    msg_terminal="━━━━━━━━━━━━━━━━━━━━
+[XRAY/VLESS WS]
+━━━━━━━━━━━━━━━━━━━━
+Remarks : ${user}
+Limit Quota : No Limit Quota User
+Limit IP : Not Active
+IP Address : ${IP_ADD}
+Domain : ${DOMAIN}
+Port TLS : 443
+Port NONE-TLS : 80
+ID : ${uuid}
+Network : Websocket
+Websocket Path : /vlessws
+━━━━━━━━━━━━━━━━━━━━
+LINK WS TLS : ${link_tls}
+━━━━━━━━━━━━━━━━━━━━
+LINK WS NONE-TLS : ${link_none_tls}
+━━━━━━━━━━━━━━━━━━━━
+EXPIRED ON : ${exp_date} (${masaaktif} days)"
+
+    msg_telegram="━━━━━━━━━━━━━━━━━━━━
 [XRAY/VLESS WS]
 ━━━━━━━━━━━━━━━━━━━━
 Remarks : \`${user}\`
@@ -318,8 +358,8 @@ LINK WS NONE-TLS : \`${link_none_tls}\`
 EXPIRED ON : ${exp_date} (${masaaktif} days)"
 
     clear
-    echo "$msg_format"
-    send_telegram "$msg_format"
+    echo "$msg_terminal"
+    send_telegram "$msg_telegram"
     
     echo ""
     read -n 1 -s -r -p "Press any key to back..."
@@ -346,7 +386,24 @@ add_trojan_ws() {
     
     link_tls="trojan://${uuid}@${DOMAIN}:443?path=/trojanws&security=tls&host=${DOMAIN}&type=ws&sni=${DOMAIN}#${user}"
     
-    msg_format="━━━━━━━━━━━━━━━━━━━━
+    msg_terminal="━━━━━━━━━━━━━━━━━━━━
+[XRAY/TROJAN WS]
+━━━━━━━━━━━━━━━━━━━━
+Remarks : ${user}
+Limit Quota : No Limit Quota User
+Limit IP : Not Active
+IP Address : ${IP_ADD}
+Domain : ${DOMAIN}
+Port TLS : 443
+Password : ${uuid}
+Network : Websocket
+Websocket Path : /trojanws
+━━━━━━━━━━━━━━━━━━━━
+LINK WS TLS : ${link_tls}
+━━━━━━━━━━━━━━━━━━━━
+EXPIRED ON : ${exp_date} (${masaaktif} days)"
+
+    msg_telegram="━━━━━━━━━━━━━━━━━━━━
 [XRAY/TROJAN WS]
 ━━━━━━━━━━━━━━━━━━━━
 Remarks : \`${user}\`
@@ -364,8 +421,8 @@ LINK WS TLS : \`${link_tls}\`
 EXPIRED ON : ${exp_date} (${masaaktif} days)"
 
     clear
-    echo "$msg_format"
-    send_telegram "$msg_format"
+    echo "$msg_terminal"
+    send_telegram "$msg_telegram"
     
     echo ""
     read -n 1 -s -r -p "Press any key to back..."
@@ -534,7 +591,7 @@ show_detail() {
     echo "━━━━━━━━━━━━━━━━━━━━"
     echo "[XRAY/${prot^^} WS]"
     echo "━━━━━━━━━━━━━━━━━━━━"
-    echo "Remarks : \`${user}\`"
+    echo "Remarks : ${user}"
     echo "IP Address : ${IP_ADD}"
     echo "Domain : ${DOMAIN}"
     echo "Port TLS : 443"
@@ -542,32 +599,32 @@ show_detail() {
     if [[ "$prot" == "vmess" ]]; then
         uuid=$(jq -r '.inbounds[] | select(.protocol=="vmess") | .settings.clients[] | select(.email=="'$user'") | .id' /usr/local/etc/xray/config.json)
         echo "Port NONE-TLS : 80"
-        echo "ID : \`${uuid}\`"
+        echo "ID : ${uuid}"
         echo "Network : Websocket"
         echo "Websocket Path : /vmessws"
         echo "━━━━━━━━━━━━━━━━━━━━"
         tls_json="{\"v\":\"2\",\"ps\":\"${user}\",\"add\":\"${DOMAIN}\",\"port\":\"443\",\"id\":\"${uuid}\",\"aid\":\"0\",\"net\":\"ws\",\"type\":\"none\",\"host\":\"${DOMAIN}\",\"path\":\"/vmessws\",\"tls\":\"tls\",\"sni\":\"${DOMAIN}\"}"
         none_tls_json="{\"v\":\"2\",\"ps\":\"${user}\",\"add\":\"${DOMAIN}\",\"port\":\"80\",\"id\":\"${uuid}\",\"aid\":\"0\",\"net\":\"ws\",\"type\":\"none\",\"host\":\"${DOMAIN}\",\"path\":\"/vmessws\",\"tls\":\"\",\"sni\":\"\"}"
-        echo "LINK WS TLS : \`vmess://$(echo -n "$tls_json" | jq -c . | base64 -w 0)\`"
+        echo "LINK WS TLS : vmess://$(echo -n "$tls_json" | jq -c . | base64 -w 0)"
         echo "━━━━━━━━━━━━━━━━━━━━"
-        echo "LINK WS NONE-TLS : \`vmess://$(echo -n "$none_tls_json" | jq -c . | base64 -w 0)\`"
+        echo "LINK WS NONE-TLS : vmess://$(echo -n "$none_tls_json" | jq -c . | base64 -w 0)"
     elif [[ "$prot" == "vless" ]]; then
         uuid=$(jq -r '.inbounds[] | select(.protocol=="vless") | .settings.clients[] | select(.email=="'$user'") | .id' /usr/local/etc/xray/config.json)
         echo "Port NONE-TLS : 80"
-        echo "ID : \`${uuid}\`"
+        echo "ID : ${uuid}"
         echo "Network : Websocket"
         echo "Websocket Path : /vlessws"
         echo "━━━━━━━━━━━━━━━━━━━━"
-        echo "LINK WS TLS : \`vless://${uuid}@${DOMAIN}:443?path=/vlessws&security=tls&encryption=none&host=${DOMAIN}&type=ws&sni=${DOMAIN}#${user}\`"
+        echo "LINK WS TLS : vless://${uuid}@${DOMAIN}:443?path=/vlessws&security=tls&encryption=none&host=${DOMAIN}&type=ws&sni=${DOMAIN}#${user}"
         echo "━━━━━━━━━━━━━━━━━━━━"
-        echo "LINK WS NONE-TLS : \`vless://${uuid}@${DOMAIN}:80?path=/vlessws&security=none&encryption=none&host=${DOMAIN}&type=ws#${user}\`"
+        echo "LINK WS NONE-TLS : vless://${uuid}@${DOMAIN}:80?path=/vlessws&security=none&encryption=none&host=${DOMAIN}&type=ws#${user}"
     elif [[ "$prot" == "trojan" ]]; then
         uuid=$(jq -r '.inbounds[] | select(.protocol=="trojan") | .settings.clients[] | select(.email=="'$user'") | .password' /usr/local/etc/xray/config.json)
-        echo "Password : \`${uuid}\`"
+        echo "Password : ${uuid}"
         echo "Network : Websocket"
         echo "Websocket Path : /trojanws"
         echo "━━━━━━━━━━━━━━━━━━━━"
-        echo "LINK WS TLS : \`trojan://${uuid}@${DOMAIN}:443?path=/trojanws&security=tls&host=${DOMAIN}&type=ws&sni=${DOMAIN}#${user}\`"
+        echo "LINK WS TLS : trojan://${uuid}@${DOMAIN}:443?path=/trojanws&security=tls&host=${DOMAIN}&type=ws&sni=${DOMAIN}#${user}"
     fi
     echo "━━━━━━━━━━━━━━━━━━━━"
     exp_date=$(grep "^$user " /usr/local/etc/xray/expiry.txt | awk '{print $2}')
