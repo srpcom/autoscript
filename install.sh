@@ -125,7 +125,7 @@ CHAT_ID=""
 AUTOBACKUP_STATUS="OFF"
 BACKUP_TIME="00:00"
 AUTOSEND_STATUS="OFF"
-EOF
+CONFIG_EOF
 
 echo -e "\n[4/9] Menginstal & Mengonfigurasi Caddy (Auto HTTPS)..."
 apt install -y debian-keyring debian-archive-keyring apt-transport-https
@@ -757,7 +757,7 @@ restore_xray() {
     echo "file backup (.tar.gz) ke folder /root/ "
     echo "menggunakan MobaXterm."
     echo "======================================"
-    read -p "Ketik nama file backup (misal: xray-backup-20260507.tar.gz) atau 'x' untuk batal : " backup_name
+    read -p "Nama file backup (misal: xray-backup.tar.gz) atau 'x' untuk batal : " backup_name
     
     if [ -z "$backup_name" ]; then menu_settings; return; fi
     if [[ "$backup_name" == "x" || "$backup_name" == "X" ]]; then main_menu; return; fi
@@ -766,11 +766,49 @@ restore_xray() {
         sleep 2; menu_settings; return
     fi
 
-    tar -xzf "/root/$backup_name" -C / 2>/dev/null
+    echo -e "\nMetode Restore:"
+    echo "1. Replace (Hapus user saat ini, ganti total dengan backup)"
+    echo "2. Merge   (Tambahkan user dari backup ke data saat ini)"
+    read -p "Pilih Metode [1-2]: " restore_mode
+
+    case $restore_mode in
+        1)
+            tar -xzf "/root/$backup_name" -C / 2>/dev/null
+            echo -e "\n\e[32m[SUCCESS]\e[0m Restore Replace Berhasil!"
+            ;;
+        2)
+            echo -e "\nMenggabungkan data (Merging)..."
+            # Buat folder sementara untuk ekstraksi
+            mkdir -p /tmp/restore_temp
+            tar -xzf "/root/$backup_name" -C /tmp/restore_temp 2>/dev/null
+            
+            # 1. Merge Config JSON (VMESS clients)
+            # Menggunakan jq untuk menggabungkan array clients dan memastikan email unik
+            jq -s '.[0].inbounds[0].settings.clients = (.[0].inbounds[0].settings.clients + .[1].inbounds[0].settings.clients | unique_by(.email)) | .[0]' \
+               /usr/local/etc/xray/config.json /tmp/restore_temp/usr/local/etc/xray/config.json > /tmp/merged_v1.json
+            
+            # 2. Merge Config JSON (VLESS clients)
+            jq -s '.[0].inbounds[1].settings.clients = (.[0].inbounds[1].settings.clients + .[1].inbounds[1].settings.clients | unique_by(.email)) | .[0]' \
+               /tmp/merged_v1.json /tmp/restore_temp/usr/local/etc/xray/config.json > /tmp/merged_v2.json
+            
+            # 3. Merge Config JSON (TROJAN clients)
+            jq -s '.[0].inbounds[2].settings.clients = (.[0].inbounds[2].settings.clients + .[1].inbounds[2].settings.clients | unique_by(.email)) | .[0]' \
+               /tmp/merged_v2.json /tmp/restore_temp/usr/local/etc/xray/config.json > /tmp/merged_v3.json
+            
+            mv /tmp/merged_v3.json /usr/local/etc/xray/config.json
+            
+            # 4. Merge Expiry.txt
+            # Menggabungkan, mengurutkan, dan hanya menyimpan nama unik (paling baru)
+            cat /usr/local/etc/xray/expiry.txt /tmp/restore_temp/usr/local/etc/xray/expiry.txt | sort -k1,1 -k2,2r | sort -u -k1,1 > /tmp/merged_exp.txt
+            mv /tmp/merged_exp.txt /usr/local/etc/xray/expiry.txt
+            
+            rm -rf /tmp/restore_temp
+            echo -e "\n\e[32m[SUCCESS]\e[0m Restore Merge Berhasil!"
+            ;;
+        *) echo "Batal."; sleep 1; menu_settings; return ;;
+    esac
+
     systemctl restart xray
-    
-    echo -e "\n\e[32m[SUCCESS]\e[0m Restore berhasil!"
-    echo "Data user, masa aktif, dan setting bot telah dikembalikan."
     echo "======================================"
     read -n 1 -s -r -p "Press any key to back..."
     menu_settings
