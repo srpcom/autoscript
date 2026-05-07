@@ -407,6 +407,132 @@ list_xray() {
     menu_xray
 }
 
+detail_xray() {
+    clear
+    echo "======================================"
+    echo "          DETAIL XRAY ACCOUNT         "
+    echo "======================================"
+    c_vm=$(jq '[.inbounds[] | select(.protocol=="vmess") | .settings.clients[]] | length' /usr/local/etc/xray/config.json 2>/dev/null || echo 0)
+    c_vl=$(jq '[.inbounds[] | select(.protocol=="vless") | .settings.clients[]] | length' /usr/local/etc/xray/config.json 2>/dev/null || echo 0)
+    c_tr=$(jq '[.inbounds[] | select(.protocol=="trojan") | .settings.clients[]] | length' /usr/local/etc/xray/config.json 2>/dev/null || echo 0)
+
+    echo "1. VMESS ($c_vm)"
+    echo "2. VLESS ($c_vl)"
+    echo "3. TROJAN ($c_tr)"
+    echo "0. Back to XRAY Menu"
+    echo "======================================"
+    read -p "Select Protocol [0-3]: " prot_opt
+    
+    case $prot_opt in
+        1) detail_list "vmess" ;;
+        2) detail_list "vless" ;;
+        3) detail_list "trojan" ;;
+        0) menu_xray ;;
+        *) echo -e "\n=> Pilihan tidak valid!"; sleep 1; detail_xray ;;
+    esac
+}
+
+detail_list() {
+    prot=$1
+    clear
+    echo "======================================"
+    # Membuat agar tulisan protokol jadi huruf besar (UPPERCASE)
+    echo "       SELECT ${prot^^} ACCOUNT       "
+    echo "======================================"
+    
+    # Membaca daftar user ke dalam format array Bash
+    mapfile -t users < <(jq -r '.inbounds[] | select(.protocol=="'$prot'") | .settings.clients[].email' /usr/local/etc/xray/config.json 2>/dev/null)
+    
+    # Jika tidak ada akun atau hasil null
+    if [ ${#users[@]} -eq 0 ] || [ -z "${users[0]}" ] || [ "${users[0]}" == "null" ]; then
+        echo "Tidak ada akun di protokol ini."
+        echo "======================================"
+        read -n 1 -s -r -p "Press any key to back..."
+        detail_xray
+        return
+    fi
+
+    # Menampilkan akun dengan nomor urut
+    for i in "${!users[@]}"; do
+        echo "$((i+1)). ${users[$i]}"
+    done
+    echo "0. Back to Protocol Selection"
+    echo "======================================"
+    read -p "Select Account [0-${#users[@]}]: " acc_opt
+    
+    if [[ "$acc_opt" == "0" ]]; then
+        detail_xray
+        return
+    elif [[ "$acc_opt" -gt 0 && "$acc_opt" -le "${#users[@]}" ]]; then
+        selected_user="${users[$((acc_opt-1))]}"
+        show_detail "$prot" "$selected_user"
+    else
+        echo -e "\n=> Pilihan tidak valid!"; sleep 1; detail_list "$prot"
+    fi
+}
+
+show_detail() {
+    prot=$1
+    user=$2
+    clear
+    echo "━━━━━━━━━━━━━━━━━━━━"
+    echo "[XRAY/${prot^^}_WS]"
+    echo "━━━━━━━━━━━━━━━━━━━━"
+    echo "Remarks : ${user}"
+    echo "IP Address : ${IP_ADD}"
+    echo "Domain : ${DOMAIN}"
+    echo "Port TLS : 443"
+    
+    if [[ "$prot" == "vmess" ]]; then
+        uuid=$(jq -r '.inbounds[] | select(.protocol=="vmess") | .settings.clients[] | select(.email=="'$user'") | .id' /usr/local/etc/xray/config.json)
+        echo "Port NONE-TLS : 80"
+        echo "ID : ${uuid}"
+        echo "Network : Websocket"
+        echo "Websocket Path : /vmessws"
+        echo "━━━━━━━━━━━━━━━━━━━━"
+        
+        tls_json="{\"v\":\"2\",\"ps\":\"${user}\",\"add\":\"${DOMAIN}\",\"port\":\"443\",\"id\":\"${uuid}\",\"aid\":\"0\",\"net\":\"ws\",\"type\":\"none\",\"host\":\"${DOMAIN}\",\"path\":\"/vmessws\",\"tls\":\"tls\",\"sni\":\"${DOMAIN}\"}"
+        none_tls_json="{\"v\":\"2\",\"ps\":\"${user}\",\"add\":\"${DOMAIN}\",\"port\":\"80\",\"id\":\"${uuid}\",\"aid\":\"0\",\"net\":\"ws\",\"type\":\"none\",\"host\":\"${DOMAIN}\",\"path\":\"/vmessws\",\"tls\":\"\",\"sni\":\"\"}"
+        link_tls="vmess://$(echo -n "$tls_json" | jq -c . | base64 -w 0)"
+        link_none_tls="vmess://$(echo -n "$none_tls_json" | jq -c . | base64 -w 0)"
+        
+        echo "LINK WS TLS : ${link_tls}"
+        echo "━━━━━━━━━━━━━━━━━━━━"
+        echo "LINK WS NONE-TLS : ${link_none_tls}"
+        
+    elif [[ "$prot" == "vless" ]]; then
+        uuid=$(jq -r '.inbounds[] | select(.protocol=="vless") | .settings.clients[] | select(.email=="'$user'") | .id' /usr/local/etc/xray/config.json)
+        echo "Port NONE-TLS : 80"
+        echo "ID : ${uuid}"
+        echo "Network : Websocket"
+        echo "Websocket Path : /vlessws"
+        echo "━━━━━━━━━━━━━━━━━━━━"
+        
+        link_tls="vless://${uuid}@${DOMAIN}:443?path=/vlessws&security=tls&encryption=none&host=${DOMAIN}&type=ws&sni=${DOMAIN}#${user}"
+        link_none_tls="vless://${uuid}@${DOMAIN}:80?path=/vlessws&security=none&encryption=none&host=${DOMAIN}&type=ws#${user}"
+        
+        echo "LINK WS TLS : ${link_tls}"
+        echo "━━━━━━━━━━━━━━━━━━━━"
+        echo "LINK WS NONE-TLS : ${link_none_tls}"
+        
+    elif [[ "$prot" == "trojan" ]]; then
+        uuid=$(jq -r '.inbounds[] | select(.protocol=="trojan") | .settings.clients[] | select(.email=="'$user'") | .password' /usr/local/etc/xray/config.json)
+        echo "Password : ${uuid}"
+        echo "Network : Websocket"
+        echo "Websocket Path : /trojanws"
+        echo "━━━━━━━━━━━━━━━━━━━━"
+        
+        link_tls="trojan://${uuid}@${DOMAIN}:443?path=/trojanws&security=tls&host=${DOMAIN}&type=ws&sni=${DOMAIN}#${user}"
+        
+        echo "LINK WS TLS : ${link_tls}"
+    fi
+    echo "━━━━━━━━━━━━━━━━━━━━"
+    echo "Expired On : Lifetime (Basic System)"
+    echo ""
+    read -n 1 -s -r -p "Press any key to back..."
+    detail_list "$prot"
+}
+
 menu_xray() {
     clear
     XRAY_VER=$(/usr/local/bin/xray version 2>/dev/null | head -n 1 | awk '{print $1" "$2}')
@@ -420,14 +546,16 @@ menu_xray() {
     echo "2. Delete XRAY Account"
     echo "3. Renew XRAY Account"
     echo "4. List XRAY Account"
+    echo "5. Detail XRAY Account"
     echo "0. Back to Main Menu"
     echo "======================================"
-    read -p "Please select an option [0-4]: " opt
+    read -p "Please select an option [0-5]: " opt
     case $opt in
         1) create_xray ;;
         2) delete_xray ;;
         3) renew_xray ;;
         4) list_xray ;;
+        5) detail_xray ;;
         0) main_menu ;;
         *) echo -e "\n=> Pilihan tidak valid!"; sleep 1; menu_xray ;;
     esac
