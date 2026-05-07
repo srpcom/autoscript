@@ -31,7 +31,6 @@ while true; do
     fi
 
     echo -e "Memverifikasi resolusi DNS untuk \e[33m$DOMAIN\e[0m..."
-    # Mengecek kemana domain diarahkan (A Record)
     DOMAIN_IP=$(getent ahostsv4 "$DOMAIN" | awk '{ print $1 }' | head -n 1)
 
     if [ "$DOMAIN_IP" == "$VPS_IP" ]; then
@@ -41,21 +40,21 @@ while true; do
         echo -e "\e[31m[ERROR] VERIFIKASI DOMAIN GAGAL!\e[0m"
         echo -e "IP dari Domain : \e[31m${DOMAIN_IP:-TIDAK DITEMUKAN}\e[0m"
         echo -e "IP VPS Asli    : \e[32m$VPS_IP\e[0m"
-        echo -e "\e[33m[Solusi]\e[0m Pastikan A Record di DNS Management mengarah ke IP $VPS_IP dan Proxy Cloudflare (ikon awan) berstatus ABU-ABU (DNS Only)."
+        echo -e "\e[33m[Solusi]\e[0m Pastikan A Record di DNS mengarah ke IP $VPS_IP dan Proxy Cloudflare berstatus ABU-ABU (DNS Only)."
         echo -e "Tunggu sekitar 1-2 menit setelah merubah DNS, lalu coba masukkan lagi...\n"
     fi
 done
 
-echo -e "\n[1/7] Memperbarui sistem & menginstal dependensi..."
+echo -e "\n[1/9] Memperbarui sistem & menginstal dependensi..."
 apt update && apt upgrade -y
-apt install curl wget unzip uuid-runtime jq tzdata ufw -y
+apt install curl wget unzip uuid-runtime jq tzdata ufw cron -y
 timedatectl set-timezone Asia/Jakarta
 
-echo -e "\n[2/7] Menginstal Xray-core..."
+echo -e "\n[2/9] Menginstal Xray-core..."
 bash -c "$(curl -L https://github.com/XTLS/Xray-install/raw/main/install-release.sh)" @ install
 systemctl enable xray
 
-echo -e "\n[3/7] Mengonfigurasi Xray (VMESS, VLESS, TROJAN)..."
+echo -e "\n[3/9] Mengonfigurasi Xray (VMESS, VLESS, TROJAN)..."
 rm -rf /usr/local/etc/xray/config.json
 cat > /usr/local/etc/xray/config.json << EOF
 {
@@ -118,8 +117,18 @@ cat > /usr/local/etc/xray/config.json << EOF
 EOF
 mkdir -p /var/log/xray
 chown -R nobody:nogroup /var/log/xray
+touch /usr/local/etc/xray/expiry.txt
 
-echo -e "\n[4/7] Menginstal & Mengonfigurasi Caddy (Auto HTTPS)..."
+# Membuat file konfigurasi bot Telegram
+cat > /usr/local/etc/xray/bot_setting.conf << 'EOF'
+BOT_TOKEN=""
+CHAT_ID=""
+AUTOBACKUP_STATUS="OFF"
+BACKUP_TIME="00:00"
+AUTOSEND_STATUS="OFF"
+EOF
+
+echo -e "\n[4/9] Menginstal & Mengonfigurasi Caddy (Auto HTTPS)..."
 apt install -y debian-keyring debian-archive-keyring apt-transport-https
 curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
 curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | tee /etc/apt/sources.list.d/caddy-stable.list
@@ -142,13 +151,25 @@ http://$DOMAIN, https://$DOMAIN {
 }
 EOF
 
-echo -e "\n[5/7] Mengatur Firewall (UFW)..."
+echo -e "\n[5/9] Mengatur Firewall (UFW)..."
 ufw allow 22/tcp
 ufw allow 80/tcp
 ufw allow 443/tcp
 ufw --force enable
 
-echo -e "\n[6/7] Membangun CLI Menu Interaktif..."
+echo -e "\n[6/9] Menyiapkan Script Eksekusi Telegram..."
+cat > /usr/local/bin/xray-backup-bot << 'EOF'
+#!/bin/bash
+source /usr/local/etc/xray/bot_setting.conf
+if [ -z "$BOT_TOKEN" ] || [ -z "$CHAT_ID" ] || [ "$AUTOBACKUP_STATUS" == "OFF" ]; then exit 0; fi
+
+BACKUP_FILE="/root/xray-backup-$(date +"%Y%m%d").tar.gz"
+tar -czf "$BACKUP_FILE" -C / usr/local/etc/xray/config.json usr/local/etc/xray/expiry.txt usr/local/etc/xray/bot_setting.conf 2>/dev/null
+curl -s -F chat_id="${CHAT_ID}" -F document=@"${BACKUP_FILE}" -F caption="Auto Backup XRAY | Server IP: $(curl -sS ipv4.icanhazip.com) | Date: $(date)" "https://api.telegram.org/bot${BOT_TOKEN}/sendDocument" >/dev/null
+EOF
+chmod +x /usr/local/bin/xray-backup-bot
+
+echo -e "\n[7/9] Membangun CLI Menu Interaktif..."
 cat > /usr/local/bin/menu << 'EOF'
 #!/bin/bash
 clear
@@ -175,42 +196,83 @@ SLOWDNS="157at"
 CLIENT_N="syam157"
 VER="1.3.0"
 
+# Memuat Setting Bot Telegram
+load_bot_setting() {
+    source /usr/local/etc/xray/bot_setting.conf
+}
+save_bot_setting() {
+    cat > /usr/local/etc/xray/bot_setting.conf << CONFIG_EOF
+BOT_TOKEN="${BOT_TOKEN}"
+CHAT_ID="${CHAT_ID}"
+AUTOBACKUP_STATUS="${AUTOBACKUP_STATUS}"
+BACKUP_TIME="${BACKUP_TIME}"
+AUTOSEND_STATUS="${AUTOSEND_STATUS}"
+CONFIG_EOF
+}
+setup_autobackup_cron() {
+    if [[ "$AUTOBACKUP_STATUS" == "ON" ]]; then
+        IFS=':' read -r HH MM <<< "$BACKUP_TIME"
+        echo "$MM $HH * * * root /usr/local/bin/xray-backup-bot" > /etc/cron.d/xray_autobackup
+    else
+        rm -f /etc/cron.d/xray_autobackup
+    fi
+    systemctl restart cron
+}
+
+# Fungsi Kirim Telegram
+send_telegram() {
+    local text="$1"
+    if [[ "$AUTOSEND_STATUS" == "ON" && -n "$BOT_TOKEN" && -n "$CHAT_ID" ]]; then
+        curl -s -X POST "https://api.telegram.org/bot${BOT_TOKEN}/sendMessage" -d chat_id="${CHAT_ID}" -d text="$text" >/dev/null 2>&1
+    fi
+}
+
 add_vmess_ws() {
     clear
+    load_bot_setting
     echo "======================================"
     echo "       CREATE VMESS WS ACCOUNT        "
     echo "======================================"
     read -p "Username : " user
     read -p "Expired (Days) : " masaaktif
     uuid=$(uuidgen)
-    exp=$(date -d "$masaaktif days" +"%Y-%m-%d %H:%M:%S WIB")
+    
+    exp_date=$(date -d "$masaaktif days" +"%Y-%m-%d")
+    echo "$user $exp_date" >> /usr/local/etc/xray/expiry.txt
+
     jq '(.inbounds[] | select(.protocol=="vmess") | .settings.clients) += [{"id": "'$uuid'", "alterId": 0, "email": "'$user'"}]' /usr/local/etc/xray/config.json > /tmp/config.json
     mv /tmp/config.json /usr/local/etc/xray/config.json
     systemctl restart xray
+    
     tls_json="{\"v\":\"2\",\"ps\":\"${user}\",\"add\":\"${DOMAIN}\",\"port\":\"443\",\"id\":\"${uuid}\",\"aid\":\"0\",\"net\":\"ws\",\"type\":\"none\",\"host\":\"${DOMAIN}\",\"path\":\"/vmessws\",\"tls\":\"tls\",\"sni\":\"${DOMAIN}\"}"
     none_tls_json="{\"v\":\"2\",\"ps\":\"${user}\",\"add\":\"${DOMAIN}\",\"port\":\"80\",\"id\":\"${uuid}\",\"aid\":\"0\",\"net\":\"ws\",\"type\":\"none\",\"host\":\"${DOMAIN}\",\"path\":\"/vmessws\",\"tls\":\"\",\"sni\":\"\"}"
     link_tls="vmess://$(echo -n "$tls_json" | jq -c . | base64 -w 0)"
     link_none_tls="vmess://$(echo -n "$none_tls_json" | jq -c . | base64 -w 0)"
+    
+    msg_format="━━━━━━━━━━━━━━━━━━━━
+[XRAY/VMESS_WS]
+━━━━━━━━━━━━━━━━━━━━
+Remarks : ${user}
+Limit Quota : No Limit Quota User
+Limit IP : Not Active
+IP Address : ${IP_ADD}
+Domain : ${DOMAIN}
+Port TLS : 443
+Port NONE-TLS : 80
+ID : ${uuid}
+Network : Websocket
+Websocket Path : /vmessws
+━━━━━━━━━━━━━━━━━━━━
+LINK WS TLS : ${link_tls}
+━━━━━━━━━━━━━━━━━━━━
+LINK WS NONE-TLS : ${link_none_tls}
+━━━━━━━━━━━━━━━━━━━━
+EXPIRED ON : ${exp_date} (${masaaktif} days)"
+
     clear
-    echo "━━━━━━━━━━━━━━━━━━━━"
-    echo "[XRAY/VMESS_WS]"
-    echo "━━━━━━━━━━━━━━━━━━━━"
-    echo "Remarks : ${user}"
-    echo "Limit Quota : No Limit Quota User"
-    echo "Limit IP : Not Active"
-    echo "IP Address : ${IP_ADD}"
-    echo "Domain : ${DOMAIN}"
-    echo "Port TLS : 443"
-    echo "Port NONE-TLS : 80"
-    echo "ID : ${uuid}"
-    echo "Network : Websocket"
-    echo "Websocket Path : /vmessws"
-    echo "━━━━━━━━━━━━━━━━━━━━"
-    echo "LINK WS TLS : ${link_tls}"
-    echo "━━━━━━━━━━━━━━━━━━━━"
-    echo "LINK WS NONE-TLS : ${link_none_tls}"
-    echo "━━━━━━━━━━━━━━━━━━━━"
-    echo "EXPIRED ON : ${exp} (${masaaktif} days)"
+    echo "$msg_format"
+    send_telegram "$msg_format"
+    
     echo ""
     read -n 1 -s -r -p "Press any key to back..."
     create_xray
@@ -218,38 +280,48 @@ add_vmess_ws() {
 
 add_vless_ws() {
     clear
+    load_bot_setting
     echo "======================================"
     echo "       CREATE VLESS WS ACCOUNT        "
     echo "======================================"
     read -p "Username : " user
     read -p "Expired (Days) : " masaaktif
     uuid=$(uuidgen)
-    exp=$(date -d "$masaaktif days" +"%Y-%m-%d %H:%M:%S WIB")
+    
+    exp_date=$(date -d "$masaaktif days" +"%Y-%m-%d")
+    echo "$user $exp_date" >> /usr/local/etc/xray/expiry.txt
+
     jq '(.inbounds[] | select(.protocol=="vless") | .settings.clients) += [{"id": "'$uuid'", "email": "'$user'"}]' /usr/local/etc/xray/config.json > /tmp/config.json
     mv /tmp/config.json /usr/local/etc/xray/config.json
     systemctl restart xray
+    
     link_tls="vless://${uuid}@${DOMAIN}:443?path=/vlessws&security=tls&encryption=none&host=${DOMAIN}&type=ws&sni=${DOMAIN}#${user}"
     link_none_tls="vless://${uuid}@${DOMAIN}:80?path=/vlessws&security=none&encryption=none&host=${DOMAIN}&type=ws#${user}"
+    
+    msg_format="━━━━━━━━━━━━━━━━━━━━
+[XRAY/VLESS_WS]
+━━━━━━━━━━━━━━━━━━━━
+Remarks : ${user}
+Limit Quota : No Limit Quota User
+Limit IP : Not Active
+IP Address : ${IP_ADD}
+Domain : ${DOMAIN}
+Port TLS : 443
+Port NONE-TLS : 80
+ID : ${uuid}
+Network : Websocket
+Websocket Path : /vlessws
+━━━━━━━━━━━━━━━━━━━━
+LINK WS TLS : ${link_tls}
+━━━━━━━━━━━━━━━━━━━━
+LINK WS NONE-TLS : ${link_none_tls}
+━━━━━━━━━━━━━━━━━━━━
+EXPIRED ON : ${exp_date} (${masaaktif} days)"
+
     clear
-    echo "━━━━━━━━━━━━━━━━━━━━"
-    echo "[XRAY/VLESS_WS]"
-    echo "━━━━━━━━━━━━━━━━━━━━"
-    echo "Remarks : ${user}"
-    echo "Limit Quota : No Limit Quota User"
-    echo "Limit IP : Not Active"
-    echo "IP Address : ${IP_ADD}"
-    echo "Domain : ${DOMAIN}"
-    echo "Port TLS : 443"
-    echo "Port NONE-TLS : 80"
-    echo "ID : ${uuid}"
-    echo "Network : Websocket"
-    echo "Websocket Path : /vlessws"
-    echo "━━━━━━━━━━━━━━━━━━━━"
-    echo "LINK WS TLS : ${link_tls}"
-    echo "━━━━━━━━━━━━━━━━━━━━"
-    echo "LINK WS NONE-TLS : ${link_none_tls}"
-    echo "━━━━━━━━━━━━━━━━━━━━"
-    echo "EXPIRED ON : ${exp} (${masaaktif} days)"
+    echo "$msg_format"
+    send_telegram "$msg_format"
+    
     echo ""
     read -n 1 -s -r -p "Press any key to back..."
     create_xray
@@ -257,34 +329,44 @@ add_vless_ws() {
 
 add_trojan_ws() {
     clear
+    load_bot_setting
     echo "======================================"
     echo "       CREATE TROJAN WS ACCOUNT       "
     echo "======================================"
     read -p "Username : " user
     read -p "Expired (Days) : " masaaktif
     uuid=$(uuidgen)
-    exp=$(date -d "$masaaktif days" +"%Y-%m-%d %H:%M:%S WIB")
+    
+    exp_date=$(date -d "$masaaktif days" +"%Y-%m-%d")
+    echo "$user $exp_date" >> /usr/local/etc/xray/expiry.txt
+
     jq '(.inbounds[] | select(.protocol=="trojan") | .settings.clients) += [{"password": "'$uuid'", "email": "'$user'"}]' /usr/local/etc/xray/config.json > /tmp/config.json
     mv /tmp/config.json /usr/local/etc/xray/config.json
     systemctl restart xray
+    
     link_tls="trojan://${uuid}@${DOMAIN}:443?path=/trojanws&security=tls&host=${DOMAIN}&type=ws&sni=${DOMAIN}#${user}"
+    
+    msg_format="━━━━━━━━━━━━━━━━━━━━
+[XRAY/TROJAN_WS]
+━━━━━━━━━━━━━━━━━━━━
+Remarks : ${user}
+Limit Quota : No Limit Quota User
+Limit IP : Not Active
+IP Address : ${IP_ADD}
+Domain : ${DOMAIN}
+Port TLS : 443
+Password : ${uuid}
+Network : Websocket
+Websocket Path : /trojanws
+━━━━━━━━━━━━━━━━━━━━
+LINK WS TLS : ${link_tls}
+━━━━━━━━━━━━━━━━━━━━
+EXPIRED ON : ${exp_date} (${masaaktif} days)"
+
     clear
-    echo "━━━━━━━━━━━━━━━━━━━━"
-    echo "[XRAY/TROJAN_WS]"
-    echo "━━━━━━━━━━━━━━━━━━━━"
-    echo "Remarks : ${user}"
-    echo "Limit Quota : No Limit Quota User"
-    echo "Limit IP : Not Active"
-    echo "IP Address : ${IP_ADD}"
-    echo "Domain : ${DOMAIN}"
-    echo "Port TLS : 443"
-    echo "Password : ${uuid}"
-    echo "Network : Websocket"
-    echo "Websocket Path : /trojanws"
-    echo "━━━━━━━━━━━━━━━━━━━━"
-    echo "LINK WS TLS : ${link_tls}"
-    echo "━━━━━━━━━━━━━━━━━━━━"
-    echo "EXPIRED ON : ${exp} (${masaaktif} days)"
+    echo "$msg_format"
+    send_telegram "$msg_format"
+    
     echo ""
     read -n 1 -s -r -p "Press any key to back..."
     create_xray
@@ -317,23 +399,14 @@ delete_xray() {
     echo "          DELETE XRAY ACCOUNT         "
     echo "======================================"
     read -p "Masukkan Username yang akan dihapus: " user
-    
-    if [ -z "$user" ]; then
-        echo -e "\n=> Username tidak boleh kosong!"
-        sleep 1; menu_xray; return
-    fi
+    if [ -z "$user" ]; then echo -e "\n=> Username tidak boleh kosong!"; sleep 1; menu_xray; return; fi
 
-    # Cek apakah user ada di dalam config
     cek=$(jq -r '.inbounds[].settings.clients[] | select(.email=="'$user'") | .email' /usr/local/etc/xray/config.json 2>/dev/null | head -n 1)
-    
-    if [ "$cek" != "$user" ]; then
-        echo -e "\n=> User '$user' tidak ditemukan!"
-        sleep 2; menu_xray; return
-    fi
+    if [ "$cek" != "$user" ]; then echo -e "\n=> User '$user' tidak ditemukan!"; sleep 2; menu_xray; return; fi
 
-    # Menghapus user dari semua inbound menggunakan jq
     jq '(.inbounds[].settings.clients) |= map(select(.email != "'$user'"))' /usr/local/etc/xray/config.json > /tmp/config.json
     mv /tmp/config.json /usr/local/etc/xray/config.json
+    sed -i "/^$user /d" /usr/local/etc/xray/expiry.txt
     systemctl restart xray
 
     echo "======================================"
@@ -348,22 +421,21 @@ renew_xray() {
     echo "======================================"
     echo "          RENEW XRAY ACCOUNT          "
     echo "======================================"
-    echo "Catatan: Pada versi Basic ini, akun tidak "
-    echo "terhapus otomatis (Lifetime). Fitur ini "
-    echo "hanya formalitas perpanjangan UI."
-    echo "======================================"
     read -p "Masukkan Username: " user
-    
     cek=$(jq -r '.inbounds[].settings.clients[] | select(.email=="'$user'") | .email' /usr/local/etc/xray/config.json 2>/dev/null | head -n 1)
-    
-    if [ "$cek" != "$user" ]; then
-        echo -e "\n=> User '$user' tidak ditemukan!"
-        sleep 2; menu_xray; return
-    fi
+    if [ "$cek" != "$user" ]; then echo -e "\n=> User '$user' tidak ditemukan!"; sleep 2; menu_xray; return; fi
 
     read -p "Tambah Masa Aktif (Hari): " masaaktif
+    current_exp=$(grep "^$user " /usr/local/etc/xray/expiry.txt | awk '{print $2}')
+    if [ -z "$current_exp" ]; then current_exp=$(date +"%Y-%m-%d"); fi
+    new_exp=$(date -d "$current_exp + $masaaktif days" +"%Y-%m-%d")
+    
+    sed -i "/^$user /d" /usr/local/etc/xray/expiry.txt
+    echo "$user $new_exp" >> /usr/local/etc/xray/expiry.txt
+
     echo "======================================"
     echo "   Akun '$user' diperpanjang $masaaktif Hari!"
+    echo "   Expired Baru: $new_exp"
     echo "======================================"
     read -n 1 -s -r -p "Press any key to back..."
     menu_xray
@@ -374,34 +446,21 @@ list_xray() {
     echo "======================================"
     echo "          LIST XRAY ACCOUNTS          "
     echo "======================================"
-    
     echo -e "\n\e[32m[ VMESS WS ]\e[0m"
     echo "--------------------------------------"
     vmess_users=$(jq -r '.inbounds[] | select(.protocol=="vmess") | .settings.clients[].email' /usr/local/etc/xray/config.json 2>/dev/null)
-    if [ -z "$vmess_users" ] || [ "$vmess_users" == "null" ]; then
-        echo "Tidak ada akun."
-    else
-        echo "$vmess_users" | awk '{print "- " $0}'
-    fi
-
+    if [ -z "$vmess_users" ] || [ "$vmess_users" == "null" ]; then echo "Tidak ada akun."; else echo "$vmess_users" | awk '{print "- " $0}'; fi
+    
     echo -e "\n\e[32m[ VLESS WS ]\e[0m"
     echo "--------------------------------------"
     vless_users=$(jq -r '.inbounds[] | select(.protocol=="vless") | .settings.clients[].email' /usr/local/etc/xray/config.json 2>/dev/null)
-    if [ -z "$vless_users" ] || [ "$vless_users" == "null" ]; then
-        echo "Tidak ada akun."
-    else
-        echo "$vless_users" | awk '{print "- " $0}'
-    fi
-
+    if [ -z "$vless_users" ] || [ "$vless_users" == "null" ]; then echo "Tidak ada akun."; else echo "$vless_users" | awk '{print "- " $0}'; fi
+    
     echo -e "\n\e[32m[ TROJAN WS ]\e[0m"
     echo "--------------------------------------"
     trojan_users=$(jq -r '.inbounds[] | select(.protocol=="trojan") | .settings.clients[].email' /usr/local/etc/xray/config.json 2>/dev/null)
-    if [ -z "$trojan_users" ] || [ "$trojan_users" == "null" ]; then
-        echo "Tidak ada akun."
-    else
-        echo "$trojan_users" | awk '{print "- " $0}'
-    fi
-
+    if [ -z "$trojan_users" ] || [ "$trojan_users" == "null" ]; then echo "Tidak ada akun."; else echo "$trojan_users" | awk '{print "- " $0}'; fi
+    
     echo -e "\n======================================"
     read -n 1 -s -r -p "Press any key to back..."
     menu_xray
@@ -422,7 +481,6 @@ detail_xray() {
     echo "0. Back to XRAY Menu"
     echo "======================================"
     read -p "Select Protocol [0-3]: " prot_opt
-    
     case $prot_opt in
         1) detail_list "vmess" ;;
         2) detail_list "vless" ;;
@@ -436,33 +494,21 @@ detail_list() {
     prot=$1
     clear
     echo "======================================"
-    # Membuat agar tulisan protokol jadi huruf besar (UPPERCASE)
     echo "       SELECT ${prot^^} ACCOUNT       "
     echo "======================================"
-    
-    # Membaca daftar user ke dalam format array Bash
     mapfile -t users < <(jq -r '.inbounds[] | select(.protocol=="'$prot'") | .settings.clients[].email' /usr/local/etc/xray/config.json 2>/dev/null)
-    
-    # Jika tidak ada akun atau hasil null
     if [ ${#users[@]} -eq 0 ] || [ -z "${users[0]}" ] || [ "${users[0]}" == "null" ]; then
         echo "Tidak ada akun di protokol ini."
         echo "======================================"
         read -n 1 -s -r -p "Press any key to back..."
-        detail_xray
-        return
+        detail_xray; return
     fi
-
-    # Menampilkan akun dengan nomor urut
-    for i in "${!users[@]}"; do
-        echo "$((i+1)). ${users[$i]}"
-    done
+    for i in "${!users[@]}"; do echo "$((i+1)). ${users[$i]}"; done
     echo "0. Back to Protocol Selection"
     echo "======================================"
     read -p "Select Account [0-${#users[@]}]: " acc_opt
     
-    if [[ "$acc_opt" == "0" ]]; then
-        detail_xray
-        return
+    if [[ "$acc_opt" == "0" ]]; then detail_xray; return
     elif [[ "$acc_opt" -gt 0 && "$acc_opt" -le "${#users[@]}" ]]; then
         selected_user="${users[$((acc_opt-1))]}"
         show_detail "$prot" "$selected_user"
@@ -490,16 +536,11 @@ show_detail() {
         echo "Network : Websocket"
         echo "Websocket Path : /vmessws"
         echo "━━━━━━━━━━━━━━━━━━━━"
-        
         tls_json="{\"v\":\"2\",\"ps\":\"${user}\",\"add\":\"${DOMAIN}\",\"port\":\"443\",\"id\":\"${uuid}\",\"aid\":\"0\",\"net\":\"ws\",\"type\":\"none\",\"host\":\"${DOMAIN}\",\"path\":\"/vmessws\",\"tls\":\"tls\",\"sni\":\"${DOMAIN}\"}"
         none_tls_json="{\"v\":\"2\",\"ps\":\"${user}\",\"add\":\"${DOMAIN}\",\"port\":\"80\",\"id\":\"${uuid}\",\"aid\":\"0\",\"net\":\"ws\",\"type\":\"none\",\"host\":\"${DOMAIN}\",\"path\":\"/vmessws\",\"tls\":\"\",\"sni\":\"\"}"
-        link_tls="vmess://$(echo -n "$tls_json" | jq -c . | base64 -w 0)"
-        link_none_tls="vmess://$(echo -n "$none_tls_json" | jq -c . | base64 -w 0)"
-        
-        echo "LINK WS TLS : ${link_tls}"
+        echo "LINK WS TLS : vmess://$(echo -n "$tls_json" | jq -c . | base64 -w 0)"
         echo "━━━━━━━━━━━━━━━━━━━━"
-        echo "LINK WS NONE-TLS : ${link_none_tls}"
-        
+        echo "LINK WS NONE-TLS : vmess://$(echo -n "$none_tls_json" | jq -c . | base64 -w 0)"
     elif [[ "$prot" == "vless" ]]; then
         uuid=$(jq -r '.inbounds[] | select(.protocol=="vless") | .settings.clients[] | select(.email=="'$user'") | .id' /usr/local/etc/xray/config.json)
         echo "Port NONE-TLS : 80"
@@ -507,27 +548,21 @@ show_detail() {
         echo "Network : Websocket"
         echo "Websocket Path : /vlessws"
         echo "━━━━━━━━━━━━━━━━━━━━"
-        
-        link_tls="vless://${uuid}@${DOMAIN}:443?path=/vlessws&security=tls&encryption=none&host=${DOMAIN}&type=ws&sni=${DOMAIN}#${user}"
-        link_none_tls="vless://${uuid}@${DOMAIN}:80?path=/vlessws&security=none&encryption=none&host=${DOMAIN}&type=ws#${user}"
-        
-        echo "LINK WS TLS : ${link_tls}"
+        echo "LINK WS TLS : vless://${uuid}@${DOMAIN}:443?path=/vlessws&security=tls&encryption=none&host=${DOMAIN}&type=ws&sni=${DOMAIN}#${user}"
         echo "━━━━━━━━━━━━━━━━━━━━"
-        echo "LINK WS NONE-TLS : ${link_none_tls}"
-        
+        echo "LINK WS NONE-TLS : vless://${uuid}@${DOMAIN}:80?path=/vlessws&security=none&encryption=none&host=${DOMAIN}&type=ws#${user}"
     elif [[ "$prot" == "trojan" ]]; then
         uuid=$(jq -r '.inbounds[] | select(.protocol=="trojan") | .settings.clients[] | select(.email=="'$user'") | .password' /usr/local/etc/xray/config.json)
         echo "Password : ${uuid}"
         echo "Network : Websocket"
         echo "Websocket Path : /trojanws"
         echo "━━━━━━━━━━━━━━━━━━━━"
-        
-        link_tls="trojan://${uuid}@${DOMAIN}:443?path=/trojanws&security=tls&host=${DOMAIN}&type=ws&sni=${DOMAIN}#${user}"
-        
-        echo "LINK WS TLS : ${link_tls}"
+        echo "LINK WS TLS : trojan://${uuid}@${DOMAIN}:443?path=/trojanws&security=tls&host=${DOMAIN}&type=ws&sni=${DOMAIN}#${user}"
     fi
     echo "━━━━━━━━━━━━━━━━━━━━"
-    echo "Expired On : Lifetime (Basic System)"
+    exp_date=$(grep "^$user " /usr/local/etc/xray/expiry.txt | awk '{print $2}')
+    if [ -z "$exp_date" ]; then exp_date="Lifetime / No Exp"; fi
+    echo "Expired On : $exp_date"
     echo ""
     read -n 1 -s -r -p "Press any key to back..."
     detail_list "$prot"
@@ -551,13 +586,143 @@ menu_xray() {
     echo "======================================"
     read -p "Please select an option [0-5]: " opt
     case $opt in
-        1) create_xray ;;
-        2) delete_xray ;;
-        3) renew_xray ;;
-        4) list_xray ;;
-        5) detail_xray ;;
-        0) main_menu ;;
+        1) create_xray ;; 2) delete_xray ;; 3) renew_xray ;; 
+        4) list_xray ;; 5) detail_xray ;; 0) main_menu ;;
         *) echo -e "\n=> Pilihan tidak valid!"; sleep 1; menu_xray ;;
+    esac
+}
+
+# --- MENU SETTINGS & TELEGRAM ---
+
+menu_autobackup() {
+    clear
+    load_bot_setting
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo "   » Backup Data Via Telegram Bot «"
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo " Status Autobackup Data Via Bot Is [$AUTOBACKUP_STATUS]"
+    echo "   [1]  Start Backup Data (Enable Autobackup)"
+    echo "   [2]  Change Api Bot & Chat ID"
+    echo "   [3]  Change Backup Time (Current: $BACKUP_TIME)"
+    echo "   [4]  Stop Autobackup Data (Disable Autobackup)"
+    echo "   [0]  back"
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    read -p "   Select From Options [1-4 or 0] : " opt
+    case $opt in
+        1) AUTOBACKUP_STATUS="ON"; save_bot_setting; setup_autobackup_cron; echo "Autobackup Enabled!"; sleep 1; menu_autobackup ;;
+        2) 
+            read -p "Input New API Bot: " new_api; BOT_TOKEN="$new_api"
+            read -p "Input New Chat ID: " new_id; CHAT_ID="$new_id"
+            save_bot_setting; echo "Data Bot Tersimpan!"; sleep 1; menu_autobackup ;;
+        3) 
+            read -p "Input New Time (HH:MM) [ex: 23:00] : " new_time
+            BACKUP_TIME="$new_time"; save_bot_setting; setup_autobackup_cron; echo "Waktu Backup Diubah!"; sleep 1; menu_autobackup ;;
+        4) AUTOBACKUP_STATUS="OFF"; save_bot_setting; setup_autobackup_cron; echo "Autobackup Disabled!"; sleep 1; menu_autobackup ;;
+        0) menu_settings ;;
+        *) menu_autobackup ;;
+    esac
+}
+
+menu_autosend() {
+    clear
+    load_bot_setting
+    echo "======================"
+    echo "AUTOSEND ACCOUNT VPN"
+    echo "AFTER CREATED"
+    echo "======================"
+    echo "STATUS AUTOSEND ACCOUNT ($AUTOSEND_STATUS !)"
+    echo "Current IDtelegram : $CHAT_ID"
+    echo "Current API BOT : $BOT_TOKEN"
+    echo "======================"
+    echo " [1] Change User ID (warn: don't use id group)"
+    echo " [2] Change API BOT TELEGRAM"
+    if [ "$AUTOSEND_STATUS" == "ON" ]; then
+        echo " [3] Stop AUTOSEND ACCOUNT"
+    else
+        echo " [3] Start AUTOSEND ACCOUNT"
+    fi
+    echo " [0] back"
+    echo ""
+    read -p " Select From Options [1-3 or 0] : " opt
+    case $opt in
+        1) read -p "Input New Chat ID: " new_id; CHAT_ID="$new_id"; save_bot_setting; menu_autosend ;;
+        2) read -p "Input New API Bot: " new_api; BOT_TOKEN="$new_api"; save_bot_setting; menu_autosend ;;
+        3) 
+            if [ "$AUTOSEND_STATUS" == "ON" ]; then AUTOSEND_STATUS="OFF"; else AUTOSEND_STATUS="ON"; fi
+            save_bot_setting; menu_autosend ;;
+        0) menu_settings ;;
+        *) menu_autosend ;;
+    esac
+}
+
+manual_backup_telegram() {
+    clear
+    load_bot_setting
+    echo "======================================"
+    echo "     MANUAL BACKUP VIA TELEGRAM       "
+    echo "======================================"
+    if [ -z "$BOT_TOKEN" ] || [ -z "$CHAT_ID" ]; then
+        echo "API Bot atau Chat ID belum disetting!"
+        echo "Silakan setting di menu Autobackup/Autosend terlebih dahulu."
+        sleep 3; menu_settings; return
+    fi
+    
+    BACKUP_FILE="/root/xray-backup-$(date +"%Y%m%d").tar.gz"
+    tar -czf "$BACKUP_FILE" -C / usr/local/etc/xray/config.json usr/local/etc/xray/expiry.txt usr/local/etc/xray/bot_setting.conf 2>/dev/null
+    
+    echo "Sedang mengirim file backup ke Telegram..."
+    curl -s -F chat_id="${CHAT_ID}" -F document=@"${BACKUP_FILE}" -F caption="Manual Backup XRAY | Server IP: $VPS_IP | Date: $(date)" "https://api.telegram.org/bot${BOT_TOKEN}/sendDocument" > /dev/null
+    
+    echo -e "\n\e[32m[SUCCESS]\e[0m Backup berhasil dikirim ke Telegram!"
+    read -n 1 -s -r -p "Press any key to back..."
+    menu_settings
+}
+
+restore_xray() {
+    clear
+    echo "======================================"
+    echo "          RESTORE DATA via VPS        "
+    echo "======================================"
+    echo "PENTING: Pastikan Anda sudah mengupload"
+    echo "file backup (.tar.gz) ke folder /root/ "
+    echo "menggunakan MobaXterm."
+    echo "======================================"
+    read -p "Ketik nama file backup (misal: xray-backup-20260507.tar.gz) : " backup_name
+    
+    if [ -z "$backup_name" ]; then menu_settings; return; fi
+    if [ ! -f "/root/$backup_name" ]; then
+        echo -e "\n\e[31m[ERROR]\e[0m File /root/$backup_name tidak ditemukan!"
+        sleep 2; menu_settings; return
+    fi
+
+    tar -xzf "/root/$backup_name" -C / 2>/dev/null
+    systemctl restart xray
+    
+    echo -e "\n\e[32m[SUCCESS]\e[0m Restore berhasil!"
+    echo "Data user, masa aktif, dan setting bot telah dikembalikan."
+    echo "======================================"
+    read -n 1 -s -r -p "Press any key to back..."
+    menu_settings
+}
+
+menu_settings() {
+    clear
+    echo "▶ BACKUP & RESTORE / SETTINGS"
+    echo ""
+    echo " [1] AUTOBACKUP VIA BOT TELEGRAM"
+    echo " [2] AUTOSEND CREATED VPN VIA BOT"
+    echo " [3] BACKUP VIA BOT TELEGRAM (MANUAL)"
+    echo " [4] RESTORE DATA via VPS"
+    echo " [0] Back to Main Menu"
+    echo ""
+    read -p " Select option [0-4]: " opt
+    case $opt in
+        1) menu_autobackup ;;
+        2) menu_autosend ;;
+        3) manual_backup_telegram ;;
+        4) restore_xray ;;
+        0) main_menu ;;
+        *) menu_settings ;;
     esac
 }
 
@@ -590,25 +755,24 @@ main_menu() {
     echo "║              MAIN MENU             ║"
     echo "╚════════════════════════════════════╝"
     echo "1. MENU XRAY"
-    echo "2. RESTART SERVICES (Xray & Caddy)"
-    echo "3. CEK STATUS SERVICES"
+    echo "2. SETTINGS (Backup/Restore/Bot)"
+    echo "3. RESTART SERVICES (Xray & Caddy)"
+    echo "4. CEK STATUS SERVICES"
     echo "0. Exit"
     echo "══════════════════════════════════════"
     echo "EXP SCRIPT: 2272-09-04 (89970 days)"
     echo "REGIST BY : 5666536947 (id telegram)"
     echo "══════════════════════════════════════"
-    read -p "Please select an option [0-3]: " opt
+    read -p "Please select an option [0-4]: " opt
     case $opt in
         1) menu_xray ;;
-        2) 
-            echo -e "\n=> Restarting Xray & Caddy..."
-            systemctl restart xray
-            systemctl restart caddy
-            echo -e "=> Done!"
-            sleep 1.5
-            main_menu 
-            ;;
+        2) menu_settings ;;
         3) 
+            echo -e "\n=> Restarting Xray & Caddy..."
+            systemctl restart xray caddy cron
+            echo -e "=> Done!"
+            sleep 1.5; main_menu ;;
+        4) 
             clear
             echo "======================================"
             echo "          STATUS SERVICES             "
@@ -618,9 +782,7 @@ main_menu() {
             echo -n "CADDY PROXY : "
             if systemctl is-active --quiet caddy; then echo -e "\e[32m[ RUNNING ]\e[0m"; else echo -e "\e[31m[ ERROR ]\e[0m"; fi
             echo "======================================"
-            read -n 1 -s -r -p "Press any key to back..."
-            main_menu
-            ;;
+            read -n 1 -s -r -p "Press any key to back..."; main_menu ;;
         0) clear; exit 0 ;;
         *) echo -e "\n=> Pilihan tidak valid!"; sleep 1; main_menu ;;
     esac
@@ -642,9 +804,44 @@ if ! grep -q "menu" /etc/bash.bashrc; then
     echo "menu" >> /etc/bash.bashrc
 fi
 
-echo -e "\n[7/7] Merestart Services..."
+echo -e "\n[8/9] Memasang Auto-Delete Cronjob..."
+cat > /usr/local/bin/xray-exp << 'EOF'
+#!/bin/bash
+# Script untuk mengecek dan menghapus user expired
+today_epoch=$(date +%s)
+restart_required=false
+
+if [ ! -f /usr/local/etc/xray/expiry.txt ]; then
+    exit 0
+fi
+
+while read -r user exp; do
+    if [ -z "$user" ] || [ -z "$exp" ]; then continue; fi
+    
+    exp_epoch=$(date -d "$exp 00:00:00" +%s 2>/dev/null)
+    
+    if [[ -n "$exp_epoch" ]] && [[ $today_epoch -ge $exp_epoch ]]; then
+        if jq '(.inbounds[].settings.clients) |= map(select(.email != "'$user'"))' /usr/local/etc/xray/config.json > /tmp/config.json; then
+            mv /tmp/config.json /usr/local/etc/xray/config.json
+            sed -i "/^$user /d" /usr/local/etc/xray/expiry.txt
+            restart_required=true
+        fi
+    fi
+done < /usr/local/etc/xray/expiry.txt
+
+if [ "$restart_required" = true ]; then
+    systemctl restart xray
+fi
+EOF
+chmod +x /usr/local/bin/xray-exp
+
+if ! crontab -l | grep -q "xray-exp"; then
+    (crontab -l 2>/dev/null; echo "0 0 * * * /usr/local/bin/xray-exp") | crontab -
+fi
+
+echo -e "\n[9/9] Merestart Services..."
 systemctl daemon-reload
-systemctl restart xray caddy
+systemctl restart xray caddy cron
 
 clear
 echo "======================================================"
@@ -653,6 +850,8 @@ echo "======================================================"
 echo "- Domain terdaftar : $DOMAIN"
 echo "- Xray Port        : 10001 (VMESS), 10002 (VLESS), 10003 (TROJAN)"
 echo "- Reverse Proxy    : Caddy (Auto HTTPS Port 443 & 80)"
+echo "- Fitur Auto-Delete: Aktif (Mengecek Setiap Jam 00:00)"
+echo "- Fitur Telegram   : Tersedia di menu SETTINGS"
 echo "======================================================"
 echo "Silakan ketik 'menu' untuk membuat akun VPN."
 echo "======================================================"
