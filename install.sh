@@ -723,6 +723,7 @@ detail_list() {
 show_detail() {
     prot=$1
     user=$2
+    from_menu=$3
     clear
     echo "━━━━━━━━━━━━━━━━━━━━"
     echo "[XRAY/${prot^^} WS]"
@@ -768,7 +769,76 @@ show_detail() {
     echo "Expired On : $exp_date"
     echo ""
     read -n 1 -s -r -p "Press any key to back..."
-    detail_list "$prot"
+    if [ "$from_menu" == "change_uuid" ]; then
+        menu_change_uuid
+    else
+        detail_list "$prot"
+    fi
+}
+
+change_protocol_uuid() {
+    prot=$1
+    clear
+    echo "======================================"
+    echo "     CHANGE UUID/PASS ${prot^^} WS    "
+    echo "======================================"
+    mapfile -t users < <(jq -r '.inbounds[] | select(.protocol=="'$prot'") | .settings.clients[].email' /usr/local/etc/xray/config.json 2>/dev/null)
+    if [ ${#users[@]} -eq 0 ] || [ -z "${users[0]}" ] || [ "${users[0]}" == "null" ]; then
+        echo "Tidak ada akun di protokol ini."
+        echo "======================================"
+        read -n 1 -s -r -p "Press any key to back..."
+        menu_change_uuid; return
+    fi
+    for i in "${!users[@]}"; do echo "$((i+1)). ${users[$i]}"; done
+    echo "0. Back"
+    echo "x. Back to Main Menu"
+    echo "======================================"
+    read -p "Select Account [0-${#users[@]} or x]: " acc_opt
+    
+    if [[ "$acc_opt" == "0" ]]; then menu_change_uuid; return
+    elif [[ "$acc_opt" == "x" || "$acc_opt" == "X" ]]; then main_menu; return
+    elif [[ "$acc_opt" -gt 0 && "$acc_opt" -le "${#users[@]}" ]]; then
+        selected_user="${users[$((acc_opt-1))]}"
+        read -p "Input New UUID/Password (Press Enter to auto-generate): " new_uuid
+        if [ -z "$new_uuid" ]; then new_uuid=$(uuidgen); fi
+        
+        if [[ "$prot" == "vmess" || "$prot" == "vless" ]]; then
+            jq '(.inbounds[] | select(.protocol=="'$prot'") | .settings.clients[] | select(.email=="'$selected_user'") | .id) = "'$new_uuid'"' /usr/local/etc/xray/config.json > /tmp/config.json
+        elif [[ "$prot" == "trojan" ]]; then
+            jq '(.inbounds[] | select(.protocol=="'$prot'") | .settings.clients[] | select(.email=="'$selected_user'") | .password) = "'$new_uuid'"' /usr/local/etc/xray/config.json > /tmp/config.json
+        fi
+        mv /tmp/config.json /usr/local/etc/xray/config.json
+        systemctl restart xray
+        echo -e "\n=> UUID/Password untuk '$selected_user' berhasil diubah!"
+        sleep 2
+        show_detail "$prot" "$selected_user" "change_uuid"
+    else
+        echo -e "\n=> Pilihan tidak valid!"; sleep 1; change_protocol_uuid "$prot"
+    fi
+}
+
+menu_change_uuid() {
+    clear
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo "   CHANGE UUID OR PASSWORD XRAY   "
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo " [1]  CHANGE UUID/PASS FOR VMESS WS"
+    echo " [2]  CHANGE UUID/PASS FOR VLESS WS"
+    echo " [3]  CHANGE UUID/PASS FOR TROJAN WS"
+    echo "----------------------------------"
+    echo " [0]  Back"
+    echo " [x]  Back To Menu"
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo ""
+    read -p "  Select From Options [1-3 or 0/x] : " opt
+    case $opt in
+        1) change_protocol_uuid "vmess" ;;
+        2) change_protocol_uuid "vless" ;;
+        3) change_protocol_uuid "trojan" ;;
+        0) menu_xray ;;
+        x|X) main_menu ;;
+        *) echo -e "\n=> Pilihan tidak valid!"; sleep 1; menu_change_uuid ;;
+    esac
 }
 
 menu_xray() {
@@ -785,12 +855,13 @@ menu_xray() {
     echo "3. Renew XRAY Account"
     echo "4. List XRAY Account"
     echo "5. Detail XRAY Account"
+    echo "6. Change UUID/Password"
     echo "0. Back to Main Menu"
     echo "======================================"
-    read -p "Please select an option [0-5]: " opt
+    read -p "Please select an option [0-6]: " opt
     case $opt in
         1) create_xray ;; 2) delete_xray ;; 3) renew_xray ;; 
-        4) list_xray ;; 5) detail_xray ;; 
+        4) list_xray ;; 5) detail_xray ;; 6) menu_change_uuid ;;
         0|x|X) main_menu ;;
         *) echo -e "\n=> Pilihan tidak valid!"; sleep 1; menu_xray ;;
     esac
