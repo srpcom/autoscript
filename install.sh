@@ -46,16 +46,16 @@ while true; do
     fi
 done
 
-echo -e "\n[1/9] Memperbarui sistem & menginstal dependensi..."
+echo -e "\n[1/10] Memperbarui sistem & menginstal dependensi..."
 apt update && apt upgrade -y
-apt install curl wget unzip uuid-runtime jq tzdata ufw cron gnupg2 gnupg -y
+apt install curl wget unzip uuid-runtime jq tzdata ufw cron gnupg2 gnupg python3 python3-flask -y
 timedatectl set-timezone Asia/Jakarta
 
-echo -e "\n[2/9] Menginstal Xray-core..."
+echo -e "\n[2/10] Menginstal Xray-core..."
 bash -c "$(curl -L https://github.com/XTLS/Xray-install/raw/main/install-release.sh)" @ install
 systemctl enable xray
 
-echo -e "\n[3/9] Mengonfigurasi Xray (VMESS, VLESS, TROJAN)..."
+echo -e "\n[3/10] Mengonfigurasi Xray (VMESS, VLESS, TROJAN)..."
 rm -rf /usr/local/etc/xray/config.json
 cat > /usr/local/etc/xray/config.json << EOF
 {
@@ -128,7 +128,243 @@ BACKUP_TIME="00:00"
 AUTOSEND_STATUS="OFF"
 EOF
 
-echo -e "\n[4/9] Menginstal & Mengonfigurasi Caddy (Auto HTTPS)..."
+# Set API Key default
+echo "SANGATRAHASIA123" > /usr/local/etc/xray/api_key.conf
+
+echo -e "\n[4/10] Membangun API Backend (Python Flask) untuk Website..."
+cat > /usr/local/bin/xray-api.py << 'EOF'
+from flask import Flask, request, jsonify
+import json, os, subprocess, uuid, datetime
+
+app = Flask(__name__)
+API_KEY_FILE = '/usr/local/etc/xray/api_key.conf'
+XRAY_CONF = '/usr/local/etc/xray/config.json'
+EXP_FILE = '/usr/local/etc/xray/expiry.txt'
+LOCK_FILE = '/usr/local/etc/xray/locked.json'
+
+def get_api_key():
+    try:
+        with open(API_KEY_FILE, 'r') as f: return f.read().strip()
+    except: return "DEFAULT_KEY"
+
+def check_auth():
+    return request.headers.get('x-api-key') == get_api_key()
+
+def load_json(p):
+    if not os.path.exists(p): return {}
+    with open(p, 'r') as f: return json.load(f)
+
+def save_json(p, d):
+    with open(p, 'w') as f: json.dump(d, f, indent=2)
+
+def restart_xray():
+    subprocess.run(['systemctl', 'restart', 'xray'])
+
+@app.route('/srpcom/add-<protocol>ws', methods=['POST'])
+def add_user(protocol):
+    if not check_auth(): return jsonify({"stdout": "Unauthorized"}), 401
+    data = request.json or {}
+    user = data.get('user')
+    exp = int(data.get('exp', 30))
+    if not user: return jsonify({"stdout": "Error: User required"}), 400
+    
+    uid = str(uuid.uuid4())
+    dt = datetime.datetime.now() + datetime.timedelta(days=exp)
+    
+    cfg = load_json(XRAY_CONF)
+    for ib in cfg.get('inbounds', []):
+        if ib.get('protocol') == protocol:
+            cls = ib['settings']['clients']
+            if protocol == 'trojan': cls.append({'password': uid, 'email': user})
+            else:
+                c = {'id': uid, 'email': user}
+                if protocol == 'vmess': c['alterId'] = 0
+                cls.append(c)
+    save_json(XRAY_CONF, cfg)
+    with open(EXP_FILE, 'a') as f: f.write(f"{user} {dt.strftime('%Y-%m-%d %H:%M:%S')}\n")
+    restart_xray()
+    return jsonify({"stdout": f"Success: {user} added to {protocol}ws."})
+
+@app.route('/srpcom/trial-<protocol>ws', methods=['POST'])
+def trial_user(protocol):
+    if not check_auth(): return jsonify({"stdout": "Unauthorized"}), 401
+    data = request.json or {}
+    exp_min = int(data.get('exp', 60))
+    user = f"trialsrp-{datetime.datetime.now().strftime('%m%d%H%M')}"
+    uid = str(uuid.uuid4())
+    dt = datetime.datetime.now() + datetime.timedelta(minutes=exp_min)
+    
+    cfg = load_json(XRAY_CONF)
+    for ib in cfg.get('inbounds', []):
+        if ib.get('protocol') == protocol:
+            cls = ib['settings']['clients']
+            if protocol == 'trojan': cls.append({'password': uid, 'email': user})
+            else:
+                c = {'id': uid, 'email': user}
+                if protocol == 'vmess': c['alterId'] = 0
+                cls.append(c)
+    save_json(XRAY_CONF, cfg)
+    with open(EXP_FILE, 'a') as f: f.write(f"{user} {dt.strftime('%Y-%m-%d %H:%M:%S')}\n")
+    restart_xray()
+    return jsonify({"stdout": f"Success: Trial {user} added."})
+
+@app.route('/srpcom/del-<protocol>ws', methods=['DELETE'])
+def del_user(protocol):
+    if not check_auth(): return jsonify({"stdout": "Unauthorized"}), 401
+    data = request.json or {}
+    user = data.get('user')
+    if not user: return jsonify({"stdout": "Error: User required"}), 400
+    
+    cfg = load_json(XRAY_CONF)
+    for ib in cfg.get('inbounds', []):
+        if ib.get('protocol') == protocol:
+            ib['settings']['clients'] = [c for c in ib['settings']['clients'] if c.get('email') != user]
+    save_json(XRAY_CONF, cfg)
+    
+    if os.path.exists(EXP_FILE):
+        with open(EXP_FILE, 'r') as f: lines = f.readlines()
+        with open(EXP_FILE, 'w') as f:
+            for line in lines:
+                if not line.startswith(user + ' '): f.write(line)
+    restart_xray()
+    return jsonify({"stdout": f"Success: {user} deleted."})
+
+@app.route('/srpcom/renew-<protocol>ws', methods=['POST'])
+def renew_user(protocol):
+    if not check_auth(): return jsonify({"stdout": "Unauthorized"}), 401
+    data = request.json or {}
+    user = data.get('user')
+    add_days = int(data.get('exp', 30))
+    if not user: return jsonify({"stdout": "Error: User required"}), 400
+    
+    updated = False
+    if os.path.exists(EXP_FILE):
+        with open(EXP_FILE, 'r') as f: lines = f.readlines()
+        with open(EXP_FILE, 'w') as f:
+            for line in lines:
+                if line.startswith(user + ' '):
+                    parts = line.strip().split()
+                    if len(parts) >= 3:
+                        curr_dt = datetime.datetime.strptime(f"{parts[1]} {parts[2]}", '%Y-%m-%d %H:%M:%S')
+                        new_dt = curr_dt + datetime.timedelta(days=add_days)
+                        f.write(f"{user} {new_dt.strftime('%Y-%m-%d %H:%M:%S')}\n")
+                        updated = True
+                        continue
+                f.write(line)
+    if updated: return jsonify({"stdout": f"Success: {user} renewed."})
+    return jsonify({"stdout": f"Error: User {user} not found."})
+
+@app.route('/srpcom/detail-<protocol>ws', methods=['GET', 'POST'])
+def detail_user(protocol):
+    if not check_auth(): return jsonify({"stdout": "Unauthorized"}), 401
+    data = request.json or {}
+    user = data.get('user')
+    cfg = load_json(XRAY_CONF)
+    for ib in cfg.get('inbounds', []):
+        if ib.get('protocol') == protocol:
+            for c in ib['settings']['clients']:
+                if c.get('email') == user:
+                    return jsonify({"stdout": f"Found: {json.dumps(c)}"})
+    return jsonify({"stdout": "Not found"})
+
+@app.route('/srpcom/change-uuid', methods=['POST'])
+def change_uuid():
+    if not check_auth(): return jsonify({"stdout": "Unauthorized"}), 401
+    data = request.json or {}
+    uuidold = data.get('uuidold')
+    uuidnew = data.get('uuidnew')
+    cfg = load_json(XRAY_CONF)
+    found = False
+    for ib in cfg.get('inbounds', []):
+        for c in ib['settings'].get('clients', []):
+            if ib.get('protocol') == 'trojan':
+                if c.get('password') == uuidold:
+                    c['password'] = uuidnew
+                    found = True
+            else:
+                if c.get('id') == uuidold:
+                    c['id'] = uuidnew
+                    found = True
+    if found:
+        save_json(XRAY_CONF, cfg)
+        restart_xray()
+        return jsonify({"stdout": "Success: UUID changed."})
+    return jsonify({"stdout": "Error: Old UUID not found."})
+
+@app.route('/srpcom/cek-xray', methods=['GET', 'POST'])
+def cek_xray():
+    if not check_auth(): return jsonify({"stdout": "Unauthorized"}), 401
+    out = subprocess.run(['systemctl', 'is-active', 'xray'], capture_output=True, text=True).stdout.strip()
+    return jsonify({"stdout": f"Xray status: {out}"})
+
+@app.route('/srpcom/lock-xray', methods=['GET', 'POST'])
+def lock_xray():
+    if not check_auth(): return jsonify({"stdout": "Unauthorized"}), 401
+    user = (request.json or {}).get('user')
+    
+    cfg = load_json(XRAY_CONF)
+    locked = load_json(LOCK_FILE) if os.path.exists(LOCK_FILE) else {}
+    
+    found = False
+    for ib in cfg.get('inbounds', []):
+        cls = ib['settings'].get('clients', [])
+        for c in cls:
+            if c.get('email') == user:
+                locked[user] = {'protocol': ib['protocol'], 'data': c}
+                cls.remove(c)
+                found = True
+                break
+    if found:
+        save_json(XRAY_CONF, cfg)
+        save_json(LOCK_FILE, locked)
+        restart_xray()
+        return jsonify({"stdout": f"Success: {user} locked."})
+    return jsonify({"stdout": "Error: User not found."})
+
+@app.route('/srpcom/unlock-xray', methods=['GET', 'POST'])
+def unlock_xray():
+    if not check_auth(): return jsonify({"stdout": "Unauthorized"}), 401
+    user = (request.json or {}).get('user')
+    
+    locked = load_json(LOCK_FILE) if os.path.exists(LOCK_FILE) else {}
+    if user in locked:
+        info = locked[user]
+        cfg = load_json(XRAY_CONF)
+        for ib in cfg.get('inbounds', []):
+            if ib.get('protocol') == info['protocol']:
+                ib['settings']['clients'].append(info['data'])
+        save_json(XRAY_CONF, cfg)
+        del locked[user]
+        save_json(LOCK_FILE, locked)
+        restart_xray()
+        return jsonify({"stdout": f"Success: {user} unlocked."})
+    return jsonify({"stdout": "Error: User not locked."})
+
+if __name__ == '__main__':
+    app.run(host='127.0.0.1', port=5000)
+EOF
+chmod +x /usr/local/bin/xray-api.py
+
+cat > /etc/systemd/system/xray-api.service << EOF
+[Unit]
+Description=Xray Python API Backend
+After=network.target
+
+[Service]
+ExecStart=/usr/bin/python3 /usr/local/bin/xray-api.py
+Restart=always
+User=root
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+systemctl daemon-reload
+systemctl enable xray-api
+systemctl start xray-api
+
+echo -e "\n[5/10] Menginstal & Mengonfigurasi Caddy (Auto HTTPS)..."
 apt install -y debian-keyring debian-archive-keyring apt-transport-https
 curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
 curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | tee /etc/apt/sources.list.d/caddy-stable.list
@@ -136,6 +372,9 @@ apt update && apt install caddy -y
 
 cat > /etc/caddy/Caddyfile << EOF
 http://$DOMAIN, https://$DOMAIN {
+    handle /srpcom/* {
+        reverse_proxy localhost:5000
+    }
     handle / {
         respond "Server is running normally." 200
     }
@@ -151,13 +390,13 @@ http://$DOMAIN, https://$DOMAIN {
 }
 EOF
 
-echo -e "\n[5/9] Mengatur Firewall (UFW)..."
+echo -e "\n[6/10] Mengatur Firewall (UFW)..."
 ufw allow 22/tcp
 ufw allow 80/tcp
 ufw allow 443/tcp
 ufw --force enable
 
-echo -e "\n[6/9] Menyiapkan Script Eksekusi Telegram..."
+echo -e "\n[7/10] Menyiapkan Script Eksekusi Telegram..."
 cat > /usr/local/bin/xray-backup-bot << 'EOF'
 #!/bin/bash
 source /usr/local/etc/xray/bot_setting.conf
@@ -176,7 +415,7 @@ curl -s -F chat_id="${CHAT_ID}" -F document=@"${BACKUP_FILE}" -F caption="Auto B
 EOF
 chmod +x /usr/local/bin/xray-backup-bot
 
-echo -e "\n[7/9] Membangun CLI Menu Interaktif..."
+echo -e "\n[8/10] Membangun CLI Menu Interaktif..."
 cat > /usr/local/bin/menu << 'EOF'
 #!/bin/bash
 clear
@@ -867,6 +1106,27 @@ menu_xray() {
     esac
 }
 
+menu_api_key() {
+    clear
+    echo "======================================"
+    echo "       SETTING API KEY WEBSITE        "
+    echo "======================================"
+    current_key=$(cat /usr/local/etc/xray/api_key.conf 2>/dev/null)
+    echo "Current API Key: ${current_key}"
+    echo "======================================"
+    echo "Ini adalah kunci akses rahasia agar website billing"
+    echo "Anda bisa mengontrol Xray di server ini."
+    echo "======================================"
+    read -p "Input New API Key (tekan 'x' untuk batal): " new_key
+    if [[ "$new_key" != "x" && "$new_key" != "X" && -n "$new_key" ]]; then
+        echo "$new_key" > /usr/local/etc/xray/api_key.conf
+        systemctl restart xray-api
+        echo -e "\n\e[32m[SUCCESS]\e[0m API Key berhasil diubah dan sistem direstart!"
+        sleep 2
+    fi
+    menu_settings
+}
+
 menu_autobackup() {
     clear
     load_bot_setting
@@ -1029,14 +1289,16 @@ menu_settings() {
     echo " [2] AUTOSEND CREATED VPN VIA BOT"
     echo " [3] BACKUP VIA BOT TELEGRAM (MANUAL)"
     echo " [4] RESTORE DATA via VPS"
+    echo " [5] SETTING API KEY FOR WEBSITE"
     echo " [0/x] Back to Main Menu"
     echo ""
-    read -p " Select option [0-4 or x]: " opt
+    read -p " Select option [0-5 or x]: " opt
     case $opt in
         1) menu_autobackup ;;
         2) menu_autosend ;;
         3) manual_backup_telegram ;;
         4) restore_xray ;;
+        5) menu_api_key ;;
         0|x|X) main_menu ;;
         *) menu_settings ;;
     esac
@@ -1062,7 +1324,7 @@ main_menu() {
     printf "║       XRAY ACCOUNT ➠ %-14s║\n" "${XRAY_C}"
     echo "╚════════════════════════════════════╝"
     echo "1. MENU XRAY"
-    echo "2. SETTINGS (Backup/Restore/Bot)"
+    echo "2. SETTINGS (Backup/Restore/Bot/API)"
     echo "3. RESTART SERVICES (Xray & Caddy)"
     echo "4. CEK STATUS SERVICES"
     echo "0/x. Exit"
@@ -1072,8 +1334,8 @@ main_menu() {
         1) menu_xray ;;
         2) menu_settings ;;
         3) 
-            echo -e "\n=> Restarting Xray & Caddy..."
-            systemctl restart xray caddy cron
+            echo -e "\n=> Restarting Xray, Caddy, & API..."
+            systemctl restart xray caddy cron xray-api
             echo -e "=> Done!"
             sleep 1.5; main_menu ;;
         4) 
@@ -1085,6 +1347,8 @@ main_menu() {
             if systemctl is-active --quiet xray; then echo -e "\e[32m[ RUNNING ]\e[0m"; else echo -e "\e[31m[ ERROR ]\e[0m"; fi
             echo -n "CADDY PROXY : "
             if systemctl is-active --quiet caddy; then echo -e "\e[32m[ RUNNING ]\e[0m"; else echo -e "\e[31m[ ERROR ]\e[0m"; fi
+            echo -n "API SERVER  : "
+            if systemctl is-active --quiet xray-api; then echo -e "\e[32m[ RUNNING ]\e[0m"; else echo -e "\e[31m[ ERROR ]\e[0m"; fi
             echo "======================================"
             read -n 1 -s -r -p "Press any key to back..."; main_menu ;;
         0|x|X) clear; exit 0 ;;
@@ -1108,7 +1372,7 @@ if ! grep -q "menu" /etc/bash.bashrc; then
     echo "menu" >> /etc/bash.bashrc
 fi
 
-echo -e "\n[8/9] Memasang Auto-Delete Cronjob..."
+echo -e "\n[9/10] Memasang Auto-Delete Cronjob..."
 cat > /usr/local/bin/xray-exp << 'EOF'
 #!/bin/bash
 today_epoch=$(date +%s)
@@ -1137,9 +1401,9 @@ chmod +x /usr/local/bin/xray-exp
 crontab -l 2>/dev/null | grep -v "xray-exp" | crontab -
 (crontab -l 2>/dev/null; echo "* * * * * /usr/local/bin/xray-exp") | crontab -
 
-echo -e "\n[9/9] Merestart Services..."
+echo -e "\n[10/10] Merestart Services..."
 systemctl daemon-reload
-systemctl restart xray caddy cron
+systemctl restart xray caddy cron xray-api
 
 clear
 echo "======================================================"
@@ -1149,9 +1413,7 @@ echo "- Domain terdaftar : $DOMAIN"
 echo "- Xray Port        : 10001 (VMESS), 10002 (VLESS), 10003 (TROJAN)"
 echo "- Reverse Proxy    : Caddy (Auto HTTPS Port 443 & 80)"
 echo "- Fitur Auto-Delete: Aktif (Mengecek Setiap Menit)"
-echo "- Fitur Telegram   : Tersedia di menu SETTINGS"
-echo "- Menu Delete/Renew: Sekarang menggunakan nomor urut"
+echo "- Fitur API Backend: Aktif (Jalur Web Billing -> VPS)"
 echo "======================================================"
-echo "Silakan ketik 'menu' untuk membuat akun VPN."
+echo "Silakan ketik 'menu' untuk mengatur XRAY dan API KEY."
 echo "======================================================"
-```
