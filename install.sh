@@ -1,7 +1,7 @@
 #!/bin/bash
 # ==========================================
 # AUTO INSTALLER XRAY & CADDY BY SRPCOM
-# OS Support: Ubuntu 20.04 / 22.04 LTS
+# OS Support: Ubuntu 20.04 / 22.04 / 24.04 LTS
 # ==========================================
 
 # Memastikan script dijalankan sebagai root
@@ -13,6 +13,7 @@ fi
 clear
 echo "=========================================="
 echo "    MEMULAI INSTALASI XRAY & CADDY"
+echo "    SUPPORT UBUNTU 20/22/24 LTS"
 echo "=========================================="
 
 # Mendapatkan IP Publik VPS saat ini
@@ -47,7 +48,7 @@ done
 
 echo -e "\n[1/9] Memperbarui sistem & menginstal dependensi..."
 apt update && apt upgrade -y
-apt install curl wget unzip uuid-runtime jq tzdata ufw cron -y
+apt install curl wget unzip uuid-runtime jq tzdata ufw cron gnupg2 gnupg -y
 timedatectl set-timezone Asia/Jakarta
 
 echo -e "\n[2/9] Menginstal Xray-core..."
@@ -125,7 +126,7 @@ CHAT_ID=""
 AUTOBACKUP_STATUS="OFF"
 BACKUP_TIME="00:00"
 AUTOSEND_STATUS="OFF"
-CONFIG_EOF
+EOF
 
 echo -e "\n[4/9] Menginstal & Mengonfigurasi Caddy (Auto HTTPS)..."
 apt install -y debian-keyring debian-archive-keyring apt-transport-https
