@@ -119,7 +119,6 @@ mkdir -p /var/log/xray
 chown -R nobody:nogroup /var/log/xray
 touch /usr/local/etc/xray/expiry.txt
 
-# Membuat file konfigurasi bot Telegram
 cat > /usr/local/etc/xray/bot_setting.conf << 'EOF'
 BOT_TOKEN=""
 CHAT_ID=""
@@ -196,7 +195,6 @@ SLOWDNS="157at"
 CLIENT_N="syam157"
 VER="1.3.0"
 
-# Memuat Setting Bot Telegram
 load_bot_setting() {
     source /usr/local/etc/xray/bot_setting.conf
 }
@@ -219,7 +217,6 @@ setup_autobackup_cron() {
     systemctl restart cron
 }
 
-# Fungsi Kirim Telegram
 send_telegram() {
     local text="$1"
     if [[ "$AUTOSEND_STATUS" == "ON" && -n "$BOT_TOKEN" && -n "$CHAT_ID" ]]; then
@@ -233,7 +230,8 @@ add_vmess_ws() {
     echo "======================================"
     echo "       CREATE VMESS WS ACCOUNT        "
     echo "======================================"
-    read -p "Username : " user
+    read -p "Username (x = Batal) : " user
+    if [[ "$user" == "x" || "$user" == "X" ]]; then main_menu; return; fi
     read -p "Expired (Days) : " masaaktif
     uuid=$(uuidgen)
     
@@ -284,7 +282,8 @@ add_vless_ws() {
     echo "======================================"
     echo "       CREATE VLESS WS ACCOUNT        "
     echo "======================================"
-    read -p "Username : " user
+    read -p "Username (x = Batal) : " user
+    if [[ "$user" == "x" || "$user" == "X" ]]; then main_menu; return; fi
     read -p "Expired (Days) : " masaaktif
     uuid=$(uuidgen)
     
@@ -333,7 +332,8 @@ add_trojan_ws() {
     echo "======================================"
     echo "       CREATE TROJAN WS ACCOUNT       "
     echo "======================================"
-    read -p "Username : " user
+    read -p "Username (x = Batal) : " user
+    if [[ "$user" == "x" || "$user" == "X" ]]; then main_menu; return; fi
     read -p "Expired (Days) : " masaaktif
     uuid=$(uuidgen)
     
@@ -382,13 +382,15 @@ create_xray() {
     echo "3.  TROJAN WS"
     echo " ————————————————————————————————————"
     echo "0. Back to XRAY Menu"
+    echo "x. Back to Main Menu"
     echo "======================================"
-    read -p "Please select an option [0-3]: " opt
+    read -p "Please select an option [0-3 or x]: " opt
     case $opt in
         1) add_vmess_ws ;;
         2) add_vless_ws ;;
         3) add_trojan_ws ;;
         0) menu_xray ;;
+        x|X) main_menu ;;
         *) echo -e "\n=> Pilihan tidak valid!"; sleep 1; create_xray ;;
     esac
 }
@@ -398,8 +400,9 @@ delete_xray() {
     echo "======================================"
     echo "          DELETE XRAY ACCOUNT         "
     echo "======================================"
-    read -p "Masukkan Username yang akan dihapus: " user
+    read -p "Masukkan Username (Ketik 'x' untuk Batal): " user
     if [ -z "$user" ]; then echo -e "\n=> Username tidak boleh kosong!"; sleep 1; menu_xray; return; fi
+    if [[ "$user" == "x" || "$user" == "X" ]]; then main_menu; return; fi
 
     cek=$(jq -r '.inbounds[].settings.clients[] | select(.email=="'$user'") | .email' /usr/local/etc/xray/config.json 2>/dev/null | head -n 1)
     if [ "$cek" != "$user" ]; then echo -e "\n=> User '$user' tidak ditemukan!"; sleep 2; menu_xray; return; fi
@@ -421,7 +424,10 @@ renew_xray() {
     echo "======================================"
     echo "          RENEW XRAY ACCOUNT          "
     echo "======================================"
-    read -p "Masukkan Username: " user
+    read -p "Masukkan Username (Ketik 'x' untuk Batal): " user
+    if [ -z "$user" ]; then echo -e "\n=> Username tidak boleh kosong!"; sleep 1; menu_xray; return; fi
+    if [[ "$user" == "x" || "$user" == "X" ]]; then main_menu; return; fi
+
     cek=$(jq -r '.inbounds[].settings.clients[] | select(.email=="'$user'") | .email' /usr/local/etc/xray/config.json 2>/dev/null | head -n 1)
     if [ "$cek" != "$user" ]; then echo -e "\n=> User '$user' tidak ditemukan!"; sleep 2; menu_xray; return; fi
 
@@ -479,13 +485,15 @@ detail_xray() {
     echo "2. VLESS ($c_vl)"
     echo "3. TROJAN ($c_tr)"
     echo "0. Back to XRAY Menu"
+    echo "x. Back to Main Menu"
     echo "======================================"
-    read -p "Select Protocol [0-3]: " prot_opt
+    read -p "Select Protocol [0-3 or x]: " prot_opt
     case $prot_opt in
         1) detail_list "vmess" ;;
         2) detail_list "vless" ;;
         3) detail_list "trojan" ;;
         0) menu_xray ;;
+        x|X) main_menu ;;
         *) echo -e "\n=> Pilihan tidak valid!"; sleep 1; detail_xray ;;
     esac
 }
@@ -505,10 +513,12 @@ detail_list() {
     fi
     for i in "${!users[@]}"; do echo "$((i+1)). ${users[$i]}"; done
     echo "0. Back to Protocol Selection"
+    echo "x. Back to Main Menu"
     echo "======================================"
-    read -p "Select Account [0-${#users[@]}]: " acc_opt
+    read -p "Select Account [0-${#users[@]} or x]: " acc_opt
     
     if [[ "$acc_opt" == "0" ]]; then detail_xray; return
+    elif [[ "$acc_opt" == "x" || "$acc_opt" == "X" ]]; then main_menu; return
     elif [[ "$acc_opt" -gt 0 && "$acc_opt" -le "${#users[@]}" ]]; then
         selected_user="${users[$((acc_opt-1))]}"
         show_detail "$prot" "$selected_user"
@@ -587,12 +597,11 @@ menu_xray() {
     read -p "Please select an option [0-5]: " opt
     case $opt in
         1) create_xray ;; 2) delete_xray ;; 3) renew_xray ;; 
-        4) list_xray ;; 5) detail_xray ;; 0) main_menu ;;
+        4) list_xray ;; 5) detail_xray ;; 
+        0|x|X) main_menu ;;
         *) echo -e "\n=> Pilihan tidak valid!"; sleep 1; menu_xray ;;
     esac
 }
-
-# --- MENU SETTINGS & TELEGRAM ---
 
 menu_autobackup() {
     clear
@@ -601,13 +610,14 @@ menu_autobackup() {
     echo "   » Backup Data Via Telegram Bot «"
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━"
     echo " Status Autobackup Data Via Bot Is [$AUTOBACKUP_STATUS]"
-    echo "   [1]  Start Backup Data (Enable Autobackup)"
+    echo "   [1]  Start Backup Data (Enable)"
     echo "   [2]  Change Api Bot & Chat ID"
     echo "   [3]  Change Backup Time (Current: $BACKUP_TIME)"
-    echo "   [4]  Stop Autobackup Data (Disable Autobackup)"
-    echo "   [0]  back"
+    echo "   [4]  Stop Autobackup Data (Disable)"
+    echo "   [0]  Back to Settings"
+    echo "   [x]  Back to Main Menu"
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━"
-    read -p "   Select From Options [1-4 or 0] : " opt
+    read -p "   Select From Options [1-4, 0, or x] : " opt
     case $opt in
         1) AUTOBACKUP_STATUS="ON"; save_bot_setting; setup_autobackup_cron; echo "Autobackup Enabled!"; sleep 1; menu_autobackup ;;
         2) 
@@ -619,6 +629,7 @@ menu_autobackup() {
             BACKUP_TIME="$new_time"; save_bot_setting; setup_autobackup_cron; echo "Waktu Backup Diubah!"; sleep 1; menu_autobackup ;;
         4) AUTOBACKUP_STATUS="OFF"; save_bot_setting; setup_autobackup_cron; echo "Autobackup Disabled!"; sleep 1; menu_autobackup ;;
         0) menu_settings ;;
+        x|X) main_menu ;;
         *) menu_autobackup ;;
     esac
 }
@@ -641,9 +652,10 @@ menu_autosend() {
     else
         echo " [3] Start AUTOSEND ACCOUNT"
     fi
-    echo " [0] back"
+    echo " [0] Back to Settings"
+    echo " [x] Back to Main Menu"
     echo ""
-    read -p " Select From Options [1-3 or 0] : " opt
+    read -p " Select From Options [1-3, 0, or x] : " opt
     case $opt in
         1) read -p "Input New Chat ID: " new_id; CHAT_ID="$new_id"; save_bot_setting; menu_autosend ;;
         2) read -p "Input New API Bot: " new_api; BOT_TOKEN="$new_api"; save_bot_setting; menu_autosend ;;
@@ -651,6 +663,7 @@ menu_autosend() {
             if [ "$AUTOSEND_STATUS" == "ON" ]; then AUTOSEND_STATUS="OFF"; else AUTOSEND_STATUS="ON"; fi
             save_bot_setting; menu_autosend ;;
         0) menu_settings ;;
+        x|X) main_menu ;;
         *) menu_autosend ;;
     esac
 }
@@ -687,9 +700,10 @@ restore_xray() {
     echo "file backup (.tar.gz) ke folder /root/ "
     echo "menggunakan MobaXterm."
     echo "======================================"
-    read -p "Ketik nama file backup (misal: xray-backup-20260507.tar.gz) : " backup_name
+    read -p "Ketik nama file backup (misal: xray-backup-20260507.tar.gz) atau 'x' untuk batal : " backup_name
     
     if [ -z "$backup_name" ]; then menu_settings; return; fi
+    if [[ "$backup_name" == "x" || "$backup_name" == "X" ]]; then main_menu; return; fi
     if [ ! -f "/root/$backup_name" ]; then
         echo -e "\n\e[31m[ERROR]\e[0m File /root/$backup_name tidak ditemukan!"
         sleep 2; menu_settings; return
@@ -713,15 +727,15 @@ menu_settings() {
     echo " [2] AUTOSEND CREATED VPN VIA BOT"
     echo " [3] BACKUP VIA BOT TELEGRAM (MANUAL)"
     echo " [4] RESTORE DATA via VPS"
-    echo " [0] Back to Main Menu"
+    echo " [0/x] Back to Main Menu"
     echo ""
-    read -p " Select option [0-4]: " opt
+    read -p " Select option [0-4 or x]: " opt
     case $opt in
         1) menu_autobackup ;;
         2) menu_autosend ;;
         3) manual_backup_telegram ;;
         4) restore_xray ;;
-        0) main_menu ;;
+        0|x|X) main_menu ;;
         *) menu_settings ;;
     esac
 }
@@ -758,12 +772,12 @@ main_menu() {
     echo "2. SETTINGS (Backup/Restore/Bot)"
     echo "3. RESTART SERVICES (Xray & Caddy)"
     echo "4. CEK STATUS SERVICES"
-    echo "0. Exit"
+    echo "0/x. Exit"
     echo "══════════════════════════════════════"
     echo "EXP SCRIPT: 2272-09-04 (89970 days)"
     echo "REGIST BY : 5666536947 (id telegram)"
     echo "══════════════════════════════════════"
-    read -p "Please select an option [0-4]: " opt
+    read -p "Please select an option [0-4 or x]: " opt
     case $opt in
         1) menu_xray ;;
         2) menu_settings ;;
@@ -783,7 +797,7 @@ main_menu() {
             if systemctl is-active --quiet caddy; then echo -e "\e[32m[ RUNNING ]\e[0m"; else echo -e "\e[31m[ ERROR ]\e[0m"; fi
             echo "======================================"
             read -n 1 -s -r -p "Press any key to back..."; main_menu ;;
-        0) clear; exit 0 ;;
+        0|x|X) clear; exit 0 ;;
         *) echo -e "\n=> Pilihan tidak valid!"; sleep 1; main_menu ;;
     esac
 }
