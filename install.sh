@@ -124,7 +124,7 @@ cat > /usr/local/etc/xray/bot_setting.conf << 'EOF'
 BOT_TOKEN=""
 CHAT_ID=""
 AUTOBACKUP_STATUS="OFF"
-BACKUP_TIME="00:00"
+BACKUP_TIME="24"
 AUTOSEND_STATUS="OFF"
 EOF
 
@@ -399,7 +399,7 @@ if __name__ == '__main__':
 EOF
 chmod +x /usr/local/bin/xray-api.py
 
-# Inject variabel ke dalam file Python
+# Menambahkan systemd dan proxy untuk API
 sed -i "s/DOMAIN_PLACEHOLDER/$DOMAIN/g" /usr/local/bin/xray-api.py
 sed -i "s/IP_PLACEHOLDER/$VPS_IP/g" /usr/local/bin/xray-api.py
 
@@ -511,15 +511,22 @@ CONFIG_EOF
 }
 setup_autobackup_cron() {
     if [[ "$AUTOBACKUP_STATUS" == "ON" ]]; then
-        IFS=':' read -r HH MM <<< "$BACKUP_TIME"
-        echo "$MM $HH * * * root /usr/local/bin/xray-backup-bot" > /etc/cron.d/xray_autobackup
+        if [[ "$BACKUP_TIME" == *":"* ]]; then BACKUP_TIME="24"; fi
+        case $BACKUP_TIME in
+            2) cron_exp="0 */12 * * *" ;;
+            4) cron_exp="0 */6 * * *" ;;
+            6) cron_exp="0 */4 * * *" ;;
+            12) cron_exp="0 */2 * * *" ;;
+            24) cron_exp="0 * * * *" ;;
+            *) cron_exp="0 * * * *" ;;
+        esac
+        echo "$cron_exp root /usr/local/bin/xray-backup-bot" > /etc/cron.d/xray_autobackup
     else
         rm -f /etc/cron.d/xray_autobackup
     fi
     systemctl restart cron
 }
 
-# Fungsi kirim telegram yang jauh lebih aman menggunakan JQ untuk membungkus payload JSON (Mencegah terpotong simbol &)
 send_telegram() {
     local text="$1"
     if [[ "$AUTOSEND_STATUS" == "ON" && -n "$BOT_TOKEN" && -n "$CHAT_ID" ]]; then
@@ -1210,13 +1217,14 @@ menu_api_key() {
 menu_autobackup() {
     clear
     load_bot_setting
+    if [[ "$BACKUP_TIME" == *":"* ]]; then BACKUP_TIME="24"; fi
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━"
     echo "   » Backup Data Via Telegram Bot «"
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━"
     echo " Status Autobackup Data Via Bot Is [$AUTOBACKUP_STATUS]"
     echo "   [1]  Start Backup Data (Enable)"
     echo "   [2]  Change Api Bot & Chat ID"
-    echo "   [3]  Change Backup Time (Current: $BACKUP_TIME)"
+    echo "   [3]  Change Backup Frequency (Current: $BACKUP_TIME kali/hari)"
     echo "   [4]  Stop Autobackup Data (Disable)"
     echo "   [0]  Back to Settings"
     echo "   [x]  Back to Main Menu"
@@ -1229,8 +1237,22 @@ menu_autobackup() {
             read -p "Input New Chat ID: " new_id; CHAT_ID="$new_id"
             save_bot_setting; echo "Data Bot Tersimpan!"; sleep 1; menu_autobackup ;;
         3) 
-            read -p "Input New Time (HH:MM) [ex: 23:00] : " new_time
-            BACKUP_TIME="$new_time"; save_bot_setting; setup_autobackup_cron; echo "Waktu Backup Diubah!"; sleep 1; menu_autobackup ;;
+            echo -e "\nPilih Frekuensi Backup:"
+            echo " [1] 2 Kali Sehari  (Tiap 12 Jam)"
+            echo " [2] 4 Kali Sehari  (Tiap 6 Jam)"
+            echo " [3] 6 Kali Sehari  (Tiap 4 Jam)"
+            echo " [4] 12 Kali Sehari (Tiap 2 Jam)"
+            echo " [5] 24 Kali Sehari (Tiap 1 Jam)"
+            read -p " Pilih opsi [1-5]: " freq_opt
+            case $freq_opt in
+                1) BACKUP_TIME="2" ;;
+                2) BACKUP_TIME="4" ;;
+                3) BACKUP_TIME="6" ;;
+                4) BACKUP_TIME="12" ;;
+                5) BACKUP_TIME="24" ;;
+                *) echo "Pilihan tidak valid!"; sleep 1; menu_autobackup; return ;;
+            esac
+            save_bot_setting; setup_autobackup_cron; echo "Frekuensi Backup Diubah menjadi $BACKUP_TIME kali sehari!"; sleep 1.5; menu_autobackup ;;
         4) AUTOBACKUP_STATUS="OFF"; save_bot_setting; setup_autobackup_cron; echo "Autobackup Disabled!"; sleep 1; menu_autobackup ;;
         0) menu_settings ;;
         x|X) main_menu ;;
