@@ -244,7 +244,8 @@ add_vmess_ws() {
     uuid=$(uuidgen)
     
     exp_date=$(date -d "$masaaktif days" +"%Y-%m-%d")
-    echo "$user $exp_date" >> /usr/local/etc/xray/expiry.txt
+    exp_time=$(date -d "$masaaktif days" +"%H:%M:%S")
+    echo "$user $exp_date $exp_time" >> /usr/local/etc/xray/expiry.txt
 
     jq '(.inbounds[] | select(.protocol=="vmess") | .settings.clients) += [{"id": "'$uuid'", "alterId": 0, "email": "'$user'"}]' /usr/local/etc/xray/config.json > /tmp/config.json
     mv /tmp/config.json /usr/local/etc/xray/config.json
@@ -273,7 +274,7 @@ LINK WS TLS : ${link_tls}
 ━━━━━━━━━━━━━━━━━━━━
 LINK WS NONE-TLS : ${link_none_tls}
 ━━━━━━━━━━━━━━━━━━━━
-EXPIRED ON : ${exp_date} (${masaaktif} days)"
+EXPIRED ON : ${exp_date} ${exp_time} (${masaaktif} days)"
 
     msg_telegram="━━━━━━━━━━━━━━━━━━━━
 [XRAY/VMESS WS]
@@ -293,7 +294,7 @@ LINK WS TLS : \`${link_tls}\`
 ━━━━━━━━━━━━━━━━━━━━
 LINK WS NONE-TLS : \`${link_none_tls}\`
 ━━━━━━━━━━━━━━━━━━━━
-EXPIRED ON : ${exp_date} (${masaaktif} days)"
+EXPIRED ON : ${exp_date} ${exp_time} (${masaaktif} days)"
 
     clear
     echo "$msg_terminal"
@@ -316,7 +317,8 @@ add_vless_ws() {
     uuid=$(uuidgen)
     
     exp_date=$(date -d "$masaaktif days" +"%Y-%m-%d")
-    echo "$user $exp_date" >> /usr/local/etc/xray/expiry.txt
+    exp_time=$(date -d "$masaaktif days" +"%H:%M:%S")
+    echo "$user $exp_date $exp_time" >> /usr/local/etc/xray/expiry.txt
 
     jq '(.inbounds[] | select(.protocol=="vless") | .settings.clients) += [{"id": "'$uuid'", "email": "'$user'"}]' /usr/local/etc/xray/config.json > /tmp/config.json
     mv /tmp/config.json /usr/local/etc/xray/config.json
@@ -343,7 +345,7 @@ LINK WS TLS : ${link_tls}
 ━━━━━━━━━━━━━━━━━━━━
 LINK WS NONE-TLS : ${link_none_tls}
 ━━━━━━━━━━━━━━━━━━━━
-EXPIRED ON : ${exp_date} (${masaaktif} days)"
+EXPIRED ON : ${exp_date} ${exp_time} (${masaaktif} days)"
 
     msg_telegram="━━━━━━━━━━━━━━━━━━━━
 [XRAY/VLESS WS]
@@ -363,7 +365,7 @@ LINK WS TLS : \`${link_tls}\`
 ━━━━━━━━━━━━━━━━━━━━
 LINK WS NONE-TLS : \`${link_none_tls}\`
 ━━━━━━━━━━━━━━━━━━━━
-EXPIRED ON : ${exp_date} (${masaaktif} days)"
+EXPIRED ON : ${exp_date} ${exp_time} (${masaaktif} days)"
 
     clear
     echo "$msg_terminal"
@@ -386,7 +388,8 @@ add_trojan_ws() {
     uuid=$(uuidgen)
     
     exp_date=$(date -d "$masaaktif days" +"%Y-%m-%d")
-    echo "$user $exp_date" >> /usr/local/etc/xray/expiry.txt
+    exp_time=$(date -d "$masaaktif days" +"%H:%M:%S")
+    echo "$user $exp_date $exp_time" >> /usr/local/etc/xray/expiry.txt
 
     jq '(.inbounds[] | select(.protocol=="trojan") | .settings.clients) += [{"password": "'$uuid'", "email": "'$user'"}]' /usr/local/etc/xray/config.json > /tmp/config.json
     mv /tmp/config.json /usr/local/etc/xray/config.json
@@ -409,7 +412,7 @@ Websocket Path : /trojanws
 ━━━━━━━━━━━━━━━━━━━━
 LINK WS TLS : ${link_tls}
 ━━━━━━━━━━━━━━━━━━━━
-EXPIRED ON : ${exp_date} (${masaaktif} days)"
+EXPIRED ON : ${exp_date} ${exp_time} (${masaaktif} days)"
 
     msg_telegram="━━━━━━━━━━━━━━━━━━━━
 [XRAY/TROJAN WS]
@@ -426,7 +429,7 @@ Websocket Path : /trojanws
 ━━━━━━━━━━━━━━━━━━━━
 LINK WS TLS : \`${link_tls}\`
 ━━━━━━━━━━━━━━━━━━━━
-EXPIRED ON : ${exp_date} (${masaaktif} days)"
+EXPIRED ON : ${exp_date} ${exp_time} (${masaaktif} days)"
 
     clear
     echo "$msg_terminal"
@@ -618,15 +621,22 @@ renew_xray() {
     if [[ "$choice" -gt 0 && "$choice" -le "${#users[@]}" ]]; then
         user="${users[$((choice-1))]}"
         read -p "Tambah Masa Aktif (Hari): " masaaktif
-        current_exp=$(grep "^$user " /usr/local/etc/xray/expiry.txt | awk '{print $2}')
-        if [ -z "$current_exp" ]; then current_exp=$(date +"%Y-%m-%d"); fi
-        new_exp=$(date -d "$current_exp + $masaaktif days" +"%Y-%m-%d")
+        
+        current_data=$(grep "^$user " /usr/local/etc/xray/expiry.txt)
+        current_date=$(echo "$current_data" | awk '{print $2}')
+        current_time=$(echo "$current_data" | awk '{print $3}')
+        
+        if [ -z "$current_date" ]; then current_date=$(date +"%Y-%m-%d"); fi
+        if [ -z "$current_time" ]; then current_time=$(date +"%H:%M:%S"); fi
+        
+        new_exp_date=$(date -d "$current_date $current_time + $masaaktif days" +"%Y-%m-%d")
+        new_exp_time=$(date -d "$current_date $current_time + $masaaktif days" +"%H:%M:%S")
         
         sed -i "/^$user /d" /usr/local/etc/xray/expiry.txt
-        echo "$user $new_exp" >> /usr/local/etc/xray/expiry.txt
+        echo "$user $new_exp_date $new_exp_time" >> /usr/local/etc/xray/expiry.txt
         
         echo -e "\n=> Akun '$user' diperpanjang $masaaktif Hari!"
-        echo "=> Expired Baru: $new_exp"
+        echo "=> Expired Baru: $new_exp_date $new_exp_time"
         sleep 2; menu_xray
     else
         echo -e "\n=> Pilihan tidak valid!"; sleep 1; renew_xray
