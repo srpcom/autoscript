@@ -172,7 +172,7 @@ BACKUP_NAME="xray-backup-$(date +"%Y%m%d %H%M%S").tar.gz"
 BACKUP_FILE="/root/$BACKUP_NAME"
 
 tar -czf "$BACKUP_FILE" -C / usr/local/etc/xray/config.json usr/local/etc/xray/expiry.txt usr/local/etc/xray/bot_setting.conf 2>/dev/null
-curl -s -F chat_id="${CHAT_ID}" -F document=@"${BACKUP_FILE}" -F caption="Auto Backup XRAY | $XRAY_C account | Server IP: $MYIP | Date: $(date)" "https://api.telegram.org/bot${BOT_TOKEN}/sendDocument" >/dev/null
+curl -s -F chat_id="${CHAT_ID}" -F document=@"${BACKUP_FILE}" -F caption="Auto Backup XRAY | ${XRAY_C} account |Server IP:${MYIP}  | Date: $(date)" "https://api.telegram.org/bot${BOT_TOKEN}/sendDocument" >/dev/null
 EOF
 chmod +x /usr/local/bin/xray-backup-bot
 
@@ -437,6 +437,96 @@ EXPIRED ON : ${exp_date} (${masaaktif} days)"
     create_xray
 }
 
+add_trial() {
+    clear
+    load_bot_setting
+    echo "======================================"
+    echo "       CREATE TRIAL ACCOUNT (60M)     "
+    echo "======================================"
+    echo "1. VMESS WS"
+    echo "2. VLESS WS"
+    echo "3. TROJAN WS"
+    echo "0. Back"
+    read -p "Select Protocol [1-3 or 0]: " prot_opt
+    
+    if [[ "$prot_opt" == "0" ]]; then create_xray; return; fi
+    
+    user="trialsrp-$(date +%m%d%H%M)"
+    masaaktif="60 Minutes"
+    exp_date=$(date -d "+60 minutes" +"%Y-%m-%d")
+    exp_time=$(date -d "+60 minutes" +"%H:%M:%S")
+    uuid=$(uuidgen)
+    
+    if [[ "$prot_opt" == "1" ]]; then
+        prot="vmess"
+        jq '(.inbounds[] | select(.protocol=="vmess") | .settings.clients) += [{"id": "'$uuid'", "alterId": 0, "email": "'$user'"}]' /usr/local/etc/xray/config.json > /tmp/config.json
+    elif [[ "$prot_opt" == "2" ]]; then
+        prot="vless"
+        jq '(.inbounds[] | select(.protocol=="vless") | .settings.clients) += [{"id": "'$uuid'", "email": "'$user'"}]' /usr/local/etc/xray/config.json > /tmp/config.json
+    elif [[ "$prot_opt" == "3" ]]; then
+        prot="trojan"
+        jq '(.inbounds[] | select(.protocol=="trojan") | .settings.clients) += [{"password": "'$uuid'", "email": "'$user'"}]' /usr/local/etc/xray/config.json > /tmp/config.json
+    else
+        echo -e "\n=> Pilihan tidak valid!"; sleep 1; add_trial; return
+    fi
+    
+    mv /tmp/config.json /usr/local/etc/xray/config.json
+    echo "$user $exp_date $exp_time" >> /usr/local/etc/xray/expiry.txt
+    systemctl restart xray
+    
+    if [[ "$prot" == "vmess" ]]; then
+        tls_json="{\"v\":\"2\",\"ps\":\"${user}\",\"add\":\"${DOMAIN}\",\"port\":\"443\",\"id\":\"${uuid}\",\"aid\":\"0\",\"net\":\"ws\",\"type\":\"none\",\"host\":\"${DOMAIN}\",\"path\":\"/vmessws\",\"tls\":\"tls\",\"sni\":\"${DOMAIN}\"}"
+        none_tls_json="{\"v\":\"2\",\"ps\":\"${user}\",\"add\":\"${DOMAIN}\",\"port\":\"80\",\"id\":\"${uuid}\",\"aid\":\"0\",\"net\":\"ws\",\"type\":\"none\",\"host\":\"${DOMAIN}\",\"path\":\"/vmessws\",\"tls\":\"\",\"sni\":\"\"}"
+        link_tls="vmess://$(echo -n "$tls_json" | jq -c . | base64 -w 0)"
+        link_none_tls="vmess://$(echo -n "$none_tls_json" | jq -c . | base64 -w 0)"
+        port_none="80"
+        path="/vmessws"
+    elif [[ "$prot" == "vless" ]]; then
+        link_tls="vless://${uuid}@${DOMAIN}:443?path=/vlessws&security=tls&encryption=none&host=${DOMAIN}&type=ws&sni=${DOMAIN}#${user}"
+        link_none_tls="vless://${uuid}@${DOMAIN}:80?path=/vlessws&security=none&encryption=none&host=${DOMAIN}&type=ws#${user}"
+        port_none="80"
+        path="/vlessws"
+    elif [[ "$prot" == "trojan" ]]; then
+        link_tls="trojan://${uuid}@${DOMAIN}:443?path=/trojanws&security=tls&host=${DOMAIN}&type=ws&sni=${DOMAIN}#${user}"
+        link_none_tls="-"
+        port_none="-"
+        path="/trojanws"
+    fi
+    
+    msg_terminal="━━━━━━━━━━━━━━━━━━━━
+[XRAY/${prot^^} WS TRIAL]
+━━━━━━━━━━━━━━━━━━━━
+Remarks : ${user}
+IP Address : ${IP_ADD}
+Domain : ${DOMAIN}
+Port TLS : 443
+Port NONE-TLS : ${port_none}
+ID/PW : ${uuid}
+Network : Websocket
+Websocket Path : ${path}
+━━━━━━━━━━━━━━━━━━━━
+LINK WS TLS : ${link_tls}
+━━━━━━━━━━━━━━━━━━━━"
+    if [[ "$prot" != "trojan" ]]; then
+        msg_terminal="${msg_terminal}\nLINK WS NONE-TLS : ${link_none_tls}\n━━━━━━━━━━━━━━━━━━━━"
+    fi
+    msg_terminal="${msg_terminal}\nEXPIRED ON : ${exp_date} ${exp_time} (${masaaktif})"
+
+    msg_telegram="━━━━━━━━━━━━━━━━━━━━\n[XRAY/${prot^^} WS TRIAL]\n━━━━━━━━━━━━━━━━━━━━\nRemarks : \`${user}\`\nIP Address : ${IP_ADD}\nDomain : ${DOMAIN}\nPort TLS : 443\nPort NONE-TLS : ${port_none}\nID/PW : \`${uuid}\`\nNetwork : Websocket\nWebsocket Path : ${path}\n━━━━━━━━━━━━━━━━━━━━\nLINK WS TLS : \`${link_tls}\`\n━━━━━━━━━━━━━━━━━━━━"
+    if [[ "$prot" != "trojan" ]]; then
+        msg_telegram="${msg_telegram}\nLINK WS NONE-TLS : \`${link_none_tls}\`\n━━━━━━━━━━━━━━━━━━━━"
+    fi
+    msg_telegram="${msg_telegram}\nEXPIRED ON : ${exp_date} ${exp_time} (${masaaktif})"
+
+    clear
+    echo -e "$msg_terminal"
+    send_telegram "$msg_telegram"
+    
+    echo ""
+    read -n 1 -s -r -p "Press any key to back..."
+    create_xray
+}
+
 create_xray() {
     clear
     echo "╔════════════════════════════════════╗"
@@ -445,15 +535,17 @@ create_xray() {
     echo "1.  VMESS WS"
     echo "2.  VLESS WS"
     echo "3.  TROJAN WS"
+    echo "4.  TRIAL ACCOUNT (60 Minutes)"
     echo " ————————————————————————————————————"
     echo "0. Back to XRAY Menu"
     echo "x. Back to Main Menu"
     echo "======================================"
-    read -p "Please select an option [0-3 or x]: " opt
+    read -p "Please select an option [0-4 or x]: " opt
     case $opt in
         1) add_vmess_ws ;;
         2) add_vless_ws ;;
         3) add_trojan_ws ;;
+        4) add_trial ;;
         0) menu_xray ;;
         x|X) main_menu ;;
         *) echo -e "\n=> Pilihan tidak valid!"; sleep 1; create_xray ;;
@@ -664,7 +756,7 @@ show_detail() {
         echo "LINK WS TLS : trojan://${uuid}@${DOMAIN}:443?path=/trojanws&security=tls&host=${DOMAIN}&type=ws&sni=${DOMAIN}#${user}"
     fi
     echo "━━━━━━━━━━━━━━━━━━━━"
-    exp_date=$(grep "^$user " /usr/local/etc/xray/expiry.txt | awk '{print $2}')
+    exp_date=$(grep "^$user " /usr/local/etc/xray/expiry.txt | cut -d' ' -f2-)
     if [ -z "$exp_date" ]; then exp_date="Lifetime / No Exp"; fi
     echo "Expired On : $exp_date"
     echo ""
@@ -785,7 +877,7 @@ manual_backup_telegram() {
     tar -czf "$BACKUP_FILE" -C / usr/local/etc/xray/config.json usr/local/etc/xray/expiry.txt usr/local/etc/xray/bot_setting.conf 2>/dev/null
     
     echo "Sedang mengirim file backup ke Telegram..."
-    curl -s -F chat_id="${CHAT_ID}" -F document=@"${BACKUP_FILE}" -F caption="Manual Backup XRAY | $XRAY_C account | Server IP: $MYIP | Date: $(date)" "https://api.telegram.org/bot${BOT_TOKEN}/sendDocument" > /dev/null
+    curl -s -F chat_id="${CHAT_ID}" -F document=@"${BACKUP_FILE}" -F caption="Manual Backup XRAY | ${XRAY_C} account |Server IP:${MYIP}  | Date: $(date)" "https://api.telegram.org/bot${BOT_TOKEN}/sendDocument" > /dev/null
     
     echo -e "\n\e[32m[SUCCESS]\e[0m Backup berhasil dikirim ke Telegram!"
     read -n 1 -s -r -p "Press any key to back..."
@@ -851,32 +943,11 @@ restore_xray() {
     menu_settings
 }
 
-menu_settings() {
-    clear
-    echo "▶ BACKUP & RESTORE / SETTINGS"
-    echo ""
-    echo " [1] AUTOBACKUP VIA BOT TELEGRAM"
-    echo " [2] AUTOSEND CREATED VPN VIA BOT"
-    echo " [3] BACKUP VIA BOT TELEGRAM (MANUAL)"
-    echo " [4] RESTORE DATA via VPS"
-    echo " [0/x] Back to Main Menu"
-    echo ""
-    read -p " Select option [0-4 or x]: " opt
-    case $opt in
-        1) menu_autobackup ;;
-        2) menu_autosend ;;
-        3) manual_backup_telegram ;;
-        4) restore_xray ;;
-        0|x|X) main_menu ;;
-        *) menu_settings ;;
-    esac
-}
-
 main_menu() {
     clear
     XRAY_C=$(jq '[.inbounds[].settings.clients | length] | add' /usr/local/etc/xray/config.json 2>/dev/null || echo 0)
     echo "╔════════════════════════════════════╗"
-    echo "║          SCRIP BY SRPCOM           ║"
+    echo "║          SCRIP BY SRPCOM ver.1     ║"
     echo "╚════════════════════════════════════╝"
     echo " OS SYSTEM: ${OS_SYS} ${BIT}"
     echo " KERNEL TYPE: ${KRNL}"
@@ -885,30 +956,18 @@ main_menu() {
     echo " TOTAL RAM: ${T_RAM} Total / ${U_RAM} Used"
     echo " TOTAL STORAGE: ${T_DISK} Total / ${U_DISK} Used"
     echo " DOMAIN: ${DOMAIN}"
-    echo " SLOWDNS DOMAIN: ${SLOWDNS}"
     echo " IP ADDRESS: ${IP_ADD}"
     echo " ISP: ${ISP_NAME}"
     echo " REGION: ${REG} [${TZ}]"
-    echo " CLIENTNAME: ${CLIENT_N}"
-    echo " SCRIPT VERSION: ${VER}"
     echo "╔════════════════════════════════════╗"
-    echo "                                      "
-    echo " ———————————————————————————————————— "
-    echo "         XRAY ACCOUNT ➠ ${XRAY_C}     "
-    echo " ———————————————————————————————————— "
-    echo "                                      "
-    echo "╔════════════════════════════════════╗"
-    echo "║              MAIN MENU             ║"
+    printf "║       XRAY ACCOUNT ➠ %-14s║\n" "${XRAY_C}"
     echo "╚════════════════════════════════════╝"
     echo "1. MENU XRAY"
     echo "2. SETTINGS (Backup/Restore/Bot)"
     echo "3. RESTART SERVICES (Xray & Caddy)"
     echo "4. CEK STATUS SERVICES"
     echo "0/x. Exit"
-    echo "══════════════════════════════════════"
-    echo "EXP SCRIPT: 2272-09-04 (89970 days)"
-    echo "REGIST BY : 5666536947 (id telegram)"
-    echo "══════════════════════════════════════"
+    echo ""
     read -p "Please select an option [0-4 or x]: " opt
     case $opt in
         1) menu_xray ;;
@@ -956,9 +1015,13 @@ cat > /usr/local/bin/xray-exp << 'EOF'
 today_epoch=$(date +%s)
 restart_required=false
 if [ ! -f /usr/local/etc/xray/expiry.txt ]; then exit 0; fi
-while read -r user exp; do
-    if [ -z "$user" ] || [ -z "$exp" ]; then continue; fi
-    exp_epoch=$(date -d "$exp 00:00:00" +%s 2>/dev/null)
+while read -r user exp_date exp_time; do
+    if [ -z "$user" ] || [ -z "$exp_date" ]; then continue; fi
+    if [ -z "$exp_time" ]; then
+        exp_epoch=$(date -d "$exp_date 00:00:00" +%s 2>/dev/null)
+    else
+        exp_epoch=$(date -d "$exp_date $exp_time" +%s 2>/dev/null)
+    fi
     if [[ -n "$exp_epoch" ]] && [[ $today_epoch -ge $exp_epoch ]]; then
         if jq '(.inbounds[].settings.clients) |= map(select(.email != "'$user'"))' /usr/local/etc/xray/config.json > /tmp/config.json; then
             mv /tmp/config.json /usr/local/etc/xray/config.json
@@ -971,9 +1034,8 @@ if [ "$restart_required" = true ]; then systemctl restart xray; fi
 EOF
 chmod +x /usr/local/bin/xray-exp
 
-if ! crontab -l | grep -q "xray-exp"; then
-    (crontab -l 2>/dev/null; echo "0 0 * * * /usr/local/bin/xray-exp") | crontab -
-fi
+crontab -l 2>/dev/null | grep -v "xray-exp" | crontab -
+(crontab -l 2>/dev/null; echo "* * * * * /usr/local/bin/xray-exp") | crontab -
 
 echo -e "\n[9/9] Merestart Services..."
 systemctl daemon-reload
