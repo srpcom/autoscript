@@ -134,13 +134,15 @@ echo "SANGATRAHASIA123" > /usr/local/etc/xray/api_key.conf
 echo -e "\n[4/10] Membangun API Backend (Python Flask) untuk Website..."
 cat > /usr/local/bin/xray-api.py << 'EOF'
 from flask import Flask, request, jsonify
-import json, os, subprocess, uuid, datetime
+import json, os, subprocess, uuid, datetime, base64
 
 app = Flask(__name__)
 API_KEY_FILE = '/usr/local/etc/xray/api_key.conf'
 XRAY_CONF = '/usr/local/etc/xray/config.json'
 EXP_FILE = '/usr/local/etc/xray/expiry.txt'
 LOCK_FILE = '/usr/local/etc/xray/locked.json'
+DOMAIN = "DOMAIN_PLACEHOLDER"
+IP_ADD = "IP_PLACEHOLDER"
 
 def get_api_key():
     try:
@@ -159,6 +161,36 @@ def save_json(p, d):
 
 def restart_xray():
     subprocess.run(['systemctl', 'restart', 'xray'])
+
+def generate_account_detail(protocol, user, uid, exp_date_str, is_trial=False):
+    trial_txt = " TRIAL" if is_trial else ""
+    res = f"━━━━━━━━━━━━━━━━━━━━\n[XRAY/{protocol.upper()} WS{trial_txt}]\n━━━━━━━━━━━━━━━━━━━━\n"
+    res += f"Remarks : {user}\n"
+    res += f"IP Address : {IP_ADD}\n"
+    res += f"Domain : {DOMAIN}\n"
+    res += f"Port TLS : 443\n"
+    
+    if protocol == 'vmess':
+        res += f"Port NONE-TLS : 80\nID : {uid}\nNetwork : Websocket\nWebsocket Path : /vmessws\n━━━━━━━━━━━━━━━━━━━━\n"
+        tls_dict = {"v":"2","ps":user,"add":DOMAIN,"port":"443","id":uid,"aid":"0","net":"ws","type":"none","host":DOMAIN,"path":"/vmessws","tls":"tls","sni":DOMAIN}
+        none_tls_dict = {"v":"2","ps":user,"add":DOMAIN,"port":"80","id":uid,"aid":"0","net":"ws","type":"none","host":DOMAIN,"path":"/vmessws","tls":"","sni":""}
+        link_tls = "vmess://" + base64.b64encode(json.dumps(tls_dict, separators=(',', ':')).encode('utf-8')).decode('utf-8')
+        link_none = "vmess://" + base64.b64encode(json.dumps(none_tls_dict, separators=(',', ':')).encode('utf-8')).decode('utf-8')
+        res += f"LINK WS TLS : {link_tls}\n━━━━━━━━━━━━━━━━━━━━\nLINK WS NONE-TLS : {link_none}\n━━━━━━━━━━━━━━━━━━━━\n"
+        
+    elif protocol == 'vless':
+        res += f"Port NONE-TLS : 80\nID : {uid}\nNetwork : Websocket\nWebsocket Path : /vlessws\n━━━━━━━━━━━━━━━━━━━━\n"
+        link_tls = f"vless://{uid}@{DOMAIN}:443?path=/vlessws&security=tls&encryption=none&host={DOMAIN}&type=ws&sni={DOMAIN}#{user}"
+        link_none = f"vless://{uid}@{DOMAIN}:80?path=/vlessws&security=none&encryption=none&host={DOMAIN}&type=ws#{user}"
+        res += f"LINK WS TLS : {link_tls}\n━━━━━━━━━━━━━━━━━━━━\nLINK WS NONE-TLS : {link_none}\n━━━━━━━━━━━━━━━━━━━━\n"
+        
+    elif protocol == 'trojan':
+        res += f"Password : {uid}\nNetwork : Websocket\nWebsocket Path : /trojanws\n━━━━━━━━━━━━━━━━━━━━\n"
+        link_tls = f"trojan://{uid}@{DOMAIN}:443?path=/trojanws&security=tls&host={DOMAIN}&type=ws&sni={DOMAIN}#{user}"
+        res += f"LINK WS TLS : {link_tls}\n━━━━━━━━━━━━━━━━━━━━\n"
+        
+    res += f"Expired On : {exp_date_str}"
+    return res
 
 @app.route('/user_legend/add-<protocol>ws', methods=['POST'])
 def add_user(protocol):
@@ -181,9 +213,12 @@ def add_user(protocol):
                 if protocol == 'vmess': c['alterId'] = 0
                 cls.append(c)
     save_json(XRAY_CONF, cfg)
-    with open(EXP_FILE, 'a') as f: f.write(f"{user} {dt.strftime('%Y-%m-%d %H:%M:%S')}\n")
+    dt_str = dt.strftime('%Y-%m-%d %H:%M:%S')
+    with open(EXP_FILE, 'a') as f: f.write(f"{user} {dt_str}\n")
     restart_xray()
-    return jsonify({"stdout": f"Success: {user} added to {protocol}ws."})
+    
+    detail_msg = generate_account_detail(protocol, user, uid, dt_str)
+    return jsonify({"stdout": detail_msg})
 
 @app.route('/user_legend/trial-<protocol>ws', methods=['POST'])
 def trial_user(protocol):
@@ -204,9 +239,12 @@ def trial_user(protocol):
                 if protocol == 'vmess': c['alterId'] = 0
                 cls.append(c)
     save_json(XRAY_CONF, cfg)
-    with open(EXP_FILE, 'a') as f: f.write(f"{user} {dt.strftime('%Y-%m-%d %H:%M:%S')}\n")
+    dt_str = dt.strftime('%Y-%m-%d %H:%M:%S')
+    with open(EXP_FILE, 'a') as f: f.write(f"{user} {dt_str}\n")
     restart_xray()
-    return jsonify({"stdout": f"Success: Trial {user} added."})
+    
+    detail_msg = generate_account_detail(protocol, user, uid, dt_str, True)
+    return jsonify({"stdout": detail_msg})
 
 @app.route('/user_legend/del-<protocol>ws', methods=['DELETE'])
 def del_user(protocol):
@@ -260,12 +298,28 @@ def detail_user(protocol):
     data = request.json or {}
     user = data.get('user')
     cfg = load_json(XRAY_CONF)
+    
+    uid = None
     for ib in cfg.get('inbounds', []):
         if ib.get('protocol') == protocol:
             for c in ib['settings']['clients']:
                 if c.get('email') == user:
-                    return jsonify({"stdout": f"Found: {json.dumps(c)}"})
-    return jsonify({"stdout": "Not found"})
+                    uid = c.get('id') if protocol != 'trojan' else c.get('password')
+                    break
+    
+    if uid:
+        exp_date_str = "Lifetime / No Exp"
+        if os.path.exists(EXP_FILE):
+            with open(EXP_FILE, 'r') as f:
+                for line in f:
+                    if line.startswith(user + ' '):
+                        parts = line.strip().split(' ', 1)
+                        if len(parts) > 1: exp_date_str = parts[1]
+                        break
+        detail_msg = generate_account_detail(protocol, user, uid, exp_date_str)
+        return jsonify({"stdout": detail_msg})
+        
+    return jsonify({"stdout": "Error: User not found"})
 
 @app.route('/user_legend/change-uuid', methods=['POST'])
 def change_uuid():
@@ -344,6 +398,10 @@ if __name__ == '__main__':
     app.run(host='127.0.0.1', port=5000)
 EOF
 chmod +x /usr/local/bin/xray-api.py
+
+# Inject variabel ke dalam file Python
+sed -i "s/DOMAIN_PLACEHOLDER/$DOMAIN/g" /usr/local/bin/xray-api.py
+sed -i "s/IP_PLACEHOLDER/$VPS_IP/g" /usr/local/bin/xray-api.py
 
 cat > /etc/systemd/system/xray-api.service << EOF
 [Unit]
