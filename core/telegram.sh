@@ -5,6 +5,8 @@
 # Berisi fungsi integrasi bot Telegram dan Backup
 # ==========================================
 
+source /usr/local/etc/srpcom/env.conf
+
 load_bot_setting() {
     source /usr/local/etc/xray/bot_setting.conf
 }
@@ -30,7 +32,6 @@ setup_autobackup_cron() {
             24) cron_exp="0 * * * *" ;;
             *) cron_exp="0 * * * *" ;;
         esac
-        # Kita panggil telegram.sh dengan argumen 'cron_backup'
         echo "$cron_exp root /usr/local/bin/srpcom/telegram.sh cron_backup" > /etc/cron.d/xray_autobackup
     else
         rm -f /etc/cron.d/xray_autobackup
@@ -55,11 +56,11 @@ manual_backup_telegram() {
     echo "     MANUAL BACKUP VIA TELEGRAM       "
     echo "======================================"
     if [ -z "$BOT_TOKEN" ] || [ -z "$CHAT_ID" ]; then
-        echo -e "${RED}API Bot atau Chat ID belum disetting!${NC}"
+        echo -e "\e[31mAPI Bot atau Chat ID belum disetting!\e[0m"
+        echo "Silakan setting di menu Autobackup/Autosend terlebih dahulu."
         sleep 3; return
     fi
     
-    source /usr/local/etc/srpcom/env.conf
     XRAY_C=$(jq '[.inbounds[].settings.clients | length] | add' /usr/local/etc/xray/config.json 2>/dev/null || echo 0)
     BACKUP_NAME="xray-backup-$(date +"%Y%m%d_%H%M%S").tar.gz"
     BACKUP_FILE="/root/$BACKUP_NAME"
@@ -67,13 +68,89 @@ manual_backup_telegram() {
     tar -czf "$BACKUP_FILE" -C / usr/local/etc/xray/config.json usr/local/etc/xray/expiry.txt usr/local/etc/xray/bot_setting.conf usr/local/etc/srpcom/env.conf 2>/dev/null
     
     echo "Sedang mengirim file backup ke Telegram..."
-    curl -s -F chat_id="${CHAT_ID}" -F document=@"${BACKUP_FILE}" -F caption="Backup XRAY | ${XRAY_C} account | IP: ${IP_ADD} | Date: $(date)" "https://api.telegram.org/bot${BOT_TOKEN}/sendDocument" > /dev/null
+    curl -s -F chat_id="${CHAT_ID}" -F document=@"${BACKUP_FILE}" -F caption="Manual Backup XRAY | ${XRAY_C} account | IP: ${IP_ADD} | Date: $(date)" "https://api.telegram.org/bot${BOT_TOKEN}/sendDocument" > /dev/null
     
-    echo -e "\n${GREEN}[SUCCESS] Backup berhasil dikirim!${NC}"
+    echo -e "\n\e[32m[SUCCESS]\e[0m Backup berhasil dikirim ke Telegram!"
     pause
 }
 
-# --- Eksekusi Khusus Cronjob ---
+menu_autobackup() {
+    clear
+    load_bot_setting
+    if [[ "$BACKUP_TIME" == *":"* ]]; then BACKUP_TIME="24"; fi
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo "   » Backup Data Via Telegram Bot «"
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo " Status Autobackup Data Via Bot Is [$AUTOBACKUP_STATUS]"
+    echo "   [1]  Start Backup Data (Enable)"
+    echo "   [2]  Change Api Bot & Chat ID"
+    echo "   [3]  Change Backup Frequency (Current: $BACKUP_TIME kali/hari)"
+    echo "   [4]  Stop Autobackup Data (Disable)"
+    echo "   [0]  Back to Settings"
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    read -p "   Select From Options [1-4 or 0] : " opt
+    case $opt in
+        1) AUTOBACKUP_STATUS="ON"; save_bot_setting; setup_autobackup_cron; echo "Autobackup Enabled!"; sleep 1 ;;
+        2) 
+            read -p "Input New API Bot: " new_api; BOT_TOKEN="$new_api"
+            read -p "Input New Chat ID: " new_id; CHAT_ID="$new_id"
+            save_bot_setting; echo "Data Bot Tersimpan!"; sleep 1 ;;
+        3) 
+            echo -e "\nPilih Frekuensi Backup:"
+            echo " [1] 2 Kali Sehari  (Tiap 12 Jam)"
+            echo " [2] 4 Kali Sehari  (Tiap 6 Jam)"
+            echo " [3] 6 Kali Sehari  (Tiap 4 Jam)"
+            echo " [4] 12 Kali Sehari (Tiap 2 Jam)"
+            echo " [5] 24 Kali Sehari (Tiap 1 Jam)"
+            read -p " Pilih opsi [1-5]: " freq_opt
+            case $freq_opt in
+                1) BACKUP_TIME="2" ;;
+                2) BACKUP_TIME="4" ;;
+                3) BACKUP_TIME="6" ;;
+                4) BACKUP_TIME="12" ;;
+                5) BACKUP_TIME="24" ;;
+                *) echo "Pilihan tidak valid!"; sleep 1; return ;;
+            esac
+            save_bot_setting; setup_autobackup_cron; echo "Frekuensi Backup Diubah menjadi $BACKUP_TIME kali sehari!"; sleep 1.5 ;;
+        4) AUTOBACKUP_STATUS="OFF"; save_bot_setting; setup_autobackup_cron; echo "Autobackup Disabled!"; sleep 1 ;;
+        0) return ;;
+        *) echo "Pilihan tidak valid!"; sleep 1 ;;
+    esac
+}
+
+menu_autosend() {
+    clear
+    load_bot_setting
+    echo "======================"
+    echo "AUTOSEND ACCOUNT VPN"
+    echo "AFTER CREATED"
+    echo "======================"
+    echo "STATUS AUTOSEND ACCOUNT ($AUTOSEND_STATUS !)"
+    echo "Current IDtelegram : $CHAT_ID"
+    echo "Current API BOT : $BOT_TOKEN"
+    echo "======================"
+    echo " [1] Change User ID (warn: don't use id group)"
+    echo " [2] Change API BOT TELEGRAM"
+    if [ "$AUTOSEND_STATUS" == "ON" ]; then
+        echo " [3] Stop AUTOSEND ACCOUNT"
+    else
+        echo " [3] Start AUTOSEND ACCOUNT"
+    fi
+    echo " [0] Back to Settings"
+    echo ""
+    read -p " Select From Options [1-3 or 0] : " opt
+    case $opt in
+        1) read -p "Input New Chat ID: " new_id; CHAT_ID="$new_id"; save_bot_setting ;;
+        2) read -p "Input New API Bot: " new_api; BOT_TOKEN="$new_api"; save_bot_setting ;;
+        3) 
+            if [ "$AUTOSEND_STATUS" == "ON" ]; then AUTOSEND_STATUS="OFF"; else AUTOSEND_STATUS="ON"; fi
+            save_bot_setting ;;
+        0) return ;;
+        *) echo "Pilihan tidak valid!"; sleep 1 ;;
+    esac
+}
+
+# Eksekusi Cronjob jika dijalankan langsung oleh sistem (Bukan menu)
 if [[ "$1" == "cron_backup" ]]; then
     manual_backup_telegram
     exit 0
