@@ -77,9 +77,18 @@ def api_req(endpoint, method="POST", payload=None):
             res = requests.delete(url, headers=headers, json=payload, timeout=10)
         else:
             res = requests.post(url, headers=headers, json=payload, timeout=10)
-        return res.json().get('stdout', 'Server error.')
+        
+        # Penanganan jika response bukan JSON
+        try:
+            return res.json().get('stdout', 'Server tidak memberikan respon.')
+        except ValueError:
+            # Jika server error atau kirim teks biasa
+            if res.text:
+                return res.text
+            return f"Server Error ({res.status_code})"
+            
     except Exception as e:
-        return f"API Error: {str(e)}"
+        return f"Koneksi API Gagal: {str(e)}"
 
 # --- FUNGSI LOGIKA LIST & BACKUP ---
 def get_list_accounts(prot):
