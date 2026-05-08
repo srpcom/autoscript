@@ -30,9 +30,9 @@ add_vmess_ws() {
     link_tls="vmess://$(echo -n "$tls_json" | jq -c . | base64 -w 0)"
     link_none_tls="vmess://$(echo -n "$none_tls_json" | jq -c . | base64 -w 0)"
     
-    msg="━━━━━━━━━━━━━━━━━━━━\n❖ XRAY/VMESS WS ❖\n━━━━━━━━━━━━━━━━━━━━\nRemarks : ${user}\nIP Address : ${IP_ADD}\nDomain : ${DOMAIN}\nPort TLS : 443\nPort NONE-TLS : 80\nID : ${uuid}\nNetwork : Websocket\nWebsocket Path : /vmessws\n━━━━━━━━━━━━━━━━━━━━\nLINK WS TLS : ${link_tls}\n━━━━━━━━━━━━━━━━━━━━\nLINK WS NONE-TLS : ${link_none_tls}\n━━━━━━━━━━━━━━━━━━━━\nEXPIRED ON : ${exp_date} ${exp_time} (${masaaktif} days)"
+    msg=$(echo -e "━━━━━━━━━━━━━━━━━━━━\n❖ XRAY/VMESS WS ❖\n━━━━━━━━━━━━━━━━━━━━\nRemarks : ${user}\nIP Address : ${IP_ADD}\nDomain : ${DOMAIN}\nPort TLS : 443\nPort NONE-TLS : 80\nID : ${uuid}\nNetwork : Websocket\nWebsocket Path : /vmessws\n━━━━━━━━━━━━━━━━━━━━\nLINK WS TLS : ${link_tls}\n━━━━━━━━━━━━━━━━━━━━\nLINK WS NONE-TLS : ${link_none_tls}\n━━━━━━━━━━━━━━━━━━━━\nEXPIRED ON : ${exp_date} ${exp_time} WIB (${masaaktif} days)")
     
-    clear; echo -e "$msg"
+    clear; echo "$msg"
     send_telegram "$msg"
     pause
 }
@@ -58,9 +58,9 @@ add_vless_ws() {
     link_tls="vless://${uuid}@${DOMAIN}:443?path=/vlessws&security=tls&encryption=none&host=${DOMAIN}&type=ws&sni=${DOMAIN}#${user}"
     link_none_tls="vless://${uuid}@${DOMAIN}:80?path=/vlessws&security=none&encryption=none&host=${DOMAIN}&type=ws#${user}"
     
-    msg="━━━━━━━━━━━━━━━━━━━━\n❖ XRAY/VLESS WS ❖\n━━━━━━━━━━━━━━━━━━━━\nRemarks : ${user}\nIP Address : ${IP_ADD}\nDomain : ${DOMAIN}\nPort TLS : 443\nPort NONE-TLS : 80\nID : ${uuid}\nNetwork : Websocket\nWebsocket Path : /vlessws\n━━━━━━━━━━━━━━━━━━━━\nLINK WS TLS : ${link_tls}\n━━━━━━━━━━━━━━━━━━━━\nLINK WS NONE-TLS : ${link_none_tls}\n━━━━━━━━━━━━━━━━━━━━\nEXPIRED ON : ${exp_date} ${exp_time} (${masaaktif} days)"
+    msg=$(echo -e "━━━━━━━━━━━━━━━━━━━━\n❖ XRAY/VLESS WS ❖\n━━━━━━━━━━━━━━━━━━━━\nRemarks : ${user}\nIP Address : ${IP_ADD}\nDomain : ${DOMAIN}\nPort TLS : 443\nPort NONE-TLS : 80\nID : ${uuid}\nNetwork : Websocket\nWebsocket Path : /vlessws\n━━━━━━━━━━━━━━━━━━━━\nLINK WS TLS : ${link_tls}\n━━━━━━━━━━━━━━━━━━━━\nLINK WS NONE-TLS : ${link_none_tls}\n━━━━━━━━━━━━━━━━━━━━\nEXPIRED ON : ${exp_date} ${exp_time} WIB (${masaaktif} days)")
     
-    clear; echo -e "$msg"
+    clear; echo "$msg"
     send_telegram "$msg"
     pause
 }
@@ -85,9 +85,9 @@ add_trojan_ws() {
     
     link_tls="trojan://${uuid}@${DOMAIN}:443?path=/trojanws&security=tls&host=${DOMAIN}&type=ws&sni=${DOMAIN}#${user}"
     
-    msg="━━━━━━━━━━━━━━━━━━━━\n❖ XRAY/TROJAN WS ❖\n━━━━━━━━━━━━━━━━━━━━\nRemarks : ${user}\nIP Address : ${IP_ADD}\nDomain : ${DOMAIN}\nPort TLS : 443\nPassword : ${uuid}\nNetwork : Websocket\nWebsocket Path : /trojanws\n━━━━━━━━━━━━━━━━━━━━\nLINK WS TLS : ${link_tls}\n━━━━━━━━━━━━━━━━━━━━\nEXPIRED ON : ${exp_date} ${exp_time} (${masaaktif} days)"
+    msg=$(echo -e "━━━━━━━━━━━━━━━━━━━━\n❖ XRAY/TROJAN WS ❖\n━━━━━━━━━━━━━━━━━━━━\nRemarks : ${user}\nIP Address : ${IP_ADD}\nDomain : ${DOMAIN}\nPort TLS : 443\nPassword : ${uuid}\nNetwork : Websocket\nWebsocket Path : /trojanws\n━━━━━━━━━━━━━━━━━━━━\nLINK WS TLS : ${link_tls}\n━━━━━━━━━━━━━━━━━━━━\nEXPIRED ON : ${exp_date} ${exp_time} WIB (${masaaktif} days)")
     
-    clear; echo -e "$msg"
+    clear; echo "$msg"
     send_telegram "$msg"
     pause
 }
@@ -128,9 +128,35 @@ add_trial() {
     echo "$user $exp_date $exp_time" >> /usr/local/etc/xray/expiry.txt
     systemctl restart xray
     
-    echo -e "\n\e[32m[SUCCESS] Trial Account ${prot^^} Created!\e[0m"
-    echo "ID: $uuid"
-    echo "Expired: $exp_date $exp_time"
+    if [[ "$prot" == "vmess" ]]; then
+        tls_json="{\"v\":\"2\",\"ps\":\"${user}\",\"add\":\"${DOMAIN}\",\"port\":\"443\",\"id\":\"${uuid}\",\"aid\":\"0\",\"net\":\"ws\",\"type\":\"none\",\"host\":\"${DOMAIN}\",\"path\":\"/vmessws\",\"tls\":\"tls\",\"sni\":\"${DOMAIN}\"}"
+        none_tls_json="{\"v\":\"2\",\"ps\":\"${user}\",\"add\":\"${DOMAIN}\",\"port\":\"80\",\"id\":\"${uuid}\",\"aid\":\"0\",\"net\":\"ws\",\"type\":\"none\",\"host\":\"${DOMAIN}\",\"path\":\"/vmessws\",\"tls\":\"\",\"sni\":\"\"}"
+        link_tls="vmess://$(echo -n "$tls_json" | jq -c . | base64 -w 0)"
+        link_none_tls="vmess://$(echo -n "$none_tls_json" | jq -c . | base64 -w 0)"
+        port_none="80"
+        path="/vmessws"
+    elif [[ "$prot" == "vless" ]]; then
+        link_tls="vless://${uuid}@${DOMAIN}:443?path=/vlessws&security=tls&encryption=none&host=${DOMAIN}&type=ws&sni=${DOMAIN}#${user}"
+        link_none_tls="vless://${uuid}@${DOMAIN}:80?path=/vlessws&security=none&encryption=none&host=${DOMAIN}&type=ws#${user}"
+        port_none="80"
+        path="/vlessws"
+    elif [[ "$prot" == "trojan" ]]; then
+        link_tls="trojan://${uuid}@${DOMAIN}:443?path=/trojanws&security=tls&host=${DOMAIN}&type=ws&sni=${DOMAIN}#${user}"
+        link_none_tls="-"
+        port_none="-"
+        path="/trojanws"
+    fi
+
+    msg_str="━━━━━━━━━━━━━━━━━━━━\n❖ XRAY/${prot^^} WS TRIAL ❖\n━━━━━━━━━━━━━━━━━━━━\nRemarks : ${user}\nIP Address : ${IP_ADD}\nDomain : ${DOMAIN}\nPort TLS : 443\nPort NONE-TLS : ${port_none}\nID/PW : ${uuid}\nNetwork : Websocket\nWebsocket Path : ${path}\n━━━━━━━━━━━━━━━━━━━━\nLINK WS TLS : ${link_tls}\n━━━━━━━━━━━━━━━━━━━━"
+    if [[ "$prot" != "trojan" ]]; then
+        msg_str="${msg_str}\nLINK WS NONE-TLS : ${link_none_tls}\n━━━━━━━━━━━━━━━━━━━━"
+    fi
+    msg_str="${msg_str}\nEXPIRED ON : ${exp_date} ${exp_time} WIB (${masaaktif})"
+    
+    msg=$(echo -e "$msg_str")
+    
+    clear; echo "$msg"
+    send_telegram "$msg"
     pause
 }
 
@@ -229,7 +255,7 @@ renew_xray() {
         echo "$user $new_exp_date $new_exp_time" >> /usr/local/etc/xray/expiry.txt
         
         echo -e "\n\e[32m=> Akun '$user' diperpanjang $masaaktif Hari!\e[0m"
-        echo "=> Expired Baru: $new_exp_date $new_exp_time"
+        echo "=> Expired Baru: $new_exp_date $new_exp_time WIB"
         sleep 2
     else
         echo -e "\n=> Pilihan tidak valid!"; sleep 1; renew_xray
@@ -305,7 +331,7 @@ show_detail() {
     fi
     echo "━━━━━━━━━━━━━━━━━━━━"
     exp_date=$(grep "^$user " /usr/local/etc/xray/expiry.txt | cut -d' ' -f2-)
-    if [ -z "$exp_date" ]; then exp_date="Lifetime / No Exp"; fi
+    if [ -z "$exp_date" ]; then exp_date="Lifetime / No Exp"; else exp_date="$exp_date WIB"; fi
     echo "Expired On : $exp_date"
     echo ""
     pause
