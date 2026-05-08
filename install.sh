@@ -5,10 +5,8 @@
 # OS Support: Ubuntu 20.04 / 22.04 / 24.04 LTS
 # ==========================================
 
-# --- KONFIGURASI GITHUB ANDA ---
 GITHUB_RAW="https://raw.githubusercontent.com/syamsul18782/xray2026/main"
 
-# Memastikan script dijalankan sebagai root
 if [ "${EUID}" -ne 0 ]; then
     echo -e "\e[31m[ERROR]\e[0m Script ini harus dijalankan sebagai root (Gunakan 'sudo su' terlebih dahulu)."
     exit 1
@@ -17,41 +15,34 @@ fi
 clear
 echo "=========================================="
 echo "  MEMULAI INSTALASI XRAY, CADDY, L2TP, SSH"
-echo "  SUPPORT UBUNTU 20/22/24 LTS (MODULAR)"
+echo "  SUPPORT UBUNTU 20/22/24 LTS (FINAL V4)"
 echo "=========================================="
 
-# Mendapatkan IP Publik
 VPS_IP=$(curl -sS --max-time 5 ipv4.icanhazip.com || curl -sS --max-time 5 ifconfig.me)
 
-# Looping Validasi Domain
 while true; do
     read -p "Masukkan Domain VPS Anda (contoh: sg1.srpcom.cloud): " DOMAIN
     if [ -z "$DOMAIN" ]; then echo -e "\e[31m[ERROR]\e[0m Domain tidak boleh kosong!\n"; continue; fi
-
     DOMAIN_IP=$(getent ahostsv4 "$DOMAIN" | awk '{ print $1 }' | head -n 1)
     if [ "$DOMAIN_IP" == "$VPS_IP" ]; then
         echo -e "\e[32m[SUCCESS]\e[0m Domain valid! ($DOMAIN -> $VPS_IP)"
         break
     else
         echo -e "\e[31m[ERROR] VERIFIKASI DOMAIN GAGAL!\e[0m"
-        echo -e "\e[33m[Solusi]\e[0m Pastikan A Record di DNS mengarah ke IP $VPS_IP (DNS Only)."
-        echo -e "Tunggu 1-2 menit setelah merubah DNS, lalu coba lagi...\n"
+        echo -e "\e[33m[Solusi]\e[0m Pastikan A Record di DNS mengarah ke IP $VPS_IP (DNS Only).\n"
     fi
 done
 
 echo -e "\n[1/10] Memperbarui sistem & dependensi..."
 export DEBIAN_FRONTEND=noninteractive
 apt update && apt upgrade -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold"
-# Tambah paket: dropbear untuk SSH
 apt install curl wget unzip uuid-runtime jq tzdata ufw cron gnupg2 gnupg python3 python3-flask strongswan xl2tpd iptables dropbear -y
 timedatectl set-timezone Asia/Jakarta
 
-# Membuat Struktur Folder SRPCOM
 mkdir -p /usr/local/etc/srpcom
 mkdir -p /usr/local/bin/srpcom
 mkdir -p /usr/local/etc/xray
 
-# Menyimpan Data Global (Environment Variable)
 cat > /usr/local/etc/srpcom/env.conf << EOF
 DOMAIN="$DOMAIN"
 IP_ADD="$VPS_IP"
@@ -61,7 +52,7 @@ echo -e "\n[2/10] Menginstal Xray-core..."
 bash -c "$(curl -L https://github.com/XTLS/Xray-install/raw/main/install-release.sh)" @ install
 systemctl enable xray
 
-echo -e "\n[3/10] Mengonfigurasi Xray Core..."
+echo -e "\n[3/10] Mengonfigurasi Xray Core (Limit & Kuota Enabled)..."
 mkdir -p /var/log/xray
 touch /var/log/xray/access.log
 touch /var/log/xray/error.log
@@ -71,15 +62,21 @@ chmod -R 777 /var/log/xray
 cat > /usr/local/etc/xray/config.json << EOF
 {
   "log": {"access": "/var/log/xray/access.log", "error": "/var/log/xray/error.log", "loglevel": "warning"},
+  "api": {"services": ["StatsService", "LoggerService"], "tag": "api"},
+  "stats": {},
+  "policy": {"levels": {"0": {"statsUserUplink": true, "statsUserDownlink": true}}, "system": {"statsInboundUplink": true, "statsInboundDownlink": true}},
   "inbounds": [
     {"port": 10001, "listen": "127.0.0.1", "protocol": "vmess", "settings": {"clients": []}, "streamSettings": {"network": "ws", "wsSettings": {"path": "/vmessws"}}},
     {"port": 10002, "listen": "127.0.0.1", "protocol": "vless", "settings": {"clients": [], "decryption": "none"}, "streamSettings": {"network": "ws", "wsSettings": {"path": "/vlessws"}}},
-    {"port": 10003, "listen": "127.0.0.1", "protocol": "trojan", "settings": {"clients": []}, "streamSettings": {"network": "ws", "wsSettings": {"path": "/trojanws"}}}
+    {"port": 10003, "listen": "127.0.0.1", "protocol": "trojan", "settings": {"clients": []}, "streamSettings": {"network": "ws", "wsSettings": {"path": "/trojanws"}}},
+    {"port": 10085, "listen": "127.0.0.1", "protocol": "dokodemo-door", "settings": {"address": "127.0.0.1"}, "tag": "api"}
   ],
-  "outbounds": [{"protocol": "freedom"}]
+  "outbounds": [{"protocol": "freedom"}],
+  "routing": {"rules": [{"inboundTag": ["api"], "outboundTag": "api", "type": "field"}]}
 }
 EOF
 touch /usr/local/etc/xray/expiry.txt
+touch /usr/local/etc/xray/limit.txt
 cat > /usr/local/etc/xray/bot_setting.conf << 'EOF'
 BOT_TOKEN=""
 CHAT_ID=""
@@ -151,7 +148,6 @@ touch /usr/local/etc/srpcom/l2tp_expiry.txt
 systemctl enable ipsec xl2tpd
 
 echo -e "\n[5/10] Mengonfigurasi SSH (Dropbear) & SSH-WS Proxy..."
-# PERBAIKAN: Konfigurasi Dropbear fix untuk Ubuntu 24.04
 cat > /etc/default/dropbear << 'EOF'
 NO_START=0
 DROPBEAR_PORT=109
@@ -162,7 +158,6 @@ EOF
 systemctl restart dropbear
 systemctl enable dropbear
 
-# Membuat Python Websocket Proxy untuk SSH (Port 10004)
 cat > /usr/local/bin/ssh-ws.py << 'EOF'
 import socket, threading, sys
 def handle_client(client_socket):
@@ -185,7 +180,6 @@ def handle_client(client_socket):
         threading.Thread(target=forward, args=(client_socket, ssh_socket)).start()
         threading.Thread(target=forward, args=(ssh_socket, client_socket)).start()
     except: client_socket.close()
-
 def main():
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -194,20 +188,16 @@ def main():
     while True:
         client, addr = server.accept()
         threading.Thread(target=handle_client, args=(client,)).start()
-
 if __name__ == '__main__': main()
 EOF
-
 cat > /etc/systemd/system/ssh-ws.service << EOF
 [Unit]
 Description=SSH WebSocket Proxy Service
 After=network.target
-
 [Service]
 ExecStart=/usr/bin/python3 /usr/local/bin/ssh-ws.py
 Restart=always
 User=root
-
 [Install]
 WantedBy=multi-user.target
 EOF
@@ -216,6 +206,7 @@ systemctl enable ssh-ws
 systemctl start ssh-ws
 
 touch /usr/local/etc/srpcom/ssh_expiry.txt
+touch /usr/local/etc/srpcom/ssh_limit.txt
 
 echo -e "\n[6/10] Mendownload Modul Sistem dari GitHub..."
 wget -q -O /usr/local/bin/srpcom/utils.sh "$GITHUB_RAW/core/utils.sh"
@@ -223,12 +214,12 @@ wget -q -O /usr/local/bin/srpcom/telegram.sh "$GITHUB_RAW/core/telegram.sh"
 wget -q -O /usr/local/bin/srpcom/xray.sh "$GITHUB_RAW/core/xray.sh"
 wget -q -O /usr/local/bin/srpcom/l2tp.sh "$GITHUB_RAW/core/l2tp.sh"
 wget -q -O /usr/local/bin/srpcom/ssh.sh "$GITHUB_RAW/core/ssh.sh"
+wget -q -O /usr/local/bin/srpcom/monitor.sh "$GITHUB_RAW/core/monitor.sh"
 wget -q -O /usr/local/bin/srpcom/menu.sh "$GITHUB_RAW/core/menu.sh"
 wget -q -O /usr/local/bin/xray-api.py "$GITHUB_RAW/configs/xray-api.py"
 
 chmod +x /usr/local/bin/srpcom/*.sh
 chmod +x /usr/local/bin/xray-api.py
-
 ln -sf /usr/local/bin/srpcom/menu.sh /usr/bin/menu
 
 echo -e "\n[7/10] Mengonfigurasi Layanan API..."
@@ -236,17 +227,14 @@ cat > /etc/systemd/system/xray-api.service << EOF
 [Unit]
 Description=Xray Python API Backend
 After=network.target
-
 [Service]
 ExecStart=/usr/bin/python3 /usr/local/bin/xray-api.py
 Restart=always
 User=root
 Environment=PYTHONUNBUFFERED=1
-
 [Install]
 WantedBy=multi-user.target
 EOF
-
 systemctl daemon-reload
 systemctl enable xray-api
 systemctl start xray-api
@@ -267,12 +255,10 @@ cat > /etc/systemd/system/l2tp-nat.service << EOF
 [Unit]
 Description=L2TP NAT IPTables Rules
 After=network.target ufw.service
-
 [Service]
 Type=oneshot
 ExecStart=/sbin/iptables -t nat -A POSTROUTING -s 192.168.42.0/24 -o $ETH -j MASQUERADE
 RemainAfterExit=yes
-
 [Install]
 WantedBy=multi-user.target
 EOF
@@ -318,8 +304,7 @@ systemctl restart xray caddy cron xray-api ipsec xl2tpd dropbear ssh-ws
 
 clear
 echo "======================================================"
-echo "    INSTALASI SELESAI & BERHASIL! (V3 MULTIPORT)      "
+echo "    INSTALASI SELESAI & BERHASIL! (V4 FINAL)          "
 echo "======================================================"
-echo "Protokol: VMESS, VLESS, TROJAN, L2TP, SSH/Dropbear/WS"
 echo "Ketik 'menu' untuk masuk ke dashboard manajemen."
 echo "======================================================"
