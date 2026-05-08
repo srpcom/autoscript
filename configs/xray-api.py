@@ -81,7 +81,7 @@ def generate_account_detail(protocol, user, uid, exp_date_str, is_trial=False, l
         link_tls = f"trojan://{uid}@{DOMAIN}:443?path=/trojanws&security=tls&host={DOMAIN}&type=ws&sni={DOMAIN}#{user}"
         link_none = ""
 
-    # msg_web: Bersih (Untuk Website)
+    # msg_web: Tanpa Backtick (Untuk Website)
     msg_web = (
         f"━━━━━━━━━━━━━━━━━━━━\n"
         f"❖ XRAY/{protocol.upper()} WS{trial_txt} ❖\n"
@@ -105,7 +105,7 @@ def generate_account_detail(protocol, user, uid, exp_date_str, is_trial=False, l
         f"Expired On : {exp_date_str} WIB"
     )
 
-    # msg_tg: Dengan Backtick (Khusus Telegram/Bot Admin agar Click-to-Copy Aktif)
+    # msg_tg: Dengan Backtick (Untuk Telegram - Click to Copy)
     msg_tg = (
         f"━━━━━━━━━━━━━━━━━━━━\n"
         f"❖ XRAY/{protocol.upper()} WS{trial_txt} ❖\n"
@@ -155,8 +155,10 @@ def add_user(protocol):
     with open(LIMIT_FILE, 'a') as f: f.write(f"{user} {limit_ip} {limit_quota}\n")
     restart_xray()
     msg_web, msg_tg = generate_account_detail(protocol, user, uid, dt_str, False, limit_ip, limit_quota)
-    send_telegram(msg_tg) # Notif Telegram pake backtick
-    return jsonify({"stdout": msg_web}) # Balasan Website pake polos
+    send_telegram(msg_tg)
+    # Kembalikan msg_tg jika dipanggil dari Bot Admin, atau msg_web jika dipanggil dari Website?
+    # Cara paling aman: Selalu return msg_tg untuk kenyamanan admin, Website biasanya memproses ulang teksnya.
+    return jsonify({"stdout": msg_tg})
 
 @app.route('/user_legend/trial-<protocol>ws', methods=['POST'])
 def trial_user(protocol):
@@ -182,7 +184,7 @@ def trial_user(protocol):
     restart_xray()
     msg_web, msg_tg = generate_account_detail(protocol, user, uid, dt_str, True, limit_ip, 1)
     send_telegram(msg_tg)
-    return jsonify({"stdout": msg_web})
+    return jsonify({"stdout": msg_tg})
 
 @app.route('/user_legend/detail-<protocol>ws', methods=['GET', 'POST'])
 def detail_user(protocol):
@@ -209,8 +211,14 @@ def detail_user(protocol):
                         p = line.strip().split()
                         if len(p) >= 3: limit_ip, limit_q = int(p[1]), int(p[2]); break
         msg_web, msg_tg = generate_account_detail(protocol, user, uid, exp_date_str, False, limit_ip, limit_q)
-        return jsonify({"stdout": msg_tg}) # Bot Admin butuh format TG (backtick)
+        return jsonify({"stdout": msg_tg})
     return jsonify({"stdout": "Error: User not found"})
+
+@app.route('/user_legend/cek-xray', methods=['GET'])
+def cek_xray():
+    if not check_auth(): return jsonify({"stdout": "Unauthorized"}), 401
+    out = subprocess.run(['systemctl', 'is-active', 'xray'], capture_output=True, text=True).stdout.strip()
+    return jsonify({"stdout": f"Xray status: {out}, Domain: {DOMAIN}"})
 
 if __name__ == '__main__':
     app.run(host='127.0.0.1', port=5000)
