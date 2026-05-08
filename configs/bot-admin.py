@@ -209,6 +209,102 @@ def status_menu_keyboard():
     )
     return markup
 
+def monitor_menu_keyboard():
+    markup = InlineKeyboardMarkup(row_width=1)
+    markup.add(
+        InlineKeyboardButton("📈 MONITOR XRAY (IP & KUOTA)", callback_data="mon_xray"),
+        InlineKeyboardButton("💻 MONITOR SSH (USER AKTIF)", callback_data="mon_ssh"),
+        InlineKeyboardButton("🔙 KEMBALI", callback_data="menu_main")
+    )
+    return markup
+
+# --- FUNGSI MONITORING ---
+def get_monitor_xray():
+    try:
+        ip_data = {}
+        if os.path.exists('/var/log/xray/access.log'):
+            try:
+                out = subprocess.run(['tail', '-n', '3000', '/var/log/xray/access.log'], capture_output=True, text=True)
+                for line in out.stdout.splitlines():
+                    if 'accepted' in line and '127.0.0.1' not in line:
+                        parts = line.split()
+                        if len(parts) >= 7:
+                            user = parts[6]
+                            ip = parts[2].replace('tcp:', '').replace('udp:', '').split(':')[0]
+                            if user not in ip_data:
+                                ip_data[user] = set()
+                            ip_data[user].add(ip)
+            except: pass
+
+        stats = {}
+        try:
+            out = subprocess.run(['/usr/local/bin/xray', 'api', 'statsquery', '--server=127.0.0.1:10085'], capture_output=True, text=True)
+            data = json.loads(out.stdout)
+            for item in data.get('stat', []):
+                name_parts = item['name'].split('>>>')
+                if len(name_parts) >= 4 and name_parts[0] == 'user':
+                    user = name_parts[1]
+                    t_type = name_parts[3]
+                    if user not in stats:
+                        stats[user] = {'downlink': 0, 'uplink': 0}
+                    stats[user][t_type] = item.get('value', 0)
+        except: pass
+
+        limits = {}
+        if os.path.exists('/usr/local/etc/xray/limit.txt'):
+            with open('/usr/local/etc/xray/limit.txt', 'r') as f:
+                for line in f:
+                    p = line.strip().split()
+                    if len(p) >= 3:
+                        limits[p[0]] = {'ip': int(p[1]), 'quota': int(p[2])}
+
+        all_users = set(list(stats.keys()) + list(ip_data.keys()))
+        if not all_users:
+            return "Belum ada data pemakaian atau user aktif di Xray."
+
+        res = "📈 *XRAY MONITORING*\n━━━━━━━━━━━━━━━━━━━━\n"
+        for u in sorted(all_users):
+            active_ips = len(ip_data.get(u, set()))
+            lim_ip = limits.get(u, {}).get('ip', 0)
+            lim_ip_str = str(lim_ip) if lim_ip > 0 else 'Unli'
+            
+            dl = stats.get(u, {}).get('downlink', 0) / 1048576
+            ul = stats.get(u, {}).get('uplink', 0) / 1048576
+            tot_gb = (dl + ul) / 1024
+            
+            lim_q = limits.get(u, {}).get('quota', 0)
+            lim_q_str = f"{lim_q} GB" if lim_q > 0 else 'Unli'
+            
+            res += f"👤 *{u}*\n├ IP Aktif : {active_ips} / {lim_ip_str}\n└ Kuota : {tot_gb:.2f} GB / {lim_q_str}\n\n"
+        return res
+    except Exception as e:
+        return f"Gagal mengambil data monitoring Xray: {e}"
+
+def get_monitor_ssh():
+    try:
+        res = "💻 *SSH MONITORING*\n━━━━━━━━━━━━━━━━━━━━\n"
+        out = subprocess.run('netstat -tnpa', shell=True, capture_output=True, text=True)
+        active_users = []
+        for line in out.stdout.splitlines():
+            if 'ESTABLISHED' in line and ('dropbear' in line or 'sshd' in line):
+                parts = line.split()
+                if len(parts) >= 7:
+                    pid_prog = parts[6]
+                    pid = pid_prog.split('/')[0]
+                    ip = parts[4].split(':')[0]
+                    try:
+                        u_out = subprocess.run(['ps', '-o', 'user=', '-p', pid], capture_output=True, text=True)
+                        user = u_out.stdout.strip()
+                        if user and user != 'root':
+                            active_users.append(f"👤 `{user}` | 🌐 {ip}")
+                    except: pass
+        
+        if not active_users:
+            return res + "Belum ada user SSH/Dropbear yang aktif."
+        return res + "\n".join(active_users)
+    except Exception as e:
+        return f"Gagal mengambil data monitoring SSH: {e}"
+
 # --- HANDLERS ---
 @bot.message_handler(commands=['start', 'menu'])
 def send_welcome(message):
@@ -233,6 +329,17 @@ def handle_query(call):
         
         elif data == "menu_status":
             bot.edit_message_text("⚙️ *MENU STATUS & BACKUP*", chat_id, msg_id, reply_markup=status_menu_keyboard(), parse_mode="Markdown")
+
+        elif data == "menu_monitor":
+            bot.edit_message_text("📊 *MENU MONITORING*\nSilakan pilih layanan yang ingin dimonitor:", chat_id, msg_id, reply_markup=monitor_menu_keyboard(), parse_mode="Markdown")
+
+        elif data == "mon_xray":
+            bot.answer_callback_query(call.id, "Mengambil data Xray...")
+            bot.send_message(chat_id, get_monitor_xray(), parse_mode="Markdown")
+
+        elif data == "mon_ssh":
+            bot.answer_callback_query(call.id, "Mengambil data SSH...")
+            bot.send_message(chat_id, get_monitor_ssh(), parse_mode="Markdown")
         
         elif data == "sys_cek_status":
             bot.answer_callback_query(call.id, "Mengecek...")
