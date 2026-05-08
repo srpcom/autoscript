@@ -13,6 +13,76 @@ source /usr/local/bin/srpcom/xray.sh
 source /usr/local/bin/srpcom/l2tp.sh
 source /usr/local/bin/srpcom/ssh.sh
 
+change_domain() {
+    clear
+    echo "======================================"
+    echo "          GANTI DOMAIN VPS            "
+    echo "======================================"
+    echo "Domain saat ini : $DOMAIN"
+    echo "IP VPS          : $IP_ADD"
+    echo "======================================"
+    echo "PENTING: Pastikan A Record DNS domain baru"
+    echo "sudah mengarah ke IP VPS ini (DNS Only)!"
+    echo "======================================"
+    read -p "Masukkan Domain Baru (tekan 'x' untuk batal): " new_domain
+    
+    if [[ "$new_domain" == "x" || "$new_domain" == "X" || -z "$new_domain" ]]; then
+        return
+    fi
+
+    echo -e "\nMemeriksa resolusi DNS untuk $new_domain..."
+    domain_ip=$(getent ahostsv4 "$new_domain" | awk '{ print $1 }' | head -n 1)
+    
+    if [[ "$domain_ip" != "$IP_ADD" ]]; then
+        echo -e "\n\e[31m[ERROR]\e[0m Domain $new_domain belum mengarah ke IP $IP_ADD!"
+        echo "IP dari DNS saat ini: ${domain_ip:-Kosong/Tidak Ditemukan}"
+        echo "Silakan update DNS Anda (Matikan Proxy/Cloudflare Orange Cloud)"
+        echo "lalu tunggu 1-2 menit dan coba lagi."
+        sleep 4
+        return
+    fi
+
+    echo -e "\n=> Memperbarui konfigurasi domain..."
+    
+    # 1. Update env.conf
+    sed -i "s/^DOMAIN=.*/DOMAIN=\"$new_domain\"/g" /usr/local/etc/srpcom/env.conf
+    
+    # Reload env
+    source /usr/local/etc/srpcom/env.conf
+
+    # 2. Update Caddyfile
+    cat > /etc/caddy/Caddyfile << EOF
+http://$DOMAIN, https://$DOMAIN {
+    handle /user_legend/* {
+        reverse_proxy localhost:5000
+    }
+    handle / {
+        respond "Server is running normally." 200
+    }
+    handle /vmessws* {
+        reverse_proxy localhost:10001
+    }
+    handle /vlessws* {
+        reverse_proxy localhost:10002
+    }
+    handle /trojanws* {
+        reverse_proxy localhost:10003
+    }
+    handle /sshws* {
+        reverse_proxy localhost:10004
+    }
+}
+EOF
+
+    # 3. Restart Services
+    echo "=> Restarting Web Server & API..."
+    systemctl restart caddy
+    systemctl restart xray-api
+    
+    echo -e "\n\e[32m[SUCCESS]\e[0m Domain berhasil diganti menjadi $DOMAIN!"
+    sleep 2
+}
+
 menu_api_key() {
     clear
     echo "======================================"
@@ -101,15 +171,17 @@ menu_settings() {
         echo " [3] BACKUP VIA BOT TELEGRAM (MANUAL)"
         echo " [4] RESTORE DATA via VPS"
         echo " [5] SETTING API KEY FOR WEBSITE"
+        echo " [6] GANTI DOMAIN VPS"
         echo " [0/x] Back to Main Menu"
         echo ""
-        read -p " Select option [0-5 or x]: " opt
+        read -p " Select option [0-6 or x]: " opt
         case $opt in
             1) menu_autobackup ;;
             2) menu_autosend ;;
             3) manual_backup_telegram ;;
             4) restore_xray ;;
             5) menu_api_key ;;
+            6) change_domain ;;
             0|x|X) break ;;
             *) echo "Pilihan tidak valid!"; sleep 1 ;;
         esac
@@ -123,7 +195,7 @@ main_menu() {
         echo "1. MENU XRAY (Vmess, Vless, Trojan)"
         echo "2. MENU SSH & OVPN"
         echo "3. MENU L2TP"
-        echo "4. SETTINGS (Backup/Bot/API)"
+        echo "4. SETTINGS (Backup/Bot/API/Domain)"
         echo "5. RESTART SERVICES (All)"
         echo "6. CEK STATUS SERVICES"
         echo "0. Exit CLI"
