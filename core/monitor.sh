@@ -7,6 +7,51 @@
 
 source /usr/local/etc/srpcom/env.conf
 
+monitor_xray() {
+    clear
+    echo "================================================================="
+    echo "               MONITORING PENGGUNAAN XRAY SAAT INI               "
+    echo "================================================================="
+    printf " %-4s | %-15s | %-8s | %-9s | %-10s\n" "No" "Username" "Protocol" "Active IP" "Usage (GB)"
+    echo "-----------------------------------------------------------------"
+    
+    # Ambil daftar user dan protokol dari config
+    mapfile -t xray_users < <(jq -r '.inbounds[] | select(.protocol=="vmess" or .protocol=="vless" or .protocol=="trojan") | .protocol as $prot | .settings.clients[].email | "\($prot):\(.)"' /usr/local/etc/xray/config.json 2>/dev/null)
+    
+    if [ ${#xray_users[@]} -eq 0 ] || [ -z "${xray_users[0]}" ]; then
+        echo " Belum ada akun Xray yang dibuat."
+    else
+        # Ambil data usage langsung dari API backend Xray
+        stats_json=$(/usr/local/bin/xray api statsquery --server=127.0.0.1:10085 2>/dev/null)
+        
+        no=1
+        for item in "${xray_users[@]}"; do
+            prot=$(echo "$item" | cut -d':' -f1)
+            user=$(echo "$item" | cut -d':' -f2)
+            
+            # Cek IP Login saat ini (mengandalkan access.log yang di-reset autokill setiap 3 mnt)
+            ip_count=$(grep "email: $user$" /var/log/xray/access.log 2>/dev/null | awk '{print $3}' | cut -d: -f1 | sort -u | wc -l)
+            
+            # Ekstrak data Downlink & Uplink menggunakan JQ
+            dl=$(echo "$stats_json" | jq -r '.stat[] | select(.name == "user>>>'${user}'>>>traffic>>>downlink") | .value' 2>/dev/null)
+            ul=$(echo "$stats_json" | jq -r '.stat[] | select(.name == "user>>>'${user}'>>>traffic>>>uplink") | .value' 2>/dev/null)
+            
+            dl=${dl:-0}
+            ul=${ul:-0}
+            total_bytes=$((dl + ul))
+            
+            # Konversi Bytes ke GB dengan format 2 angka di belakang koma (Contoh: 1.50 GB)
+            total_gb=$(awk "BEGIN {printf \"%.2f\", $total_bytes/1073741824}")
+            
+            printf " %-4s | %-15s | %-8s | %-9s | %-10s\n" "$no." "$user" "${prot^^}" "$ip_count" "$total_gb GB"
+            ((no++))
+        done
+    fi
+    
+    echo "================================================================="
+    pause
+}
+
 monitor_ssh() {
     clear
     echo "======================================"
@@ -57,26 +102,30 @@ monitor_ssh() {
 menu_monitor() {
     while true; do
         clear
-        echo "╔════════════════════════════════════╗"
-        echo "║          MONITORING PANEL          ║"
-        echo "╚════════════════════════════════════╝"
+        echo "╔══════════════════════════════════════════════╗"
+        echo "║               MONITORING PANEL               ║"
+        echo "╚══════════════════════════════════════════════╝"
         echo "1. Monitor Active SSH & Dropbear"
-        echo "2. Monitor Xray Access Log (Live)"
-        echo "3. Monitor Xray Error Log (Live)"
+        echo "2. Monitor Xray Usage & Active IP (Table)"
+        echo "3. Monitor Xray Access Log (Live Tail)"
+        echo "4. Monitor Xray Error Log (Live Tail)"
         echo "0/x. Back to Main Menu"
-        echo "======================================"
-        read -p "Select Option [0-3 or x]: " opt
+        echo "================================================="
+        read -p "Select Option [0-4 or x]: " opt
         case $opt in
             1) 
                 monitor_ssh 
                 ;;
             2) 
+                monitor_xray 
+                ;;
+            3) 
                 echo -e "\n\e[33m[INFO]\e[0m Membuka log akses Xray secara live..."
                 echo -e "\e[31m=> Tekan Ctrl+C untuk keluar dari pantauan.\e[0m\n"
                 sleep 2
                 tail -f /var/log/xray/access.log 
                 ;;
-            3) 
+            4) 
                 echo -e "\n\e[33m[INFO]\e[0m Membuka log error Xray secara live..."
                 echo -e "\e[31m=> Tekan Ctrl+C untuk keluar dari pantauan.\e[0m\n"
                 sleep 2
