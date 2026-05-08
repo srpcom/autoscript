@@ -352,6 +352,27 @@ def api_renew_l2tp():
     if updated: return jsonify({"stdout": f"Success: {user} renewed."})
     return jsonify({"stdout": f"Error: User {user} not found."})
 
+@app.route('/user_legend/detail-l2tp', methods=['GET', 'POST'])
+def api_detail_l2tp():
+    if not check_auth(): return jsonify({"stdout": "Unauthorized"}), 401
+    data = request.json or {}
+    user = data.get('user')
+    if not user: return jsonify({"stdout": "Error: User required"}), 400
+    
+    if os.path.exists(L2TP_EXP):
+        with open(L2TP_EXP, 'r') as f:
+            for line in f:
+                if line.startswith(user + ' '):
+                    parts = line.strip().split()
+                    if len(parts) >= 4:
+                        password = parts[1]
+                        dt_str = f"{parts[2]} {parts[3]}"
+                        
+                        msg_web = f"━━━━━━━━━━━━━━━━━━━━\n❖ L2TP / IPsec VPN ❖\n━━━━━━━━━━━━━━━━━━━━\nRemarks : {user}\nIP Address : {IP_ADD}\nDomain : {DOMAIN}\nIPsec PSK : {IPSEC_PSK}\nUsername : {user}\nPassword : {password}\n━━━━━━━━━━━━━━━━━━━━\nExpired On : {dt_str} WIB"
+                        return jsonify({"stdout": msg_web})
+                        
+    return jsonify({"stdout": "Error: User not found."})
+
 
 # ===============================================
 # ROUTE API: LAINNYA
