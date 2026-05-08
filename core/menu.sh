@@ -10,6 +10,7 @@ source /usr/local/etc/srpcom/env.conf
 source /usr/local/bin/srpcom/utils.sh
 source /usr/local/bin/srpcom/telegram.sh
 source /usr/local/bin/srpcom/xray.sh
+source /usr/local/bin/srpcom/l2tp.sh
 
 menu_api_key() {
     clear
@@ -120,9 +121,9 @@ main_menu() {
         
         echo "1. MENU XRAY (Vmess, Vless, Trojan)"
         echo "2. MENU SSH & OVPN (Segera Hadir)"
-        echo "3. MENU WIREGUARD (Segera Hadir)"
+        echo "3. MENU L2TP"
         echo "4. SETTINGS (Backup/Bot/API)"
-        echo "5. RESTART SERVICES (Xray, Caddy, API)"
+        echo "5. RESTART SERVICES (Xray, Caddy, API, L2TP)"
         echo "6. CEK STATUS SERVICES"
         echo "0. Exit CLI"
         echo ""
@@ -130,11 +131,11 @@ main_menu() {
         case $opt in
             1) menu_xray ;;
             2) echo "Menu SSH akan segera ditambahkan!"; pause ;;
-            3) echo "Menu Wireguard akan segera ditambahkan!"; pause ;;
+            3) menu_l2tp ;;
             4) menu_settings ;;
             5) 
-                echo -e "\n=> Restarting Xray, Caddy, & API..."
-                systemctl restart xray caddy cron xray-api
+                echo -e "\n=> Restarting Services..."
+                systemctl restart xray caddy cron xray-api ipsec xl2tpd 2>/dev/null
                 echo -e "=> Done!"
                 sleep 1.5 ;;
             6)
@@ -142,12 +143,16 @@ main_menu() {
                 echo "======================================"
                 echo "          STATUS SERVICES             "
                 echo "======================================"
-                echo -n "XRAY CORE   : "
+                echo -n "XRAY CORE     : "
                 if systemctl is-active --quiet xray; then echo -e "\e[32m[ RUNNING ]\e[0m"; else echo -e "\e[31m[ ERROR ]\e[0m"; fi
-                echo -n "CADDY PROXY : "
+                echo -n "CADDY PROXY   : "
                 if systemctl is-active --quiet caddy; then echo -e "\e[32m[ RUNNING ]\e[0m"; else echo -e "\e[31m[ ERROR ]\e[0m"; fi
-                echo -n "API SERVER  : "
+                echo -n "API SERVER    : "
                 if systemctl is-active --quiet xray-api; then echo -e "\e[32m[ RUNNING ]\e[0m"; else echo -e "\e[31m[ ERROR ]\e[0m"; fi
+                echo -n "L2TP (IPsec)  : "
+                if systemctl is-active --quiet ipsec; then echo -e "\e[32m[ RUNNING ]\e[0m"; else echo -e "\e[31m[ ERROR ]\e[0m"; fi
+                echo -n "L2TP (xl2tpd) : "
+                if systemctl is-active --quiet xl2tpd; then echo -e "\e[32m[ RUNNING ]\e[0m"; else echo -e "\e[31m[ ERROR ]\e[0m"; fi
                 echo "======================================"
                 pause ;;
             0) clear; exit 0 ;;
