@@ -390,6 +390,7 @@ wget -q -O /usr/local/bin/srpcom/ssh.sh "$GITHUB_RAW/core/ssh.sh"
 wget -q -O /usr/local/bin/srpcom/monitor.sh "$GITHUB_RAW/core/monitor.sh"
 wget -q -O /usr/local/bin/srpcom/autokill.sh "$GITHUB_RAW/core/autokill.sh"
 wget -q -O /usr/local/bin/srpcom/menu.sh "$GITHUB_RAW/core/menu.sh"
+wget -q -O /usr/local/bin/srpcom/auto_expired.sh "$GITHUB_RAW/core/auto_expired.sh"
 wget -q -O /usr/local/bin/xray-api.py "$GITHUB_RAW/configs/xray-api.py"
 wget -q -O /usr/local/bin/bot-admin.py "$GITHUB_RAW/configs/bot-admin.py"
 
@@ -430,7 +431,6 @@ systemctl daemon-reload
 systemctl enable xray-api
 systemctl start xray-api
 systemctl enable srpcom-bot
-# srpcom-bot tidak di-start di sini agar tidak memunculkan log error karena token kosong.
 
 echo -e "\n[9/11] Mengonfigurasi Firewall (UFW & Iptables NAT L2TP/OVPN)..."
 ufw allow 22/tcp
@@ -503,6 +503,9 @@ EOF
 
 echo -e "\n[11/11] Setup Cronjob Selesai..."
 if ! grep -q "menu" /root/.profile; then echo "menu" >> /root/.profile; fi
+
+# Menambahkan cronjob untuk Auto Expired (Berjalan setiap jam ke-0)
+echo "0 * * * * root /usr/local/bin/srpcom/auto_expired.sh >/dev/null 2>&1" > /etc/cron.d/auto_expired
 
 systemctl restart xray caddy cron xray-api ipsec xl2tpd dropbear ssh-ws
 
