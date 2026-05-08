@@ -5,7 +5,6 @@
 # Menampilkan antarmuka CLI utama dan perutean menu
 # ==========================================
 
-# Memuat Semua Modul
 source /usr/local/etc/srpcom/env.conf
 source /usr/local/bin/srpcom/utils.sh
 source /usr/local/bin/srpcom/telegram.sh
@@ -13,6 +12,50 @@ source /usr/local/bin/srpcom/xray.sh
 source /usr/local/bin/srpcom/l2tp.sh
 source /usr/local/bin/srpcom/ssh.sh
 source /usr/local/bin/srpcom/monitor.sh
+
+menu_bot_admin() {
+    while true; do
+        clear
+        echo "======================================"
+        echo "     SETTING TELEGRAM ADMIN BOT       "
+        echo "======================================"
+        bot_token=$(grep "^BOT_TOKEN=" /usr/local/etc/xray/bot_admin.conf 2>/dev/null | cut -d'=' -f2 | tr -d '"')
+        admin_id=$(grep "^ADMIN_ID=" /usr/local/etc/xray/bot_admin.conf 2>/dev/null | cut -d'=' -f2 | tr -d '"')
+        
+        echo "Status Service :"
+        if systemctl is-active --quiet srpcom-bot; then echo -e "\e[32m[ RUNNING ]\e[0m"; else echo -e "\e[31m[ OFF / STANDBY ]\e[0m"; fi
+        echo "Current BOT_TOKEN : ${bot_token:-Belum disetting}"
+        echo "Current ADMIN_ID  : ${admin_id:-Belum disetting}"
+        echo "======================================"
+        echo "1. Ubah Token & ID lalu Jalankan Bot"
+        echo "2. Hentikan Bot (Disable)"
+        echo "0. Kembali ke Settings"
+        echo "======================================"
+        read -p "Pilih opsi [0-2]: " opt
+        case $opt in
+            1)
+                read -p "Masukkan TOKEN BOT ADMIN : " new_token
+                read -p "Masukkan CHAT ID ADMIN   : " new_id
+                if [[ -n "$new_token" && -n "$new_id" ]]; then
+                    cat > /usr/local/etc/xray/bot_admin.conf << EOF
+BOT_TOKEN="$new_token"
+ADMIN_ID="$new_id"
+EOF
+                    systemctl restart srpcom-bot
+                    echo -e "\n\e[32m=> Bot Admin berhasil disetting dan dijalankan!\e[0m"; sleep 2
+                else
+                    echo -e "\n=> Token atau ID tidak boleh kosong!"; sleep 2
+                fi
+                ;;
+            2)
+                systemctl stop srpcom-bot
+                echo -e "\n=> Bot Admin berhasil dihentikan!"; sleep 2
+                ;;
+            0) break ;;
+            *) echo -e "\n=> Pilihan tidak valid!"; sleep 1 ;;
+        esac
+    done
+}
 
 menu_autokill() {
     while true; do
@@ -183,7 +226,6 @@ menu_api_key() {
     menu_settings
 }
 
-# PERBAIKAN: Fungsi Restore kini mendukung Multi-Protocol (Xray, SSH, OVPN, L2TP)
 restore_data() {
     clear
     echo "======================================"
@@ -205,10 +247,7 @@ restore_data() {
 
     case $restore_mode in
         1)
-            # Mengekstrak seluruh database dan konfigurasi
             tar -xzf "/root/$backup_name" -C / 2>/dev/null
-            
-            # MEMBANGUN ULANG USER SSH DI SISTEM LINUX DARI FILE BACKUP
             if [ -f "/usr/local/etc/srpcom/ssh_expiry.txt" ]; then
                 echo "=> Membangun ulang akun SSH..."
                 while read -r user pass exp_date exp_time; do
@@ -218,7 +257,6 @@ restore_data() {
                     fi
                 done < /usr/local/etc/srpcom/ssh_expiry.txt
             fi
-
             echo -e "\n\e[32m[SUCCESS]\e[0m Restore Replace Berhasil!"
             ;;
         2)
@@ -226,7 +264,6 @@ restore_data() {
             mkdir -p /tmp/restore_temp
             tar -xzf "/root/$backup_name" -C /tmp/restore_temp 2>/dev/null
             
-            # 1. Merge Config JSON (Xray)
             jq -s '.[0].inbounds[0].settings.clients = (.[0].inbounds[0].settings.clients + .[1].inbounds[0].settings.clients | unique_by(.email)) | .[0]' \
                /usr/local/etc/xray/config.json /tmp/restore_temp/usr/local/etc/xray/config.json > /tmp/merged_v1.json
             jq -s '.[0].inbounds[1].settings.clients = (.[0].inbounds[1].settings.clients + .[1].inbounds[1].settings.clients | unique_by(.email)) | .[0]' \
@@ -235,16 +272,14 @@ restore_data() {
                /tmp/merged_v2.json /tmp/restore_temp/usr/local/etc/xray/config.json > /tmp/merged_v3.json
             mv /tmp/merged_v3.json /usr/local/etc/xray/config.json
             
-            # 2. Merge Text Databases (Limits, Expired, L2TP, SSH)
             for txt_file in usr/local/etc/xray/expiry.txt usr/local/etc/xray/limit.txt usr/local/etc/srpcom/l2tp_expiry.txt usr/local/etc/srpcom/ssh_expiry.txt usr/local/etc/srpcom/ssh_limit.txt etc/ppp/chap-secrets; do
                 if [ -f "/tmp/restore_temp/$txt_file" ]; then
-                    touch "/$txt_file" 2>/dev/null # Buat jika belum ada
+                    touch "/$txt_file" 2>/dev/null
                     cat "/$txt_file" "/tmp/restore_temp/$txt_file" | sort -k1,1 -u > "/tmp/merged_$(basename $txt_file)"
                     mv "/tmp/merged_$(basename $txt_file)" "/$txt_file"
                 fi
             done
             
-            # 3. MEMBANGUN ULANG USER SSH DARI MERGE DATA
             if [ -f "/usr/local/etc/srpcom/ssh_expiry.txt" ]; then
                 echo "=> Membangun ulang akun SSH..."
                 while read -r user pass exp_date exp_time; do
@@ -261,8 +296,7 @@ restore_data() {
         *) echo "Batal."; sleep 1; return ;;
     esac
 
-    # Me-restart semua protokol yang mungkin terdampak dari restore
-    systemctl restart xray ipsec xl2tpd dropbear ssh-ws
+    systemctl restart xray ipsec xl2tpd dropbear ssh-ws srpcom-bot
     pause
 }
 
@@ -278,9 +312,10 @@ menu_settings() {
         echo " [5] SETTING API KEY FOR WEBSITE"
         echo " [6] GANTI DOMAIN VPS"
         echo " [7] SETTING AUTO-KILL MULTI LOGIN"
+        echo " [8] SETTING TELEGRAM ADMIN BOT"
         echo " [0/x] Back to Main Menu"
         echo ""
-        read -p " Select option [0-7 or x]: " opt
+        read -p " Select option [0-8 or x]: " opt
         case $opt in
             1) menu_autobackup ;;
             2) menu_autosend ;;
@@ -289,6 +324,7 @@ menu_settings() {
             5) menu_api_key ;;
             6) change_domain ;;
             7) menu_autokill ;;
+            8) menu_bot_admin ;;
             0|x|X) break ;;
             *) echo "Pilihan tidak valid!"; sleep 1 ;;
         esac
@@ -303,7 +339,7 @@ main_menu() {
         echo "2. MENU SSH & OVPN"
         echo "3. MENU L2TP"
         echo "4. MONITORING PANEL"
-        echo "5. SETTINGS (Backup/Autokill/Domain)"
+        echo "5. SETTINGS (Backup/Autokill/Bot)"
         echo "6. RESTART SERVICES (All)"
         echo "7. CEK STATUS SERVICES"
         echo "0. Exit CLI"
@@ -317,7 +353,7 @@ main_menu() {
             5) menu_settings ;;
             6) 
                 echo -e "\n=> Restarting Services..."
-                systemctl restart xray caddy cron xray-api ipsec xl2tpd dropbear ssh-ws 2>/dev/null
+                systemctl restart xray caddy cron xray-api ipsec xl2tpd dropbear ssh-ws srpcom-bot 2>/dev/null
                 echo -e "=> Done!"
                 sleep 1.5 ;;
             7)
@@ -331,6 +367,8 @@ main_menu() {
                 if systemctl is-active --quiet caddy; then echo -e "\e[32m[ RUNNING ]\e[0m"; else echo -e "\e[31m[ ERROR ]\e[0m"; fi
                 echo -n "API SERVER    : "
                 if systemctl is-active --quiet xray-api; then echo -e "\e[32m[ RUNNING ]\e[0m"; else echo -e "\e[31m[ ERROR ]\e[0m"; fi
+                echo -n "ADMIN BOT     : "
+                if systemctl is-active --quiet srpcom-bot; then echo -e "\e[32m[ RUNNING ]\e[0m"; else echo -e "\e[31m[ OFF / STANDBY ]\e[0m"; fi
                 echo -n "L2TP (IPsec)  : "
                 if systemctl is-active --quiet ipsec; then echo -e "\e[32m[ RUNNING ]\e[0m"; else echo -e "\e[31m[ ERROR ]\e[0m"; fi
                 echo -n "L2TP (xl2tpd) : "
