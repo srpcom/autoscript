@@ -85,7 +85,7 @@ def api_req(endpoint, method="POST", payload=None):
         return f"Error koneksi ke API Lokal: {str(e)}"
 
 # ==========================================
-# LOGIKA FITUR BARU: LIST, BACKUP, USAGE
+# LOGIKA FITUR: LIST, BACKUP, USAGE
 # ==========================================
 def get_list_accounts(prot):
     result = []
@@ -172,7 +172,6 @@ def handle_backup(chat_id):
         bot.send_message(chat_id, "Tidak ada file database yang terdeteksi.")
 
 def get_xray_usage():
-    # 1. Mendapatkan IP Aktif
     ip_data = {}
     try:
         log_lines = subprocess.run(['tail', '-n', '3000', '/var/log/xray/access.log'], capture_output=True, text=True).stdout.splitlines()
@@ -187,7 +186,6 @@ def get_xray_usage():
                     ip_data[user].add(ip)
     except: pass
 
-    # 2. Mendapatkan Pemakaian Kuota
     stats = {}
     try:
         out = subprocess.run(['/usr/local/bin/xray', 'api', 'statsquery', '--server=127.0.0.1:10085'], capture_output=True, text=True)
@@ -201,7 +199,6 @@ def get_xray_usage():
                 stats[user][t_type] = item.get('value', 0)
     except: pass
 
-    # 3. Mendapatkan Info Limit
     limits = {}
     try:
         if os.path.exists('/usr/local/etc/xray/limit.txt'):
@@ -376,13 +373,13 @@ def handle_query(call):
             else:
                 if action == "add":
                     if prot in ['vmess', 'vless', 'trojan']:
-                        txt = "✏️ *CREATE ACCOUNT*\nBalas pesan ini dengan format:\n`Username, Expired(Hari), Limit IP, Limit Quota(GB)`\n\n_Contoh:_ `budi, 30, 2, 50`"
+                        txt = "✏️ *CREATE ACCOUNT*\nBalas pesan ini dengan format:\n`Username Expired(Hari) Limit_IP Limit_Quota(GB)`\n\n_Contoh:_ `budi 30 2 50`"
                     elif prot == "ssh":
-                        txt = "✏️ *CREATE SSH*\nBalas pesan ini dengan format:\n`Username, Password, Expired(Hari), Limit IP`\n\n_Contoh:_ `budi, 1234, 30, 2`"
+                        txt = "✏️ *CREATE SSH*\nBalas pesan ini dengan format:\n`Username Password Expired(Hari) Limit_IP`\n\n_Contoh:_ `budi 1234 30 2`"
                     else:
-                        txt = "✏️ *CREATE L2TP*\nBalas pesan ini dengan format:\n`Username, Password, Expired(Hari)`\n\n_Contoh:_ `budi, 1234, 30`"
+                        txt = "✏️ *CREATE L2TP*\nBalas pesan ini dengan format:\n`Username Password Expired(Hari)`\n\n_Contoh:_ `budi 1234 30`"
                 elif action == "renew":
-                    txt = "🔄 *RENEW ACCOUNT*\nBalas pesan ini dengan format:\n`Username, Tambah(Hari)`\n\n_Contoh:_ `budi, 30`"
+                    txt = "🔄 *RENEW ACCOUNT*\nBalas pesan ini dengan format:\n`Username Tambah(Hari)`\n\n_Contoh:_ `budi 30`"
                 elif action in ["del", "detail"]:
                     txt = f"🗑️/📄 *{action.upper()} ACCOUNT*\nBalas pesan ini dengan format:\n`Username`\n\n_Contoh:_ `budi`"
 
@@ -393,14 +390,15 @@ def handle_query(call):
         bot.send_message(chat_id, f"Error: {e}")
 
 # ==========================================
-# PROSES INPUT DARI ADMIN
+# PROSES INPUT DARI ADMIN (Logika Spasi)
 # ==========================================
 def process_action_input(message, action, prot, api_ep):
     if not message.text: return
     chat_id = message.chat.id
     bot.send_message(chat_id, "⏳ Sedang memproses ke server...")
     
-    parts = [p.strip() for p in message.text.split(',')]
+    # PERUBAHAN: Sekarang membagi berdasarkan spasi
+    parts = message.text.split()
     payload = {}
     method = "POST"
     endpoint = f"{action}-{api_ep}"
