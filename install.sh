@@ -1,7 +1,7 @@
 #!/bin/bash
 # ==========================================
 # install.sh
-# MODULE: AUTO INSTALLER XRAY, CADDY, & L2TP BY SRPCOM
+# MODULE: AUTO INSTALLER XRAY, CADDY, L2TP, & SSH BY SRPCOM
 # OS Support: Ubuntu 20.04 / 22.04 / 24.04 LTS
 # ==========================================
 
@@ -16,8 +16,8 @@ fi
 
 clear
 echo "=========================================="
-echo "    MEMULAI INSTALASI XRAY, CADDY & L2TP"
-echo "    SUPPORT UBUNTU 20/22/24 LTS (MODULAR)"
+echo "  MEMULAI INSTALASI XRAY, CADDY, L2TP, SSH"
+echo "  SUPPORT UBUNTU 20/22/24 LTS (MODULAR)"
 echo "=========================================="
 
 # Mendapatkan IP Publik
@@ -39,11 +39,11 @@ while true; do
     fi
 done
 
-echo -e "\n[1/9] Memperbarui sistem & dependensi..."
+echo -e "\n[1/10] Memperbarui sistem & dependensi..."
 export DEBIAN_FRONTEND=noninteractive
 apt update && apt upgrade -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold"
-# PERBAIKAN: Menghapus iptables-persistent yang bentrok dengan UFW di Ubuntu 24
-apt install curl wget unzip uuid-runtime jq tzdata ufw cron gnupg2 gnupg python3 python3-flask strongswan xl2tpd iptables -y
+# Tambah paket: dropbear untuk SSH
+apt install curl wget unzip uuid-runtime jq tzdata ufw cron gnupg2 gnupg python3 python3-flask strongswan xl2tpd iptables dropbear -y
 timedatectl set-timezone Asia/Jakarta
 
 # Membuat Struktur Folder SRPCOM
@@ -57,12 +57,11 @@ DOMAIN="$DOMAIN"
 IP_ADD="$VPS_IP"
 EOF
 
-echo -e "\n[2/9] Menginstal Xray-core..."
+echo -e "\n[2/10] Menginstal Xray-core..."
 bash -c "$(curl -L https://github.com/XTLS/Xray-install/raw/main/install-release.sh)" @ install
 systemctl enable xray
 
-echo -e "\n[3/9] Mengonfigurasi Xray Core..."
-# Memperbaiki Permission Log Xray
+echo -e "\n[3/10] Mengonfigurasi Xray Core..."
 mkdir -p /var/log/xray
 touch /var/log/xray/access.log
 touch /var/log/xray/error.log
@@ -90,10 +89,9 @@ AUTOSEND_STATUS="OFF"
 EOF
 echo "SANGATRAHASIA123" > /usr/local/etc/xray/api_key.conf
 
-echo -e "\n[4/9] Mengonfigurasi L2TP & IPsec..."
+echo -e "\n[4/10] Mengonfigurasi L2TP & IPsec..."
 mkdir -p /etc/xl2tpd
 mkdir -p /etc/ppp
-# Konfigurasi IPsec (StrongSwan)
 cat > /etc/ipsec.conf << EOF
 config setup
     charondebug="ike 1, knl 1, cfg 0"
@@ -120,11 +118,7 @@ conn L2TP-PSK-noNAT
     dpdtimeout=130
     dpdaction=clear
 EOF
-
-# Membuat Preshared Key (PSK)
 echo "%any %any : PSK \"srpcom_vpn\"" > /etc/ipsec.secrets
-
-# Konfigurasi XL2TPD
 cat > /etc/xl2tpd/xl2tpd.conf << EOF
 [global]
 port = 1701
@@ -138,8 +132,6 @@ name = l2tpd
 pppoptfile = /etc/ppp/options.xl2tpd
 length bit = yes
 EOF
-
-# Konfigurasi PPP Options untuk L2TP
 cat > /etc/ppp/options.xl2tpd << EOF
 ipcp-accept-local
 ipcp-accept-remote
@@ -158,21 +150,83 @@ EOF
 touch /usr/local/etc/srpcom/l2tp_expiry.txt
 systemctl enable ipsec xl2tpd
 
-echo -e "\n[5/9] Mendownload Modul Sistem dari GitHub..."
+echo -e "\n[5/10] Mengonfigurasi SSH (Dropbear) & SSH-WS Proxy..."
+sed -i 's/NO_START=1/NO_START=0/g' /etc/default/dropbear
+sed -i 's/DROPBEAR_PORT=22/DROPBEAR_PORT=109/g' /etc/default/dropbear
+sed -i 's/DROPBEAR_EXTRA_ARGS=/DROPBEAR_EXTRA_ARGS="-p 143"/g' /etc/default/dropbear
+systemctl restart dropbear
+systemctl enable dropbear
+
+# Membuat Python Websocket Proxy untuk SSH (Port 10004)
+cat > /usr/local/bin/ssh-ws.py << 'EOF'
+import socket, threading, sys
+def handle_client(client_socket):
+    try:
+        req = client_socket.recv(4096).decode('utf-8')
+        if not req: return
+        response = "HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n\r\n"
+        client_socket.send(response.encode())
+        ssh_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        ssh_socket.connect(('127.0.0.1', 22))
+        def forward(src, dst):
+            try:
+                while True:
+                    data = src.recv(4096)
+                    if not data: break
+                    dst.send(data)
+            except: pass
+            finally:
+                src.close(); dst.close()
+        threading.Thread(target=forward, args=(client_socket, ssh_socket)).start()
+        threading.Thread(target=forward, args=(ssh_socket, client_socket)).start()
+    except: client_socket.close()
+
+def main():
+    server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    server.bind(('127.0.0.1', 10004))
+    server.listen(100)
+    while True:
+        client, addr = server.accept()
+        threading.Thread(target=handle_client, args=(client,)).start()
+
+if __name__ == '__main__': main()
+EOF
+
+cat > /etc/systemd/system/ssh-ws.service << EOF
+[Unit]
+Description=SSH WebSocket Proxy Service
+After=network.target
+
+[Service]
+ExecStart=/usr/bin/python3 /usr/local/bin/ssh-ws.py
+Restart=always
+User=root
+
+[Install]
+WantedBy=multi-user.target
+EOF
+systemctl daemon-reload
+systemctl enable ssh-ws
+systemctl start ssh-ws
+
+touch /usr/local/etc/srpcom/ssh_expiry.txt
+
+echo -e "\n[6/10] Mendownload Modul Sistem dari GitHub..."
 wget -q -O /usr/local/bin/srpcom/utils.sh "$GITHUB_RAW/core/utils.sh"
 wget -q -O /usr/local/bin/srpcom/telegram.sh "$GITHUB_RAW/core/telegram.sh"
 wget -q -O /usr/local/bin/srpcom/xray.sh "$GITHUB_RAW/core/xray.sh"
 wget -q -O /usr/local/bin/srpcom/l2tp.sh "$GITHUB_RAW/core/l2tp.sh"
+wget -q -O /usr/local/bin/srpcom/ssh.sh "$GITHUB_RAW/core/ssh.sh"
 wget -q -O /usr/local/bin/srpcom/menu.sh "$GITHUB_RAW/core/menu.sh"
 wget -q -O /usr/local/bin/xray-api.py "$GITHUB_RAW/configs/xray-api.py"
 
 chmod +x /usr/local/bin/srpcom/*.sh
 chmod +x /usr/local/bin/xray-api.py
 
-# Membuat symlink agar user bisa ketik 'menu'
 ln -sf /usr/local/bin/srpcom/menu.sh /usr/bin/menu
 
-echo -e "\n[6/9] Mengonfigurasi Layanan API..."
+echo -e "\n[7/10] Mengonfigurasi Layanan API..."
 cat > /etc/systemd/system/xray-api.service << EOF
 [Unit]
 Description=Xray Python API Backend
@@ -192,19 +246,18 @@ systemctl daemon-reload
 systemctl enable xray-api
 systemctl start xray-api
 
-echo -e "\n[7/9] Mengonfigurasi Firewall (UFW & Iptables NAT L2TP)..."
+echo -e "\n[8/10] Mengonfigurasi Firewall (UFW & Iptables NAT L2TP)..."
 ufw allow 22/tcp
 ufw allow 80/tcp
+ufw allow 109/tcp
+ufw allow 143/tcp
 ufw allow 443/tcp
 ufw allow 500/udp
 ufw allow 4500/udp
 ufw allow 1701/udp
 ufw --force enable
 
-# PERBAIKAN: Membuat Service NAT Custom (Pengganti iptables-persistent)
-# Mencari nama interface internet secara otomatis (misal: eth0, ens3, dll)
 ETH=$(ip route ls | grep default | awk '{print $5}' | head -n 1)
-
 cat > /etc/systemd/system/l2tp-nat.service << EOF
 [Unit]
 Description=L2TP NAT IPTables Rules
@@ -218,18 +271,14 @@ RemainAfterExit=yes
 [Install]
 WantedBy=multi-user.target
 EOF
-
 systemctl daemon-reload
 systemctl enable l2tp-nat
 systemctl start l2tp-nat
-
-# Aktifkan IP Forwarding di sysctl
 sed -i '/net.ipv4.ip_forward/s/^#//g' /etc/sysctl.conf
 sysctl -p
 
-echo -e "\n[8/9] Menginstal & Mengonfigurasi Caddy..."
+echo -e "\n[9/10] Menginstal & Mengonfigurasi Caddy..."
 apt install -y debian-keyring debian-archive-keyring apt-transport-https
-# PERBAIKAN: Menambahkan --yes untuk memaksa overwrite GPG Caddy tanpa prompt
 curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | gpg --dearmor --yes -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
 curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | tee /etc/apt/sources.list.d/caddy-stable.list
 apt update && apt install caddy -y
@@ -251,19 +300,21 @@ http://$DOMAIN, https://$DOMAIN {
     handle /trojanws* {
         reverse_proxy localhost:10003
     }
+    handle /sshws* {
+        reverse_proxy localhost:10004
+    }
 }
 EOF
 
-echo -e "\n[9/9] Setup Cronjob Selesai..."
-# Auto start menu
+echo -e "\n[10/10] Setup Cronjob Selesai..."
 if ! grep -q "menu" /root/.profile; then echo "menu" >> /root/.profile; fi
 
-systemctl restart xray caddy cron xray-api ipsec xl2tpd
+systemctl restart xray caddy cron xray-api ipsec xl2tpd dropbear ssh-ws
 
 clear
 echo "======================================================"
-echo "    INSTALASI SELESAI & BERHASIL! (V2 MODULAR)        "
+echo "    INSTALASI SELESAI & BERHASIL! (V3 MULTIPORT)      "
 echo "======================================================"
-echo "Protokol Terinstal : VMESS, VLESS, TROJAN, L2TP/IPsec"
+echo "Protokol: VMESS, VLESS, TROJAN, L2TP, SSH/Dropbear/WS"
 echo "Ketik 'menu' untuk masuk ke dashboard manajemen."
 echo "======================================================"
