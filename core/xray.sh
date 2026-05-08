@@ -14,12 +14,19 @@ add_vmess_ws() {
     echo "======================================"
     read -p "Username (x = Batal) : " user
     if [[ "$user" == "x" || "$user" == "X" ]]; then return; fi
-    read -p "Expired (Days) : " masaaktif
-    uuid=$(uuidgen)
+    read -p "Expired (Days)       : " masaaktif
+    read -p "Limit IP (0 = Unli)  : " limit_ip
+    read -p "Limit Kuota GB (0=Unli): " limit_quota
     
+    if [ -z "$limit_ip" ]; then limit_ip=0; fi
+    if [ -z "$limit_quota" ]; then limit_quota=0; fi
+
+    uuid=$(uuidgen)
     exp_date=$(date -d "$masaaktif days" +"%Y-%m-%d")
     exp_time=$(date -d "$masaaktif days" +"%H:%M:%S")
+    
     echo "$user $exp_date $exp_time" >> /usr/local/etc/xray/expiry.txt
+    echo "$user $limit_ip $limit_quota" >> /usr/local/etc/xray/limit.txt
 
     jq '(.inbounds[] | select(.protocol=="vmess") | .settings.clients) += [{"id": "'$uuid'", "alterId": 0, "email": "'$user'"}]' /usr/local/etc/xray/config.json > /tmp/config.json
     mv /tmp/config.json /usr/local/etc/xray/config.json
@@ -30,9 +37,9 @@ add_vmess_ws() {
     link_tls="vmess://$(echo -n "$tls_json" | jq -c . | base64 -w 0)"
     link_none_tls="vmess://$(echo -n "$none_tls_json" | jq -c . | base64 -w 0)"
     
-    msg_cli=$(echo -e "━━━━━━━━━━━━━━━━━━━━\n❖ XRAY/VMESS WS ❖\n━━━━━━━━━━━━━━━━━━━━\nRemarks : ${user}\nIP Address : ${IP_ADD}\nDomain : ${DOMAIN}\nPort TLS : 443\nPort NONE-TLS : 80\nID : ${uuid}\nNetwork : Websocket\nWebsocket Path : /vmessws\n━━━━━━━━━━━━━━━━━━━━\nLINK WS TLS : ${link_tls}\n━━━━━━━━━━━━━━━━━━━━\nLINK WS NONE-TLS : ${link_none_tls}\n━━━━━━━━━━━━━━━━━━━━\nEXPIRED ON : ${exp_date} ${exp_time} WIB (${masaaktif} days)")
+    msg_cli=$(echo -e "━━━━━━━━━━━━━━━━━━━━\n❖ XRAY/VMESS WS ❖\n━━━━━━━━━━━━━━━━━━━━\nRemarks : ${user}\nIP Address : ${IP_ADD}\nDomain : ${DOMAIN}\nPort TLS : 443\nPort NONE-TLS : 80\nID : ${uuid}\nNetwork : Websocket\nWebsocket Path : /vmessws\n━━━━━━━━━━━━━━━━━━━━\nLimit IP : ${limit_ip} IP\nLimit Kuota : ${limit_quota} GB\n━━━━━━━━━━━━━━━━━━━━\nLINK WS TLS : ${link_tls}\n━━━━━━━━━━━━━━━━━━━━\nLINK WS NONE-TLS : ${link_none_tls}\n━━━━━━━━━━━━━━━━━━━━\nEXPIRED ON : ${exp_date} ${exp_time} WIB (${masaaktif} days)")
     
-    msg_tg=$(echo -e "━━━━━━━━━━━━━━━━━━━━\n❖ XRAY/VMESS WS ❖\n━━━━━━━━━━━━━━━━━━━━\nRemarks : \`${user}\`\nIP Address : ${IP_ADD}\nDomain : ${DOMAIN}\nPort TLS : 443\nPort NONE-TLS : 80\nID : \`${uuid}\`\nNetwork : Websocket\nWebsocket Path : /vmessws\n━━━━━━━━━━━━━━━━━━━━\nLINK WS TLS : \`${link_tls}\`\n━━━━━━━━━━━━━━━━━━━━\nLINK WS NONE-TLS : \`${link_none_tls}\`\n━━━━━━━━━━━━━━━━━━━━\nEXPIRED ON : ${exp_date} ${exp_time} WIB (${masaaktif} days)")
+    msg_tg=$(echo -e "━━━━━━━━━━━━━━━━━━━━\n❖ XRAY/VMESS WS ❖\n━━━━━━━━━━━━━━━━━━━━\nRemarks : \`${user}\`\nIP Address : ${IP_ADD}\nDomain : ${DOMAIN}\nPort TLS : 443\nPort NONE-TLS : 80\nID : \`${uuid}\`\nNetwork : Websocket\nWebsocket Path : /vmessws\n━━━━━━━━━━━━━━━━━━━━\nLimit IP : ${limit_ip} IP\nLimit Kuota : ${limit_quota} GB\n━━━━━━━━━━━━━━━━━━━━\nLINK WS TLS : \`${link_tls}\`\n━━━━━━━━━━━━━━━━━━━━\nLINK WS NONE-TLS : \`${link_none_tls}\`\n━━━━━━━━━━━━━━━━━━━━\nEXPIRED ON : ${exp_date} ${exp_time} WIB (${masaaktif} days)")
     
     clear; echo "$msg_cli"
     send_telegram "$msg_tg"
@@ -46,12 +53,19 @@ add_vless_ws() {
     echo "======================================"
     read -p "Username (x = Batal) : " user
     if [[ "$user" == "x" || "$user" == "X" ]]; then return; fi
-    read -p "Expired (Days) : " masaaktif
-    uuid=$(uuidgen)
+    read -p "Expired (Days)       : " masaaktif
+    read -p "Limit IP (0 = Unli)  : " limit_ip
+    read -p "Limit Kuota GB (0=Unli): " limit_quota
     
+    if [ -z "$limit_ip" ]; then limit_ip=0; fi
+    if [ -z "$limit_quota" ]; then limit_quota=0; fi
+
+    uuid=$(uuidgen)
     exp_date=$(date -d "$masaaktif days" +"%Y-%m-%d")
     exp_time=$(date -d "$masaaktif days" +"%H:%M:%S")
+    
     echo "$user $exp_date $exp_time" >> /usr/local/etc/xray/expiry.txt
+    echo "$user $limit_ip $limit_quota" >> /usr/local/etc/xray/limit.txt
 
     jq '(.inbounds[] | select(.protocol=="vless") | .settings.clients) += [{"id": "'$uuid'", "email": "'$user'"}]' /usr/local/etc/xray/config.json > /tmp/config.json
     mv /tmp/config.json /usr/local/etc/xray/config.json
@@ -60,9 +74,9 @@ add_vless_ws() {
     link_tls="vless://${uuid}@${DOMAIN}:443?path=/vlessws&security=tls&encryption=none&host=${DOMAIN}&type=ws&sni=${DOMAIN}#${user}"
     link_none_tls="vless://${uuid}@${DOMAIN}:80?path=/vlessws&security=none&encryption=none&host=${DOMAIN}&type=ws#${user}"
     
-    msg_cli=$(echo -e "━━━━━━━━━━━━━━━━━━━━\n❖ XRAY/VLESS WS ❖\n━━━━━━━━━━━━━━━━━━━━\nRemarks : ${user}\nIP Address : ${IP_ADD}\nDomain : ${DOMAIN}\nPort TLS : 443\nPort NONE-TLS : 80\nID : ${uuid}\nNetwork : Websocket\nWebsocket Path : /vlessws\n━━━━━━━━━━━━━━━━━━━━\nLINK WS TLS : ${link_tls}\n━━━━━━━━━━━━━━━━━━━━\nLINK WS NONE-TLS : ${link_none_tls}\n━━━━━━━━━━━━━━━━━━━━\nEXPIRED ON : ${exp_date} ${exp_time} WIB (${masaaktif} days)")
+    msg_cli=$(echo -e "━━━━━━━━━━━━━━━━━━━━\n❖ XRAY/VLESS WS ❖\n━━━━━━━━━━━━━━━━━━━━\nRemarks : ${user}\nIP Address : ${IP_ADD}\nDomain : ${DOMAIN}\nPort TLS : 443\nPort NONE-TLS : 80\nID : ${uuid}\nNetwork : Websocket\nWebsocket Path : /vlessws\n━━━━━━━━━━━━━━━━━━━━\nLimit IP : ${limit_ip} IP\nLimit Kuota : ${limit_quota} GB\n━━━━━━━━━━━━━━━━━━━━\nLINK WS TLS : ${link_tls}\n━━━━━━━━━━━━━━━━━━━━\nLINK WS NONE-TLS : ${link_none_tls}\n━━━━━━━━━━━━━━━━━━━━\nEXPIRED ON : ${exp_date} ${exp_time} WIB (${masaaktif} days)")
     
-    msg_tg=$(echo -e "━━━━━━━━━━━━━━━━━━━━\n❖ XRAY/VLESS WS ❖\n━━━━━━━━━━━━━━━━━━━━\nRemarks : \`${user}\`\nIP Address : ${IP_ADD}\nDomain : ${DOMAIN}\nPort TLS : 443\nPort NONE-TLS : 80\nID : \`${uuid}\`\nNetwork : Websocket\nWebsocket Path : /vlessws\n━━━━━━━━━━━━━━━━━━━━\nLINK WS TLS : \`${link_tls}\`\n━━━━━━━━━━━━━━━━━━━━\nLINK WS NONE-TLS : \`${link_none_tls}\`\n━━━━━━━━━━━━━━━━━━━━\nEXPIRED ON : ${exp_date} ${exp_time} WIB (${masaaktif} days)")
+    msg_tg=$(echo -e "━━━━━━━━━━━━━━━━━━━━\n❖ XRAY/VLESS WS ❖\n━━━━━━━━━━━━━━━━━━━━\nRemarks : \`${user}\`\nIP Address : ${IP_ADD}\nDomain : ${DOMAIN}\nPort TLS : 443\nPort NONE-TLS : 80\nID : \`${uuid}\`\nNetwork : Websocket\nWebsocket Path : /vlessws\n━━━━━━━━━━━━━━━━━━━━\nLimit IP : ${limit_ip} IP\nLimit Kuota : ${limit_quota} GB\n━━━━━━━━━━━━━━━━━━━━\nLINK WS TLS : \`${link_tls}\`\n━━━━━━━━━━━━━━━━━━━━\nLINK WS NONE-TLS : \`${link_none_tls}\`\n━━━━━━━━━━━━━━━━━━━━\nEXPIRED ON : ${exp_date} ${exp_time} WIB (${masaaktif} days)")
     
     clear; echo "$msg_cli"
     send_telegram "$msg_tg"
@@ -76,12 +90,19 @@ add_trojan_ws() {
     echo "======================================"
     read -p "Username (x = Batal) : " user
     if [[ "$user" == "x" || "$user" == "X" ]]; then return; fi
-    read -p "Expired (Days) : " masaaktif
-    uuid=$(uuidgen)
+    read -p "Expired (Days)       : " masaaktif
+    read -p "Limit IP (0 = Unli)  : " limit_ip
+    read -p "Limit Kuota GB (0=Unli): " limit_quota
     
+    if [ -z "$limit_ip" ]; then limit_ip=0; fi
+    if [ -z "$limit_quota" ]; then limit_quota=0; fi
+
+    uuid=$(uuidgen)
     exp_date=$(date -d "$masaaktif days" +"%Y-%m-%d")
     exp_time=$(date -d "$masaaktif days" +"%H:%M:%S")
+    
     echo "$user $exp_date $exp_time" >> /usr/local/etc/xray/expiry.txt
+    echo "$user $limit_ip $limit_quota" >> /usr/local/etc/xray/limit.txt
 
     jq '(.inbounds[] | select(.protocol=="trojan") | .settings.clients) += [{"password": "'$uuid'", "email": "'$user'"}]' /usr/local/etc/xray/config.json > /tmp/config.json
     mv /tmp/config.json /usr/local/etc/xray/config.json
@@ -89,9 +110,9 @@ add_trojan_ws() {
     
     link_tls="trojan://${uuid}@${DOMAIN}:443?path=/trojanws&security=tls&host=${DOMAIN}&type=ws&sni=${DOMAIN}#${user}"
     
-    msg_cli=$(echo -e "━━━━━━━━━━━━━━━━━━━━\n❖ XRAY/TROJAN WS ❖\n━━━━━━━━━━━━━━━━━━━━\nRemarks : ${user}\nIP Address : ${IP_ADD}\nDomain : ${DOMAIN}\nPort TLS : 443\nPassword : ${uuid}\nNetwork : Websocket\nWebsocket Path : /trojanws\n━━━━━━━━━━━━━━━━━━━━\nLINK WS TLS : ${link_tls}\n━━━━━━━━━━━━━━━━━━━━\nEXPIRED ON : ${exp_date} ${exp_time} WIB (${masaaktif} days)")
+    msg_cli=$(echo -e "━━━━━━━━━━━━━━━━━━━━\n❖ XRAY/TROJAN WS ❖\n━━━━━━━━━━━━━━━━━━━━\nRemarks : ${user}\nIP Address : ${IP_ADD}\nDomain : ${DOMAIN}\nPort TLS : 443\nPassword : ${uuid}\nNetwork : Websocket\nWebsocket Path : /trojanws\n━━━━━━━━━━━━━━━━━━━━\nLimit IP : ${limit_ip} IP\nLimit Kuota : ${limit_quota} GB\n━━━━━━━━━━━━━━━━━━━━\nLINK WS TLS : ${link_tls}\n━━━━━━━━━━━━━━━━━━━━\nEXPIRED ON : ${exp_date} ${exp_time} WIB (${masaaktif} days)")
     
-    msg_tg=$(echo -e "━━━━━━━━━━━━━━━━━━━━\n❖ XRAY/TROJAN WS ❖\n━━━━━━━━━━━━━━━━━━━━\nRemarks : \`${user}\`\nIP Address : ${IP_ADD}\nDomain : ${DOMAIN}\nPort TLS : 443\nPassword : \`${uuid}\`\nNetwork : Websocket\nWebsocket Path : /trojanws\n━━━━━━━━━━━━━━━━━━━━\nLINK WS TLS : \`${link_tls}\`\n━━━━━━━━━━━━━━━━━━━━\nEXPIRED ON : ${exp_date} ${exp_time} WIB (${masaaktif} days)")
+    msg_tg=$(echo -e "━━━━━━━━━━━━━━━━━━━━\n❖ XRAY/TROJAN WS ❖\n━━━━━━━━━━━━━━━━━━━━\nRemarks : \`${user}\`\nIP Address : ${IP_ADD}\nDomain : ${DOMAIN}\nPort TLS : 443\nPassword : \`${uuid}\`\nNetwork : Websocket\nWebsocket Path : /trojanws\n━━━━━━━━━━━━━━━━━━━━\nLimit IP : ${limit_ip} IP\nLimit Kuota : ${limit_quota} GB\n━━━━━━━━━━━━━━━━━━━━\nLINK WS TLS : \`${link_tls}\`\n━━━━━━━━━━━━━━━━━━━━\nEXPIRED ON : ${exp_date} ${exp_time} WIB (${masaaktif} days)")
     
     clear; echo "$msg_cli"
     send_telegram "$msg_tg"
@@ -113,6 +134,9 @@ add_trial() {
     
     user="trialsrp-$(date +%m%d%H%M)"
     masaaktif="60 Minutes"
+    limit_ip=1
+    limit_quota=1
+    
     exp_date=$(date -d "+60 minutes" +"%Y-%m-%d")
     exp_time=$(date -d "+60 minutes" +"%H:%M:%S")
     uuid=$(uuidgen)
@@ -132,6 +156,7 @@ add_trial() {
     
     mv /tmp/config.json /usr/local/etc/xray/config.json
     echo "$user $exp_date $exp_time" >> /usr/local/etc/xray/expiry.txt
+    echo "$user $limit_ip $limit_quota" >> /usr/local/etc/xray/limit.txt
     systemctl restart xray
     
     if [[ "$prot" == "vmess" ]]; then
@@ -153,9 +178,9 @@ add_trial() {
         path="/trojanws"
     fi
 
-    msg_str_cli="━━━━━━━━━━━━━━━━━━━━\n❖ XRAY/${prot^^} WS TRIAL ❖\n━━━━━━━━━━━━━━━━━━━━\nRemarks : ${user}\nIP Address : ${IP_ADD}\nDomain : ${DOMAIN}\nPort TLS : 443\nPort NONE-TLS : ${port_none}\nID/PW : ${uuid}\nNetwork : Websocket\nWebsocket Path : ${path}\n━━━━━━━━━━━━━━━━━━━━\nLINK WS TLS : ${link_tls}\n━━━━━━━━━━━━━━━━━━━━"
+    msg_str_cli="━━━━━━━━━━━━━━━━━━━━\n❖ XRAY/${prot^^} WS TRIAL ❖\n━━━━━━━━━━━━━━━━━━━━\nRemarks : ${user}\nIP Address : ${IP_ADD}\nDomain : ${DOMAIN}\nPort TLS : 443\nPort NONE-TLS : ${port_none}\nID/PW : ${uuid}\nNetwork : Websocket\nWebsocket Path : ${path}\n━━━━━━━━━━━━━━━━━━━━\nLimit IP : 1 IP\nLimit Kuota : 1 GB\n━━━━━━━━━━━━━━━━━━━━\nLINK WS TLS : ${link_tls}\n━━━━━━━━━━━━━━━━━━━━"
     
-    msg_str_tg="━━━━━━━━━━━━━━━━━━━━\n❖ XRAY/${prot^^} WS TRIAL ❖\n━━━━━━━━━━━━━━━━━━━━\nRemarks : \`${user}\`\nIP Address : ${IP_ADD}\nDomain : ${DOMAIN}\nPort TLS : 443\nPort NONE-TLS : ${port_none}\nID/PW : \`${uuid}\`\nNetwork : Websocket\nWebsocket Path : ${path}\n━━━━━━━━━━━━━━━━━━━━\nLINK WS TLS : \`${link_tls}\`\n━━━━━━━━━━━━━━━━━━━━"
+    msg_str_tg="━━━━━━━━━━━━━━━━━━━━\n❖ XRAY/${prot^^} WS TRIAL ❖\n━━━━━━━━━━━━━━━━━━━━\nRemarks : \`${user}\`\nIP Address : ${IP_ADD}\nDomain : ${DOMAIN}\nPort TLS : 443\nPort NONE-TLS : ${port_none}\nID/PW : \`${uuid}\`\nNetwork : Websocket\nWebsocket Path : ${path}\n━━━━━━━━━━━━━━━━━━━━\nLimit IP : 1 IP\nLimit Kuota : 1 GB\n━━━━━━━━━━━━━━━━━━━━\nLINK WS TLS : \`${link_tls}\`\n━━━━━━━━━━━━━━━━━━━━"
     
     if [[ "$prot" != "trojan" ]]; then
         msg_str_cli="${msg_str_cli}\nLINK WS NONE-TLS : ${link_none_tls}\n━━━━━━━━━━━━━━━━━━━━"
@@ -220,6 +245,7 @@ delete_xray() {
         jq '(.inbounds[].settings.clients) |= map(select(.email != "'$user'"))' /usr/local/etc/xray/config.json > /tmp/config.json
         mv /tmp/config.json /usr/local/etc/xray/config.json
         sed -i "/^$user /d" /usr/local/etc/xray/expiry.txt
+        sed -i "/^$user /d" /usr/local/etc/xray/limit.txt 2>/dev/null
         systemctl restart xray
         echo -e "\n\e[32m=> Akun '$user' berhasil dihapus!\e[0m"
         sleep 2
@@ -342,6 +368,17 @@ show_detail() {
         echo "LINK WS TLS : trojan://${uuid}@${DOMAIN}:443?path=/trojanws&security=tls&host=${DOMAIN}&type=ws&sni=${DOMAIN}#${user}"
     fi
     echo "━━━━━━━━━━━━━━━━━━━━"
+    
+    # Mengambil Info Limit
+    limit_info=$(grep "^$user " /usr/local/etc/xray/limit.txt 2>/dev/null)
+    lim_ip=$(echo "$limit_info" | awk '{print $2}')
+    lim_q=$(echo "$limit_info" | awk '{print $3}')
+    if [ -z "$lim_ip" ] || [ "$lim_ip" == "0" ]; then lim_ip="Unlimited"; else lim_ip="${lim_ip} IP"; fi
+    if [ -z "$lim_q" ] || [ "$lim_q" == "0" ]; then lim_q="Unlimited"; else lim_q="${lim_q} GB"; fi
+    echo "Limit IP : $lim_ip"
+    echo "Limit Kuota : $lim_q"
+    echo "━━━━━━━━━━━━━━━━━━━━"
+
     exp_date=$(grep "^$user " /usr/local/etc/xray/expiry.txt | cut -d' ' -f2-)
     if [ -z "$exp_date" ]; then exp_date="Lifetime / No Exp"; else exp_date="$exp_date WIB"; fi
     echo "Expired On : $exp_date"
