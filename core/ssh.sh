@@ -100,10 +100,12 @@ delete_ssh() {
         echo "$((i+1)). ${users[$i]}"
     done
     echo "0. Back"
+    echo "x. Back to Main Menu"
     echo "======================================"
-    read -p "Pilih nomor akun untuk dihapus [1-${#users[@]}]: " choice
+    read -p "Pilih nomor akun untuk dihapus [1-${#users[@]} or 0/x]: " choice
     
     if [[ "$choice" == "0" ]]; then return; fi
+    if [[ "$choice" == "x" || "$choice" == "X" ]]; then exec menu; fi
 
     if [[ "$choice" -gt 0 && "$choice" -le "${#users[@]}" ]]; then
         user="${users[$((choice-1))]}"
@@ -141,10 +143,12 @@ renew_ssh() {
         echo "$((i+1)). ${users[$i]}"
     done
     echo "0. Back"
+    echo "x. Back to Main Menu"
     echo "======================================"
-    read -p "Pilih nomor akun [1-${#users[@]}]: " choice
+    read -p "Pilih nomor akun [1-${#users[@]} or 0/x]: " choice
     
     if [[ "$choice" == "0" ]]; then return; fi
+    if [[ "$choice" == "x" || "$choice" == "X" ]]; then exec menu; fi
 
     if [[ "$choice" -gt 0 && "$choice" -le "${#users[@]}" ]]; then
         user="${users[$((choice-1))]}"
@@ -211,10 +215,12 @@ detail_ssh() {
         echo "$((i+1)). ${users[$i]}"
     done
     echo "0. Back"
+    echo "x. Back to Main Menu"
     echo "======================================"
-    read -p "Pilih nomor akun [1-${#users[@]}]: " choice
+    read -p "Pilih nomor akun [1-${#users[@]} or 0/x]: " choice
     
     if [[ "$choice" == "0" ]]; then return; fi
+    if [[ "$choice" == "x" || "$choice" == "X" ]]; then exec menu; fi
 
     if [[ "$choice" -gt 0 && "$choice" -le "${#users[@]}" ]]; then
         user="${users[$((choice-1))]}"
@@ -262,9 +268,9 @@ menu_ssh() {
         echo "4. Renew SSH Account"
         echo "5. List SSH Account"
         echo "6. Detail SSH Account"
-        echo "0. Back to Main Menu"
+        echo "0/x. Back to Main Menu"
         echo "======================================"
-        read -p "Please select an option [0-6]: " opt
+        read -p "Please select an option [0-6 or x]: " opt
         case $opt in
             1) add_ssh ;; 
             2) add_trial_ssh ;; 
@@ -272,7 +278,7 @@ menu_ssh() {
             4) renew_ssh ;;
             5) list_ssh ;;
             6) detail_ssh ;;
-            0) break ;;
+            0|x|X) break ;;
             *) echo -e "\n=> Pilihan tidak valid!"; sleep 1 ;;
         esac
     done
