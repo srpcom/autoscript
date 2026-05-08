@@ -63,9 +63,9 @@ menu_monitor() {
         echo "1. Monitor Active SSH & Dropbear"
         echo "2. Monitor Xray Access Log (Live)"
         echo "3. Monitor Xray Error Log (Live)"
-        echo "0. Back to Main Menu"
+        echo "0/x. Back to Main Menu"
         echo "======================================"
-        read -p "Select Option [0-3]: " opt
+        read -p "Select Option [0-3 or x]: " opt
         case $opt in
             1) 
                 monitor_ssh 
@@ -82,7 +82,7 @@ menu_monitor() {
                 sleep 2
                 tail -f /var/log/xray/error.log 
                 ;;
-            0) 
+            0|x|X) 
                 break 
                 ;;
             *) 
