@@ -49,6 +49,7 @@ iptables-save > /etc/iptables/rules.v4 2>/dev/null
 
 echo -e "\n[6/7] Membersihkan Cronjob & Auto-Start..."
 rm -f /etc/cron.d/xray_autobackup
+rm -f /etc/cron.d/srpcom_autokill
 crontab -l 2>/dev/null | grep -v "xray" | crontab -
 sed -i '/menu/d' /root/.profile 2>/dev/null
 sed -i '/menu/d' /root/.bashrc 2>/dev/null
