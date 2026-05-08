@@ -80,7 +80,10 @@ def handle_query(call):
             bot.edit_message_text(f"🔧 *MANAGE {prot.upper()}*", chat_id, msg_id, reply_markup=markup, parse_mode="Markdown")
         elif data.startswith("act_"):
             p = data.split("_"); act, prot, api_ep = p[1], p[2], PROT_MAP.get(p[2])
-            if act == "trial": bot.send_message(chat_id, api_req(f"trial-{api_ep}", "POST", {"exp": 60}), parse_mode="Markdown")
+            if act == "trial": 
+                # API akan mengembalikan msg_tg yang ada backtick-nya
+                res = api_req(f"trial-{api_ep}", "POST", {"exp": 60})
+                bot.send_message(chat_id, res, parse_mode="Markdown")
             else:
                 t = f"✏️ Input data {act.upper()} {prot.upper()}\nContoh: `budi 30 2 50`"
                 msg = bot.send_message(chat_id, t, parse_mode="Markdown", reply_markup=telebot.types.ForceReply())
