@@ -216,7 +216,7 @@ main_menu() {
         echo "1. MENU XRAY (Vmess, Vless, Trojan)"
         echo "2. MENU SSH & OVPN"
         echo "3. MENU L2TP"
-        echo "4. MONITORING (Cek Aktif & Kuota)"
+        echo "4. MONITORING PANEL"
         echo "5. SETTINGS (Backup/Autokill/Domain)"
         echo "6. RESTART SERVICES (All)"
         echo "7. CEK STATUS SERVICES"
