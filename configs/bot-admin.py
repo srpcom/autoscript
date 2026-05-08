@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # ==========================================
 # bot-admin.py
-# MODULE: TELEGRAM ADMIN INTERACTIVE BOT
+# MODULE: TELEGRAM ADMIN INTERACTIVE BOT (REVISED)
 # ==========================================
 
 import os
@@ -24,23 +24,31 @@ SSH_EXP = '/usr/local/etc/srpcom/ssh_expiry.txt'
 L2TP_EXP = '/usr/local/etc/srpcom/l2tp_expiry.txt'
 
 # --- LOADING SETTINGS ---
-BOT_TOKEN, ADMIN_ID = "", ""
-try:
-    if os.path.exists(CONF_FILE):
-        with open(CONF_FILE, 'r') as f:
-            lines = f.read().splitlines()
-            for line in lines:
-                if line.startswith('BOT_TOKEN='):
-                    BOT_TOKEN = line.split('=')[1].strip().strip('"').strip("'")
-                elif line.startswith('ADMIN_ID='):
-                    ADMIN_ID = line.split('=')[1].strip().strip('"').strip("'")
-except Exception:
-    pass
+def load_bot_config():
+    bot_token, admin_id = "", ""
+    try:
+        if os.path.exists(CONF_FILE):
+            with open(CONF_FILE, 'r') as f:
+                lines = f.read().splitlines()
+                for line in lines:
+                    if line.startswith('BOT_TOKEN='):
+                        bot_token = line.split('=')[1].strip().strip('"').strip("'")
+                    elif line.startswith('ADMIN_ID='):
+                        admin_id = line.split('=')[1].strip().strip('"').strip("'")
+    except Exception:
+        pass
+    return bot_token, admin_id
 
+BOT_TOKEN, ADMIN_ID = load_bot_config()
+
+# Mencegah SystemD Crash Loop
 if not BOT_TOKEN or not ADMIN_ID:
-    print("Error: Token Bot atau Admin ID belum disetting di menu VPS.")
-    time.sleep(60)
-    sys.exit(1)
+    print("WARNING: Token Bot atau Admin ID kosong di file /usr/local/etc/xray/bot_admin.conf.")
+    print("Bot masuk ke mode siaga. Silakan setting melalui menu CLI.")
+    while not BOT_TOKEN or not ADMIN_ID:
+        time.sleep(30)
+        BOT_TOKEN, ADMIN_ID = load_bot_config()
+    print("Token ditemukan! Melanjutkan inisiasi bot...")
 
 def get_api_key():
     try:
@@ -77,18 +85,21 @@ def api_req(endpoint, method="POST", payload=None):
             res = requests.delete(url, headers=headers, json=payload, timeout=10)
         else:
             res = requests.post(url, headers=headers, json=payload, timeout=10)
-        
-        # Penanganan jika response bukan JSON
-        try:
-            return res.json().get('stdout', 'Server tidak memberikan respon.')
-        except ValueError:
-            # Jika server error atau kirim teks biasa
-            if res.text:
-                return res.text
-            return f"Server Error ({res.status_code})"
             
+        # Pengecekan HTTP Status agar error 404/500 tidak tereksekusi sbg text biasa
+        res.raise_for_status()
+        
+        return res.json().get('stdout', '✅ Command executed successfully but no output.')
+
+    except requests.exceptions.HTTPError as errh:
+        try:
+            return res.json().get('stdout', f"❌ API HTTP Error: {errh}")
+        except:
+            return f"❌ HTTP Error ({res.status_code}): Fungsi ini belum dikonfigurasi di server API."
+    except requests.exceptions.ConnectionError as errc:
+        return f"❌ Error Koneksi: API Server (Backend) sedang mati/down.\nDetail: {errc}"
     except Exception as e:
-        return f"Koneksi API Gagal: {str(e)}"
+        return f"❌ Unexpected Error: {str(e)}"
 
 # --- FUNGSI LOGIKA LIST & BACKUP ---
 def get_list_accounts(prot):
@@ -131,7 +142,12 @@ def get_list_accounts(prot):
 def handle_backup_bot(chat_id):
     now_str = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
     backup_file = f"/tmp/srpcom-backup-{now_str}.tar.gz"
-    files = ["/usr/local/etc/xray/config.json", "/usr/local/etc/xray/expiry.txt", "/usr/local/etc/xray/limit.txt", "/usr/local/etc/srpcom/env.conf", "/usr/local/etc/srpcom/l2tp_expiry.txt", "/usr/local/etc/srpcom/ssh_expiry.txt", "/etc/ppp/chap-secrets"]
+    files = [
+        "/usr/local/etc/xray/config.json", "/usr/local/etc/xray/expiry.txt", 
+        "/usr/local/etc/xray/limit.txt", "/usr/local/etc/srpcom/env.conf", 
+        "/usr/local/etc/srpcom/l2tp_expiry.txt", "/usr/local/etc/srpcom/ssh_expiry.txt", 
+        "/etc/ppp/chap-secrets"
+    ]
     valid = [f for f in files if os.path.exists(f)]
     if valid:
         try:
@@ -245,9 +261,9 @@ def handle_query(call):
                     if prot in ['vmess', 'vless', 'trojan']:
                         t = "✏️ Data: `User Expired(Hari) Limit_IP Limit_Quota`"
                     elif prot == "ssh":
-                        t = "✏️ Data: `User Pass Expired Limit_IP`"
+                        t = "✏️ Data: `User Pass Expired(Hari) Limit_IP`"
                     else:
-                        t = "✏️ Data: `User Pass Expired`"
+                        t = "✏️ Data: `User Pass Expired(Hari)`"
                     t += "\nContoh: `budi 30 2 50`"
                 elif act == "renew":
                     t = "🔄 Masukkan: `User Tambah(Hari)`"
@@ -298,11 +314,15 @@ def process_action_input(message, action, prot, api_ep):
         elif action == "detail":
             payload = {'user': parts[0]}
         
-        # Kirim hasil dengan parse_mode Markdown agar backtick bisa diklik-salin
         bot.send_message(message.chat.id, api_req(endpoint, method, payload), parse_mode="Markdown")
-    except Exception:
-        bot.send_message(message.chat.id, "❌ Format input salah!")
+    except Exception as e:
+        bot.send_message(message.chat.id, f"❌ Format input salah! Detail: {e}")
 
 if __name__ == '__main__':
     print("Bot Admin Panel sedang berjalan...")
-    bot.infinity_polling()
+    while True:
+        try:
+            bot.infinity_polling()
+        except Exception as e:
+            print(f"Bot Polling Error: {e}")
+            time.sleep(5)
