@@ -260,6 +260,176 @@ list_xray() {
     pause
 }
 
+show_detail() {
+    prot=$1
+    user=$2
+    from_menu=$3
+    clear
+    echo "━━━━━━━━━━━━━━━━━━━━"
+    echo "❖ XRAY/${prot^^} WS ❖"
+    echo "━━━━━━━━━━━━━━━━━━━━"
+    echo "Remarks : ${user}"
+    echo "IP Address : ${IP_ADD}"
+    echo "Domain : ${DOMAIN}"
+    echo "Port TLS : 443"
+    
+    if [[ "$prot" == "vmess" ]]; then
+        uuid=$(jq -r '.inbounds[] | select(.protocol=="vmess") | .settings.clients[] | select(.email=="'$user'") | .id' /usr/local/etc/xray/config.json)
+        echo "Port NONE-TLS : 80"
+        echo "ID : ${uuid}"
+        echo "Network : Websocket"
+        echo "Websocket Path : /vmessws"
+        echo "━━━━━━━━━━━━━━━━━━━━"
+        tls_json="{\"v\":\"2\",\"ps\":\"${user}\",\"add\":\"${DOMAIN}\",\"port\":\"443\",\"id\":\"${uuid}\",\"aid\":\"0\",\"net\":\"ws\",\"type\":\"none\",\"host\":\"${DOMAIN}\",\"path\":\"/vmessws\",\"tls\":\"tls\",\"sni\":\"${DOMAIN}\"}"
+        none_tls_json="{\"v\":\"2\",\"ps\":\"${user}\",\"add\":\"${DOMAIN}\",\"port\":\"80\",\"id\":\"${uuid}\",\"aid\":\"0\",\"net\":\"ws\",\"type\":\"none\",\"host\":\"${DOMAIN}\",\"path\":\"/vmessws\",\"tls\":\"\",\"sni\":\"\"}"
+        echo "LINK WS TLS : vmess://$(echo -n "$tls_json" | jq -c . | base64 -w 0)"
+        echo "━━━━━━━━━━━━━━━━━━━━"
+        echo "LINK WS NONE-TLS : vmess://$(echo -n "$none_tls_json" | jq -c . | base64 -w 0)"
+    elif [[ "$prot" == "vless" ]]; then
+        uuid=$(jq -r '.inbounds[] | select(.protocol=="vless") | .settings.clients[] | select(.email=="'$user'") | .id' /usr/local/etc/xray/config.json)
+        echo "Port NONE-TLS : 80"
+        echo "ID : ${uuid}"
+        echo "Network : Websocket"
+        echo "Websocket Path : /vlessws"
+        echo "━━━━━━━━━━━━━━━━━━━━"
+        echo "LINK WS TLS : vless://${uuid}@${DOMAIN}:443?path=/vlessws&security=tls&encryption=none&host=${DOMAIN}&type=ws&sni=${DOMAIN}#${user}"
+        echo "━━━━━━━━━━━━━━━━━━━━"
+        echo "LINK WS NONE-TLS : vless://${uuid}@${DOMAIN}:80?path=/vlessws&security=none&encryption=none&host=${DOMAIN}&type=ws#${user}"
+    elif [[ "$prot" == "trojan" ]]; then
+        uuid=$(jq -r '.inbounds[] | select(.protocol=="trojan") | .settings.clients[] | select(.email=="'$user'") | .password' /usr/local/etc/xray/config.json)
+        echo "Password : ${uuid}"
+        echo "Network : Websocket"
+        echo "Websocket Path : /trojanws"
+        echo "━━━━━━━━━━━━━━━━━━━━"
+        echo "LINK WS TLS : trojan://${uuid}@${DOMAIN}:443?path=/trojanws&security=tls&host=${DOMAIN}&type=ws&sni=${DOMAIN}#${user}"
+    fi
+    echo "━━━━━━━━━━━━━━━━━━━━"
+    exp_date=$(grep "^$user " /usr/local/etc/xray/expiry.txt | cut -d' ' -f2-)
+    if [ -z "$exp_date" ]; then exp_date="Lifetime / No Exp"; fi
+    echo "Expired On : $exp_date"
+    echo ""
+    pause
+    if [ "$from_menu" == "change_uuid" ]; then
+        menu_change_uuid
+    else
+        detail_list "$prot"
+    fi
+}
+
+detail_list() {
+    prot=$1
+    clear
+    echo "======================================"
+    echo "       SELECT ${prot^^} ACCOUNT       "
+    echo "======================================"
+    mapfile -t users < <(jq -r '.inbounds[] | select(.protocol=="'$prot'") | .settings.clients[].email' /usr/local/etc/xray/config.json 2>/dev/null)
+    if [ ${#users[@]} -eq 0 ] || [ -z "${users[0]}" ] || [ "${users[0]}" == "null" ]; then
+        echo "Tidak ada akun di protokol ini."
+        echo "======================================"
+        pause
+        detail_xray
+        return
+    fi
+    for i in "${!users[@]}"; do echo "$((i+1)). ${users[$i]}"; done
+    echo "0. Back to Protocol Selection"
+    echo "======================================"
+    read -p "Select Account [0-${#users[@]}]: " acc_opt
+    
+    if [[ "$acc_opt" == "0" ]]; then detail_xray; return
+    elif [[ "$acc_opt" -gt 0 && "$acc_opt" -le "${#users[@]}" ]]; then
+        selected_user="${users[$((acc_opt-1))]}"
+        show_detail "$prot" "$selected_user"
+    else
+        echo -e "\n=> Pilihan tidak valid!"; sleep 1; detail_list "$prot"
+    fi
+}
+
+detail_xray() {
+    clear
+    echo "======================================"
+    echo "          DETAIL XRAY ACCOUNT         "
+    echo "======================================"
+    c_vm=$(jq '[.inbounds[] | select(.protocol=="vmess") | .settings.clients[]] | length' /usr/local/etc/xray/config.json 2>/dev/null || echo 0)
+    c_vl=$(jq '[.inbounds[] | select(.protocol=="vless") | .settings.clients[]] | length' /usr/local/etc/xray/config.json 2>/dev/null || echo 0)
+    c_tr=$(jq '[.inbounds[] | select(.protocol=="trojan") | .settings.clients[]] | length' /usr/local/etc/xray/config.json 2>/dev/null || echo 0)
+
+    echo "1. VMESS ($c_vm)"
+    echo "2. VLESS ($c_vl)"
+    echo "3. TROJAN ($c_tr)"
+    echo "0. Back to XRAY Menu"
+    echo "======================================"
+    read -p "Select Protocol [0-3]: " prot_opt
+    case $prot_opt in
+        1) detail_list "vmess" ;;
+        2) detail_list "vless" ;;
+        3) detail_list "trojan" ;;
+        0) return ;;
+        *) echo -e "\n=> Pilihan tidak valid!"; sleep 1; detail_xray ;;
+    esac
+}
+
+change_protocol_uuid() {
+    prot=$1
+    clear
+    echo "======================================"
+    echo "     CHANGE UUID/PASS ${prot^^} WS    "
+    echo "======================================"
+    mapfile -t users < <(jq -r '.inbounds[] | select(.protocol=="'$prot'") | .settings.clients[].email' /usr/local/etc/xray/config.json 2>/dev/null)
+    if [ ${#users[@]} -eq 0 ] || [ -z "${users[0]}" ] || [ "${users[0]}" == "null" ]; then
+        echo "Tidak ada akun di protokol ini."
+        echo "======================================"
+        pause
+        menu_change_uuid
+        return
+    fi
+    for i in "${!users[@]}"; do echo "$((i+1)). ${users[$i]}"; done
+    echo "0. Back"
+    echo "======================================"
+    read -p "Select Account [0-${#users[@]}]: " acc_opt
+    
+    if [[ "$acc_opt" == "0" ]]; then menu_change_uuid; return
+    elif [[ "$acc_opt" -gt 0 && "$acc_opt" -le "${#users[@]}" ]]; then
+        selected_user="${users[$((acc_opt-1))]}"
+        read -p "Input New UUID/Password (Press Enter to auto-generate): " new_uuid
+        if [ -z "$new_uuid" ]; then new_uuid=$(uuidgen); fi
+        
+        if [[ "$prot" == "vmess" || "$prot" == "vless" ]]; then
+            jq '(.inbounds[] | select(.protocol=="'$prot'") | .settings.clients[] | select(.email=="'$selected_user'") | .id) = "'$new_uuid'"' /usr/local/etc/xray/config.json > /tmp/config.json
+        elif [[ "$prot" == "trojan" ]]; then
+            jq '(.inbounds[] | select(.protocol=="'$prot'") | .settings.clients[] | select(.email=="'$selected_user'") | .password) = "'$new_uuid'"' /usr/local/etc/xray/config.json > /tmp/config.json
+        fi
+        mv /tmp/config.json /usr/local/etc/xray/config.json
+        systemctl restart xray
+        echo -e "\n=> UUID/Password untuk '$selected_user' berhasil diubah!"
+        sleep 2
+        show_detail "$prot" "$selected_user" "change_uuid"
+    else
+        echo -e "\n=> Pilihan tidak valid!"; sleep 1; change_protocol_uuid "$prot"
+    fi
+}
+
+menu_change_uuid() {
+    clear
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo "   CHANGE UUID OR PASSWORD XRAY   "
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo " [1]  CHANGE UUID/PASS FOR VMESS WS"
+    echo " [2]  CHANGE UUID/PASS FOR VLESS WS"
+    echo " [3]  CHANGE UUID/PASS FOR TROJAN WS"
+    echo "----------------------------------"
+    echo " [0]  Back"
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo ""
+    read -p "  Select From Options [1-3 or 0] : " opt
+    case $opt in
+        1) change_protocol_uuid "vmess" ;;
+        2) change_protocol_uuid "vless" ;;
+        3) change_protocol_uuid "trojan" ;;
+        0) return ;;
+        *) echo -e "\n=> Pilihan tidak valid!"; sleep 1; menu_change_uuid ;;
+    esac
+}
+
 menu_xray() {
     XRAY_VER=$(/usr/local/bin/xray version 2>/dev/null | head -n 1 | awk '{print $1" "$2}')
     if [[ -z "$XRAY_VER" ]]; then XRAY_VER="Xray 24.11.11"; fi
@@ -274,14 +444,18 @@ menu_xray() {
         echo "2. Delete XRAY Account"
         echo "3. Renew XRAY Account"
         echo "4. List XRAY Account"
+        echo "5. Detail XRAY Account"
+        echo "6. Change UUID/Password"
         echo "0. Back to Main Menu"
         echo "======================================"
-        read -p "Please select an option [0-4]: " opt
+        read -p "Please select an option [0-6]: " opt
         case $opt in
             1) create_xray ;; 
             2) delete_xray ;; 
             3) renew_xray ;; 
             4) list_xray ;;
+            5) detail_xray ;;
+            6) menu_change_uuid ;;
             0) break ;;
             *) echo -e "\n=> Pilihan tidak valid!"; sleep 1 ;;
         esac
