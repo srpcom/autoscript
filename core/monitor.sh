@@ -2,81 +2,97 @@
 # ==========================================
 # monitor.sh
 # MODULE: MONITORING IP & DATA USAGE
+# Menampilkan detail IP aktif dan Kuota secara bersamaan
 # ==========================================
 
 source /usr/local/etc/srpcom/env.conf
 
-monitor_xray_ip() {
+monitor_xray() {
     clear
-    echo "================================================="
-    echo "           XRAY ACTIVE IP MONITOR                "
-    echo "================================================="
-    echo -e "Username\t| Jml IP\t| Daftar IP Address"
-    echo "-------------------------------------------------"
-    if [ ! -f "/var/log/xray/access.log" ]; then
-        echo "Log file belum tersedia atau Xray belum berjalan."
-        pause; return
-    fi
-    
-    # Membaca log 2000 baris terakhir, mencari status "accepted", dan mengekstrak IP unik per akun
-    tail -n 2000 /var/log/xray/access.log | grep "accepted" | grep -v "127.0.0.1" | awk '{print $7, $3}' | sed 's/tcp://g' | sed 's/udp://g' | cut -d: -f1 | sort | uniq | awk '{
-        ip_count[$1]++
-        ips[$1] = ips[$1] " " $2
-    } END {
-        for (user in ip_count) {
-            printf "%-15s | %-7s | %s\n", user, ip_count[user], ips[user]
-        }
-    }'
-    echo "================================================="
-    pause
-}
-
-monitor_xray_data() {
-    clear
-    echo "==============================================================="
-    echo "                  XRAY DATA USAGE MONITOR                      "
-    echo "==============================================================="
+    echo "======================================================================================="
+    echo "                   XRAY MONITORING (ACTIVE IP & DATA USAGE)                            "
+    echo "======================================================================================="
     
     # Menarik data statistik langsung dari mesin Xray via port API 10085
     /usr/local/bin/xray api statsquery --server=127.0.0.1:10085 > /tmp/xray_stats.json 2>/dev/null
     
-    # Mem-parsing JSON statistik menggunakan Python agar rapi dan akurat
+    # Mem-parsing log IP dan JSON statistik menggunakan Python agar rapi dan digabung
     python3 -c "
 import json, os
-try:
-    with open('/tmp/xray_stats.json', 'r') as f: data = json.load(f)
-    stats = {}
-    for item in data.get('stat', []):
-        name_parts = item['name'].split('>>>')
-        if len(name_parts) >= 4 and name_parts[0] == 'user':
-            user = name_parts[1]
-            t_type = name_parts[3]
-            if user not in stats: stats[user] = {'downlink': 0, 'uplink': 0}
-            stats[user][t_type] = item.get('value', 0)
-    
-    print(f'{\"Username\":<15} | {\"Download\":<10} | {\"Upload\":<10} | {\"Total\":<10} | {\"Limit Kuota\"}')
-    print('-'*70)
-    for u, s in stats.items():
-        dl = s['downlink'] / 1048576  # Convert Byte to MB
-        ul = s['uplink'] / 1048576
-        tot = dl + ul
-        tot_gb = tot / 1024           # Convert MB to GB
-        
-        limit_gb = 'Unli'
-        if os.path.exists('/usr/local/etc/xray/limit.txt'):
-            with open('/usr/local/etc/xray/limit.txt', 'r') as lf:
-                for line in lf:
-                    parts = line.strip().split()
-                    if len(parts) >= 3 and parts[0] == u:
-                        l_quota = int(parts[2])
-                        limit_gb = f'{l_quota} GB' if l_quota > 0 else 'Unli'
-                        break
 
-        print(f'{u:<15} | {dl:<7.1f} MB | {ul:<7.1f} MB | {tot_gb:<7.2f} GB | {limit_gb}')
-except Exception as e:
-    print('Gagal membaca data API Xray. Pastikan API Xray sudah diaktifkan.')
+# 1. Mengambil IP Aktif dari access.log
+ip_data = {}
+try:
+    log_lines = os.popen('tail -n 3000 /var/log/xray/access.log').read().splitlines()
+    for line in log_lines:
+        if 'accepted' in line and '127.0.0.1' not in line:
+            parts = line.split()
+            if len(parts) >= 7:
+                user = parts[6] # email
+                ip_port = parts[2] # IP:Port
+                ip = ip_port.replace('tcp:', '').replace('udp:', '').split(':')[0]
+                if user not in ip_data:
+                    ip_data[user] = set()
+                ip_data[user].add(ip)
+except Exception:
+    pass
+
+# 2. Mengambil Data Kuota dari xray_stats.json
+stats = {}
+try:
+    with open('/tmp/xray_stats.json', 'r') as f:
+        data = json.load(f)
+        for item in data.get('stat', []):
+            name_parts = item['name'].split('>>>')
+            if len(name_parts) >= 4 and name_parts[0] == 'user':
+                user = name_parts[1]
+                t_type = name_parts[3]
+                if user not in stats:
+                    stats[user] = {'downlink': 0, 'uplink': 0}
+                stats[user][t_type] = item.get('value', 0)
+except Exception:
+    pass
+
+# 3. Mengambil Info Limit (IP & Kuota)
+limits = {}
+try:
+    if os.path.exists('/usr/local/etc/xray/limit.txt'):
+        with open('/usr/local/etc/xray/limit.txt', 'r') as f:
+            for line in f:
+                p = line.strip().split()
+                if len(p) >= 3:
+                    limits[p[0]] = {'ip': int(p[1]), 'quota': int(p[2])}
+except:
+    pass
+
+# Menggabungkan semua user yang terdeteksi
+all_users = set(list(stats.keys()) + list(ip_data.keys()))
+
+print(f'{\"Username\":<15} | {\"IP Aktif/Limit\":<15} | {\"Download\":<10} | {\"Upload\":<10} | {\"Total Data\":<10} | {\"Limit Kuota\"}')
+print('-'*87)
+
+if not all_users:
+    print('Belum ada data pemakaian atau user aktif.')
+else:
+    for u in sorted(all_users):
+        # Info IP
+        active_ips = len(ip_data.get(u, set()))
+        limit_ip = limits.get(u, {}).get('ip', 0)
+        lim_ip_str = str(limit_ip) if limit_ip > 0 else 'Unli'
+        ip_col = f'{active_ips} / {lim_ip_str}'
+
+        # Info Data
+        dl = stats.get(u, {}).get('downlink', 0) / 1048576  # MB
+        ul = stats.get(u, {}).get('uplink', 0) / 1048576    # MB
+        tot = dl + ul
+        tot_gb = tot / 1024                                 # GB
+        
+        limit_q = limits.get(u, {}).get('quota', 0)
+        lim_q_str = f'{limit_q} GB' if limit_q > 0 else 'Unli'
+
+        print(f'{u:<15} | {ip_col:<15} | {dl:<7.1f} MB | {ul:<7.1f} MB | {tot_gb:<7.2f} GB | {lim_q_str}')
 "
-    echo "==============================================================="
+    echo "======================================================================================="
     pause
 }
 
@@ -107,16 +123,14 @@ menu_monitor() {
         echo "╔════════════════════════════════════╗"
         echo "║          MONITORING PANEL          ║"
         echo "╚════════════════════════════════════╝"
-        echo "1. Cek User Aktif (Xray IP)"
-        echo "2. Cek Pemakaian Data (Xray Kuota)"
-        echo "3. Cek User Aktif (SSH/Dropbear)"
+        echo "1. Cek Aktifitas Xray (IP & Kuota)"
+        echo "2. Cek User Aktif (SSH/Dropbear)"
         echo "0. Back to Main Menu"
         echo "======================================"
-        read -p "Pilih opsi [0-3]: " opt
+        read -p "Pilih opsi [0-2]: " opt
         case $opt in
-            1) monitor_xray_ip ;;
-            2) monitor_xray_data ;;
-            3) monitor_ssh ;;
+            1) monitor_xray ;;
+            2) monitor_ssh ;;
             0) break ;;
             *) echo -e "\n=> Pilihan tidak valid!"; sleep 1 ;;
         esac
