@@ -1,7 +1,7 @@
 #!/bin/bash
 # ==========================================
 # install.sh
-# MODULE: AUTO INSTALLER XRAY, CADDY, L2TP, & SSH BY SRPCOM
+# MODULE: AUTO INSTALLER XRAY, CADDY, L2TP, SSH, OVPN, BADVPN
 # OS Support: Ubuntu 20.04 / 22.04 / 24.04 LTS
 # ==========================================
 
@@ -14,8 +14,8 @@ fi
 
 clear
 echo "=========================================="
-echo "  MEMULAI INSTALASI XRAY, CADDY, L2TP, SSH"
-echo "  SUPPORT UBUNTU 20/22/24 LTS (FINAL V4)"
+echo "  MEMULAI INSTALASI VPN MULTIPORT V5      "
+echo "  XRAY, CADDY, L2TP, SSH, OVPN, BADVPN    "
 echo "=========================================="
 
 VPS_IP=$(curl -sS --max-time 5 ipv4.icanhazip.com || curl -sS --max-time 5 ifconfig.me)
@@ -36,7 +36,8 @@ done
 echo -e "\n[1/10] Memperbarui sistem & dependensi..."
 export DEBIAN_FRONTEND=noninteractive
 apt update && apt upgrade -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold"
-apt install curl wget unzip uuid-runtime jq tzdata ufw cron gnupg2 gnupg python3 python3-flask strongswan xl2tpd iptables dropbear -y
+# Menambahkan cmake, make, gcc, git (untuk build BadVPN) dan openvpn
+apt install curl wget unzip uuid-runtime jq tzdata ufw cron gnupg2 gnupg python3 python3-flask strongswan xl2tpd iptables dropbear openvpn cmake make gcc git -y
 timedatectl set-timezone Asia/Jakarta
 
 mkdir -p /usr/local/etc/srpcom
@@ -147,7 +148,8 @@ EOF
 touch /usr/local/etc/srpcom/l2tp_expiry.txt
 systemctl enable ipsec xl2tpd
 
-echo -e "\n[5/10] Mengonfigurasi SSH (Dropbear) & SSH-WS Proxy..."
+echo -e "\n[5/10] Mengonfigurasi SSH, Dropbear, SSH-WS, BadVPN & OpenVPN..."
+# 5A. Dropbear
 cat > /etc/default/dropbear << 'EOF'
 NO_START=0
 DROPBEAR_PORT=109
@@ -158,6 +160,7 @@ EOF
 systemctl restart dropbear
 systemctl enable dropbear
 
+# 5B. SSH-WS Proxy
 cat > /usr/local/bin/ssh-ws.py << 'EOF'
 import socket, threading, sys
 def handle_client(client_socket):
@@ -208,6 +211,152 @@ systemctl start ssh-ws
 touch /usr/local/etc/srpcom/ssh_expiry.txt
 touch /usr/local/etc/srpcom/ssh_limit.txt
 
+# 5C. Kompilasi BadVPN (UDP Custom)
+echo -e "Membuat layanan BadVPN (UDP Custom)..."
+git clone https://github.com/ambrop72/badvpn.git /tmp/badvpn
+mkdir -p /tmp/badvpn/build && cd /tmp/badvpn/build
+cmake .. -DBUILD_NOTHING_BY_DEFAULT=1 -DBUILD_UDPGW=1
+make
+cp udpgw/badvpn-udpgw /usr/local/bin/
+
+for port in 7100 7200 7300; do
+cat > /etc/systemd/system/badvpn-$port.service << EOF
+[Unit]
+Description=BadVPN UDPGW Service Port $port
+After=network.target
+
+[Service]
+ExecStart=/usr/local/bin/badvpn-udpgw --listen-addr 127.0.0.1:$port --max-clients 500
+User=root
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+EOF
+systemctl daemon-reload
+systemctl enable badvpn-$port
+systemctl start badvpn-$port
+done
+
+# 5D. Setup OpenVPN
+echo -e "Menyiapkan OpenVPN dan Sertifikatnya..."
+mkdir -p /etc/openvpn/server/keys
+cd /etc/openvpn/server/keys
+# Fast Elliptic Curve Cert Generation
+openssl ecparam -genkey -name prime256v1 -out ca.key
+openssl req -new -x509 -days 3650 -key ca.key -out ca.crt -subj "/CN=SRPCOM_CA"
+openssl ecparam -genkey -name prime256v1 -out server.key
+openssl req -new -key server.key -out server.csr -subj "/CN=SRPCOM_Server"
+openssl x509 -req -days 3650 -in server.csr -CA ca.crt -CAkey ca.key -CAcreateserial -out server.crt
+openvpn --genkey secret ta.key
+
+PAM_PLUGIN=$(find /usr -name "openvpn-plugin-auth-pam.so" | head -n 1)
+
+# OVPN UDP Config
+cat > /etc/openvpn/server/server-udp.conf << EOF
+port 2200
+proto udp
+dev tun
+ca keys/ca.crt
+cert keys/server.crt
+key keys/server.key
+dh none
+ecdh-curve prime256v1
+tls-auth keys/ta.key 0
+server 10.8.0.0 255.255.255.0
+push "redirect-gateway def1 bypass-dhcp"
+push "dhcp-option DNS 8.8.8.8"
+push "dhcp-option DNS 8.8.4.4"
+keepalive 10 120
+cipher AES-256-GCM
+persist-key
+persist-tun
+status openvpn-udp.log
+verb 3
+plugin $PAM_PLUGIN login
+verify-client-cert none
+username-as-common-name
+EOF
+
+# OVPN TCP Config
+cat > /etc/openvpn/server/server-tcp.conf << EOF
+port 1194
+proto tcp
+dev tun
+ca keys/ca.crt
+cert keys/server.crt
+key keys/server.key
+dh none
+ecdh-curve prime256v1
+tls-auth keys/ta.key 0
+server 10.9.0.0 255.255.255.0
+push "redirect-gateway def1 bypass-dhcp"
+push "dhcp-option DNS 8.8.8.8"
+push "dhcp-option DNS 8.8.4.4"
+keepalive 10 120
+cipher AES-256-GCM
+persist-key
+persist-tun
+status openvpn-tcp.log
+verb 3
+plugin $PAM_PLUGIN login
+verify-client-cert none
+username-as-common-name
+EOF
+systemctl enable openvpn-server@server-udp
+systemctl enable openvpn-server@server-tcp
+systemctl start openvpn-server@server-udp
+systemctl start openvpn-server@server-tcp
+
+# Create OVPN Download Directory
+mkdir -p /usr/local/etc/srpcom/ovpn
+CA_CERT=$(cat /etc/openvpn/server/keys/ca.crt)
+TA_CERT=$(cat /etc/openvpn/server/keys/ta.key)
+
+# Generate Client UDP
+cat > /usr/local/etc/srpcom/ovpn/udp.ovpn << EOF
+client
+dev tun
+proto udp
+remote $DOMAIN 2200
+resolv-retry infinite
+nobind
+persist-key
+persist-tun
+remote-cert-tls server
+cipher AES-256-GCM
+auth-user-pass
+key-direction 1
+<ca>
+$CA_CERT
+</ca>
+<tls-auth>
+$TA_CERT
+</tls-auth>
+EOF
+
+# Generate Client TCP
+cat > /usr/local/etc/srpcom/ovpn/tcp.ovpn << EOF
+client
+dev tun
+proto tcp
+remote $DOMAIN 1194
+resolv-retry infinite
+nobind
+persist-key
+persist-tun
+remote-cert-tls server
+cipher AES-256-GCM
+auth-user-pass
+key-direction 1
+<ca>
+$CA_CERT
+</ca>
+<tls-auth>
+$TA_CERT
+</tls-auth>
+EOF
+
 echo -e "\n[6/10] Mendownload Modul Sistem dari GitHub..."
 wget -q -O /usr/local/bin/srpcom/utils.sh "$GITHUB_RAW/core/utils.sh"
 wget -q -O /usr/local/bin/srpcom/telegram.sh "$GITHUB_RAW/core/telegram.sh"
@@ -215,6 +364,7 @@ wget -q -O /usr/local/bin/srpcom/xray.sh "$GITHUB_RAW/core/xray.sh"
 wget -q -O /usr/local/bin/srpcom/l2tp.sh "$GITHUB_RAW/core/l2tp.sh"
 wget -q -O /usr/local/bin/srpcom/ssh.sh "$GITHUB_RAW/core/ssh.sh"
 wget -q -O /usr/local/bin/srpcom/monitor.sh "$GITHUB_RAW/core/monitor.sh"
+wget -q -O /usr/local/bin/srpcom/autokill.sh "$GITHUB_RAW/core/autokill.sh"
 wget -q -O /usr/local/bin/srpcom/menu.sh "$GITHUB_RAW/core/menu.sh"
 wget -q -O /usr/local/bin/xray-api.py "$GITHUB_RAW/configs/xray-api.py"
 
@@ -239,7 +389,7 @@ systemctl daemon-reload
 systemctl enable xray-api
 systemctl start xray-api
 
-echo -e "\n[8/10] Mengonfigurasi Firewall (UFW & Iptables NAT L2TP)..."
+echo -e "\n[8/10] Mengonfigurasi Firewall (UFW & Iptables NAT L2TP/OVPN)..."
 ufw allow 22/tcp
 ufw allow 80/tcp
 ufw allow 109/tcp
@@ -248,23 +398,30 @@ ufw allow 443/tcp
 ufw allow 500/udp
 ufw allow 4500/udp
 ufw allow 1701/udp
+ufw allow 1194/tcp # OVPN TCP
+ufw allow 2200/udp # OVPN UDP
+ufw allow 7100/udp # BadVPN
+ufw allow 7200/udp # BadVPN
+ufw allow 7300/udp # BadVPN
 ufw --force enable
 
 ETH=$(ip route ls | grep default | awk '{print $5}' | head -n 1)
-cat > /etc/systemd/system/l2tp-nat.service << EOF
+cat > /etc/systemd/system/vpn-nat.service << EOF
 [Unit]
-Description=L2TP NAT IPTables Rules
+Description=VPN NAT IPTables Rules (L2TP & OVPN)
 After=network.target ufw.service
 [Service]
 Type=oneshot
 ExecStart=/sbin/iptables -t nat -A POSTROUTING -s 192.168.42.0/24 -o $ETH -j MASQUERADE
+ExecStart=/sbin/iptables -t nat -A POSTROUTING -s 10.8.0.0/24 -o $ETH -j MASQUERADE
+ExecStart=/sbin/iptables -t nat -A POSTROUTING -s 10.9.0.0/24 -o $ETH -j MASQUERADE
 RemainAfterExit=yes
 [Install]
 WantedBy=multi-user.target
 EOF
 systemctl daemon-reload
-systemctl enable l2tp-nat
-systemctl start l2tp-nat
+systemctl enable vpn-nat
+systemctl start vpn-nat
 sed -i '/net.ipv4.ip_forward/s/^#//g' /etc/sysctl.conf
 sysctl -p
 
@@ -274,10 +431,15 @@ curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | gpg --dearmo
 curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | tee /etc/apt/sources.list.d/caddy-stable.list
 apt update && apt install caddy -y
 
+# Menambahkan rute Caddy untuk mendownload file OpenVPN
 cat > /etc/caddy/Caddyfile << EOF
 http://$DOMAIN, https://$DOMAIN {
     handle /user_legend/* {
         reverse_proxy localhost:5000
+    }
+    handle /ovpn/* {
+        root * /usr/local/etc/srpcom
+        file_server
     }
     handle / {
         respond "Server is running normally." 200
@@ -304,7 +466,8 @@ systemctl restart xray caddy cron xray-api ipsec xl2tpd dropbear ssh-ws
 
 clear
 echo "======================================================"
-echo "    INSTALASI SELESAI & BERHASIL! (V4 FINAL)          "
+echo "    INSTALASI SELESAI & BERHASIL! (V5 FINAL)          "
 echo "======================================================"
+echo "Protokol: VMESS, VLESS, TROJAN, L2TP, SSH, OVPN, UDPGW"
 echo "Ketik 'menu' untuk masuk ke dashboard manajemen."
 echo "======================================================"
