@@ -2,7 +2,7 @@
 # ==========================================
 # ssh.sh
 # MODULE: SSH & OVPN LOGIC
-# Manajemen User SSH menggunakan sistem akun Linux standar
+# Manajemen User SSH, Dropbear, BadVPN, OVPN
 # ==========================================
 
 source /usr/local/etc/srpcom/env.conf
@@ -37,8 +37,12 @@ add_ssh() {
     echo "$user $pass $exp_date $exp_time" >> $SSH_EXP
     echo "$user $limit_ip" >> /usr/local/etc/srpcom/ssh_limit.txt
 
-    msg_cli=$(echo -e "━━━━━━━━━━━━━━━━━━━━\n❖ SSH & OVPN ACCOUNT ❖\n━━━━━━━━━━━━━━━━━━━━\nRemarks : ${user}\nIP Address : ${IP_ADD}\nDomain : ${DOMAIN}\nUsername : ${user}\nPassword : ${pass}\n━━━━━━━━━━━━━━━━━━━━\nPort OpenSSH : 22\nPort Dropbear : 109, 143\nPort SSH-WS TLS : 443 (Path: /sshws)\nPort SSH-WS NTLS : 80 (Path: /sshws)\n━━━━━━━━━━━━━━━━━━━━\nLimit IP : ${limit_ip} IP\n━━━━━━━━━━━━━━━━━━━━\nEXPIRED ON : ${exp_date} ${exp_time} WIB (${masaaktif} days)")
-    msg_tg=$(echo -e "━━━━━━━━━━━━━━━━━━━━\n❖ SSH & OVPN ACCOUNT ❖\n━━━━━━━━━━━━━━━━━━━━\nRemarks : \`${user}\`\nIP Address : ${IP_ADD}\nDomain : ${DOMAIN}\nUsername : \`${user}\`\nPassword : \`${pass}\`\n━━━━━━━━━━━━━━━━━━━━\nPort OpenSSH : 22\nPort Dropbear : 109, 143\nPort SSH-WS TLS : 443 (Path: /sshws)\nPort SSH-WS NTLS : 80 (Path: /sshws)\n━━━━━━━━━━━━━━━━━━━━\nLimit IP : ${limit_ip} IP\n━━━━━━━━━━━━━━━━━━━━\nEXPIRED ON : ${exp_date} ${exp_time} WIB (${masaaktif} days)")
+    lim_ip_str="${limit_ip} IP"
+    if [ "$limit_ip" == "0" ]; then lim_ip_str="Unlimited"; fi
+
+    msg_cli=$(echo -e "━━━━━━━━━━━━━━━━━━━━\n❖ SSH & OVPN ACCOUNT ❖\n━━━━━━━━━━━━━━━━━━━━\nRemarks : ${user}\nIP Address : ${IP_ADD}\nDomain : ${DOMAIN}\nUsername : ${user}\nPassword : ${pass}\n━━━━━━━━━━━━━━━━━━━━\nPort OpenSSH : 22\nPort Dropbear : 109, 143\nPort SSH-WS TLS : 443 (Path: /sshws)\nPort SSH-WS NTLS : 80 (Path: /sshws)\nPort UDP Custom : 7100, 7200, 7300\nPort OVPN UDP : 2200\nPort OVPN TCP : 1194\n━━━━━━━━━━━━━━━━━━━━\nLimit IP : ${lim_ip_str}\n━━━━━━━━━━━━━━━━━━━━\nLINK OVPN UDP : http://${DOMAIN}/ovpn/udp.ovpn\nLINK OVPN TCP : http://${DOMAIN}/ovpn/tcp.ovpn\n━━━━━━━━━━━━━━━━━━━━\nEXPIRED ON : ${exp_date} ${exp_time} WIB (${masaaktif} days)")
+    
+    msg_tg=$(echo -e "━━━━━━━━━━━━━━━━━━━━\n❖ SSH & OVPN ACCOUNT ❖\n━━━━━━━━━━━━━━━━━━━━\nRemarks : \`${user}\`\nIP Address : ${IP_ADD}\nDomain : ${DOMAIN}\nUsername : \`${user}\`\nPassword : \`${pass}\`\n━━━━━━━━━━━━━━━━━━━━\nPort OpenSSH : 22\nPort Dropbear : 109, 143\nPort SSH-WS TLS : 443 (Path: /sshws)\nPort SSH-WS NTLS : 80 (Path: /sshws)\nPort UDP Custom : 7100, 7200, 7300\nPort OVPN UDP : 2200\nPort OVPN TCP : 1194\n━━━━━━━━━━━━━━━━━━━━\nLimit IP : ${lim_ip_str}\n━━━━━━━━━━━━━━━━━━━━\nLINK OVPN UDP : http://${DOMAIN}/ovpn/udp.ovpn\nLINK OVPN TCP : http://${DOMAIN}/ovpn/tcp.ovpn\n━━━━━━━━━━━━━━━━━━━━\nEXPIRED ON : ${exp_date} ${exp_time} WIB (${masaaktif} days)")
     
     clear; echo "$msg_cli"
     send_telegram "$msg_tg"
@@ -48,11 +52,12 @@ add_ssh() {
 trial_ssh() {
     clear
     echo "======================================"
-    echo "      CREATE TRIAL SSH (60 Mins)      "
+    echo "      CREATE TRIAL SSH & OVPN (60M)   "
     echo "======================================"
     user="trial-$(date +%m%d%H%M)"
     pass="1"
     masaaktif="60 Menit"
+    limit_ip=1
     
     exp_date=$(date -d "+60 minutes" +"%Y-%m-%d")
     exp_time=$(date -d "+60 minutes" +"%H:%M:%S")
@@ -61,10 +66,11 @@ trial_ssh() {
     echo -e "$pass\n$pass" | passwd "$user" &> /dev/null
     
     echo "$user $pass $exp_date $exp_time" >> $SSH_EXP
+    echo "$user $limit_ip" >> /usr/local/etc/srpcom/ssh_limit.txt
 
-    msg_cli=$(echo -e "━━━━━━━━━━━━━━━━━━━━\n❖ TRIAL SSH ACCOUNT ❖\n━━━━━━━━━━━━━━━━━━━━\nUsername : ${user}\nPassword : ${pass}\nDomain : ${DOMAIN}\nIP : ${IP_ADD}\n━━━━━━━━━━━━━━━━━━━━\nPort SSH/Dropbear : 22, 109, 143\nPort SSH-WS : 80, 443 (Path: /sshws)\n━━━━━━━━━━━━━━━━━━━━\nEXPIRED ON : ${exp_date} ${exp_time} WIB (${masaaktif})")
+    msg_cli=$(echo -e "━━━━━━━━━━━━━━━━━━━━\n❖ TRIAL SSH & OVPN ACCOUNT ❖\n━━━━━━━━━━━━━━━━━━━━\nUsername : ${user}\nPassword : ${pass}\nDomain : ${DOMAIN}\nIP : ${IP_ADD}\n━━━━━━━━━━━━━━━━━━━━\nPort Dropbear : 109, 143\nPort SSH-WS : 80, 443 (Path: /sshws)\nPort UDP Custom : 7100, 7200\nPort OVPN : UDP(2200), TCP(1194)\n━━━━━━━━━━━━━━━━━━━━\nLINK OVPN UDP : http://${DOMAIN}/ovpn/udp.ovpn\n━━━━━━━━━━━━━━━━━━━━\nEXPIRED ON : ${exp_date} ${exp_time} WIB (${masaaktif})")
     
-    msg_tg=$(echo -e "━━━━━━━━━━━━━━━━━━━━\n❖ TRIAL SSH ACCOUNT ❖\n━━━━━━━━━━━━━━━━━━━━\nUsername : \`${user}\`\nPassword : \`${pass}\`\nDomain : ${DOMAIN}\nIP : ${IP_ADD}\n━━━━━━━━━━━━━━━━━━━━\nPort SSH/Dropbear : 22, 109, 143\nPort SSH-WS : 80, 443 (Path: /sshws)\n━━━━━━━━━━━━━━━━━━━━\nEXPIRED ON : ${exp_date} ${exp_time} WIB (${masaaktif})")
+    msg_tg=$(echo -e "━━━━━━━━━━━━━━━━━━━━\n❖ TRIAL SSH & OVPN ACCOUNT ❖\n━━━━━━━━━━━━━━━━━━━━\nUsername : \`${user}\`\nPassword : \`${pass}\`\nDomain : ${DOMAIN}\nIP : ${IP_ADD}\n━━━━━━━━━━━━━━━━━━━━\nPort Dropbear : 109, 143\nPort SSH-WS : 80, 443 (Path: /sshws)\nPort UDP Custom : 7100, 7200\nPort OVPN : UDP(2200), TCP(1194)\n━━━━━━━━━━━━━━━━━━━━\nLINK OVPN UDP : http://${DOMAIN}/ovpn/udp.ovpn\n━━━━━━━━━━━━━━━━━━━━\nEXPIRED ON : ${exp_date} ${exp_time} WIB (${masaaktif})")
     
     clear; echo "$msg_cli"
     send_telegram "$msg_tg"
@@ -134,7 +140,6 @@ renew_ssh() {
         new_exp_date=$(date -d "$current_date $current_time + $masaaktif days" +"%Y-%m-%d")
         new_exp_time=$(date -d "$current_date $current_time + $masaaktif days" +"%H:%M:%S")
         
-        # Update expired date di sistem Linux
         chage -E "$new_exp_date" "$user"
         
         sed -i "/^$user /d" $SSH_EXP
@@ -185,6 +190,10 @@ detail_ssh() {
         exp_date=$(echo "$current_data" | awk '{print $3}')
         exp_time=$(echo "$current_data" | awk '{print $4}')
         
+        limit_ip=$(grep "^$user " /usr/local/etc/srpcom/ssh_limit.txt 2>/dev/null | awk '{print $2}')
+        lim_ip_str="${limit_ip} IP"
+        if [ -z "$limit_ip" ] || [ "$limit_ip" == "0" ]; then lim_ip_str="Unlimited"; fi
+        
         clear
         echo "━━━━━━━━━━━━━━━━━━━━"
         echo "❖ SSH & OVPN ACCOUNT ❖"
@@ -199,6 +208,14 @@ detail_ssh() {
         echo "Port Dropbear : 109, 143"
         echo "Port SSH-WS TLS : 443 (Path: /sshws)"
         echo "Port SSH-WS NTLS : 80 (Path: /sshws)"
+        echo "Port UDP Custom : 7100, 7200, 7300"
+        echo "Port OVPN UDP : 2200"
+        echo "Port OVPN TCP : 1194"
+        echo "━━━━━━━━━━━━━━━━━━━━"
+        echo "Limit IP : ${lim_ip_str}"
+        echo "━━━━━━━━━━━━━━━━━━━━"
+        echo "LINK OVPN UDP : http://${DOMAIN}/ovpn/udp.ovpn"
+        echo "LINK OVPN TCP : http://${DOMAIN}/ovpn/tcp.ovpn"
         echo "━━━━━━━━━━━━━━━━━━━━"
         echo "EXPIRED ON : ${exp_date} ${exp_time} WIB"
         echo ""
@@ -243,10 +260,10 @@ menu_ssh() {
     while true; do
         clear
         echo "╔════════════════════════════════════╗"
-        echo "║              MENU SSH              ║"
+        echo "║         MENU SSH & OVPN            ║"
         echo "╚════════════════════════════════════╝"
-        echo "1. Create SSH Account"
-        echo "2. Create Trial SSH"
+        echo "1. Create SSH & OVPN Account"
+        echo "2. Create Trial SSH & OVPN"
         echo "3. Delete SSH Account"
         echo "4. Renew SSH Account"
         echo "5. List SSH Account"
