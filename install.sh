@@ -17,7 +17,7 @@ fi
 clear
 echo "=========================================="
 echo "    MEMULAI INSTALASI XRAY, CADDY & L2TP"
-echo "    SUPPORT UBUNTU 20/22/24 LTS"
+echo "    SUPPORT UBUNTU 20/22/24 LTS (MODULAR)"
 echo "=========================================="
 
 # Mendapatkan IP Publik
@@ -41,7 +41,7 @@ done
 
 echo -e "\n[1/9] Memperbarui sistem & dependensi..."
 apt update && apt upgrade -y
-# Tambahan dependensi untuk L2TP: strongswan, xl2tpd, iptables-persistent
+# Instalasi dependensi gabungan (Xray + L2TP/IPsec)
 DEBIAN_FRONTEND=noninteractive apt install curl wget unzip uuid-runtime jq tzdata ufw cron gnupg2 gnupg python3 python3-flask strongswan xl2tpd iptables iptables-persistent -y
 timedatectl set-timezone Asia/Jakarta
 
@@ -61,6 +61,7 @@ bash -c "$(curl -L https://github.com/XTLS/Xray-install/raw/main/install-release
 systemctl enable xray
 
 echo -e "\n[3/9] Mengonfigurasi Xray Core..."
+# Memperbaiki Permission Log Xray
 mkdir -p /var/log/xray
 touch /var/log/xray/access.log
 touch /var/log/xray/error.log
@@ -239,7 +240,7 @@ systemctl restart xray caddy cron xray-api ipsec xl2tpd
 
 clear
 echo "======================================================"
-echo "    INSTALASI SELESAI & BERHASIL! "
+echo "    INSTALASI SELESAI & BERHASIL! (V2 MODULAR)        "
 echo "======================================================"
 echo "Protokol Terinstal : VMESS, VLESS, TROJAN, L2TP/IPsec"
 echo "Ketik 'menu' untuk masuk ke dashboard manajemen."
