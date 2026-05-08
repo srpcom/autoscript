@@ -1,7 +1,8 @@
 #!/bin/bash
 # ==========================================
 # uninstall.sh
-# MODULE: AUTO UNINSTALLER XRAY, CADDY, L2TP, SSH
+# MODULE: FULL UNINSTALLER (V5)
+# Membersihkan VPS kembali seperti semula (Nol)
 # ==========================================
 
 if [ "${EUID}" -ne 0 ]; then
@@ -10,56 +11,99 @@ if [ "${EUID}" -ne 0 ]; then
 fi
 
 clear
-echo "=========================================="
-echo "    MEMULAI PROSES UNINSTALL SYSTEM"
-echo "=========================================="
-echo -e "\e[31mPERINGATAN:\e[0m Semua data VPN di VPS ini akan dihapus permanen!"
+echo "======================================================"
+echo "       MEMULAI PROSES UNINSTALL VPN MULTIPORT V5      "
+echo "======================================================"
+echo "PERINGATAN: Proses ini akan menghapus SELURUH data, "
+echo "akun, dan aplikasi VPN (Xray, L2TP, SSH, OVPN, BadVPN,"
+echo "Bot Telegram, dll) dari VPS Anda secara permanen!"
+echo "======================================================"
 read -p "Apakah Anda yakin ingin melanjutkan? (y/n): " confirm
-
 if [[ "$confirm" != "y" && "$confirm" != "Y" ]]; then
-    echo "Proses uninstall dibatalkan."; exit 0
+    echo "Proses dibatalkan."
+    exit 0
 fi
 
-echo -e "\n[1/7] Menghentikan semua layanan..."
-systemctl stop xray caddy xray-api cron ipsec xl2tpd dropbear ssh-ws 2>/dev/null
-systemctl disable xray caddy xray-api ipsec xl2tpd dropbear ssh-ws 2>/dev/null
+echo -e "\n[1/8] Menghapus Akun SSH/OpenVPN Linux..."
+if [ -f "/usr/local/etc/srpcom/ssh_expiry.txt" ]; then
+    while read -r user pass exp_date exp_time; do
+        userdel -f "$user" 2>/dev/null
+    done < /usr/local/etc/srpcom/ssh_expiry.txt
+fi
 
-echo -e "\n[2/7] Menghapus Systemd Service..."
-rm -f /etc/systemd/system/xray.service /etc/systemd/system/xray@.service
-rm -f /etc/systemd/system/xray-api.service /etc/systemd/system/l2tp-nat.service
+echo -e "\n[2/8] Menghentikan semua layanan (Services)..."
+systemctl stop xray caddy xray-api ipsec xl2tpd dropbear ssh-ws openvpn-server@server-udp openvpn-server@server-tcp badvpn-7100 badvpn-7200 badvpn-7300 srpcom-bot vpn-nat 2>/dev/null
+systemctl disable xray caddy xray-api ipsec xl2tpd dropbear ssh-ws openvpn-server@server-udp openvpn-server@server-tcp badvpn-7100 badvpn-7200 badvpn-7300 srpcom-bot vpn-nat 2>/dev/null
+
+echo -e "\n[3/8] Menghapus file Systemd Service..."
+rm -f /etc/systemd/system/xray-api.service
 rm -f /etc/systemd/system/ssh-ws.service
+rm -f /etc/systemd/system/badvpn-*.service
+rm -f /etc/systemd/system/srpcom-bot.service
+rm -f /etc/systemd/system/vpn-nat.service
 systemctl daemon-reload
 
-echo -e "\n[3/7] Menghapus Xray, L2TP, SSH Proxy & Data..."
-rm -rf /usr/local/bin/xray /usr/local/share/xray /usr/local/etc/xray /var/log/xray
-rm -rf /usr/local/etc/srpcom /usr/local/bin/srpcom
-rm -f /usr/local/bin/xray-api.py /usr/local/bin/ssh-ws.py /usr/bin/menu
-rm -f /etc/ipsec.conf /etc/ipsec.secrets /etc/ppp/options.xl2tpd /etc/ppp/chap-secrets
+echo -e "\n[4/8] Menghapus aplikasi dan paket bawaan..."
+apt-get remove --purge caddy strongswan xl2tpd dropbear openvpn -y 2>/dev/null
+apt-get autoremove -y 2>/dev/null
+# Menghapus Xray core
+bash -c "$(curl -L https://github.com/XTLS/Xray-install/raw/main/install-release.sh)" @ remove 2>/dev/null
+
+echo -e "\n[5/8] Menghapus folder dan file script..."
+rm -rf /usr/local/etc/xray
+rm -rf /usr/local/etc/srpcom
+rm -rf /usr/local/bin/srpcom
+rm -rf /var/log/xray
+rm -rf /etc/caddy
+rm -rf /etc/openvpn
 rm -rf /etc/xl2tpd
+rm -rf /etc/ppp
+rm -f /usr/local/bin/ssh-ws.py
+rm -f /usr/local/bin/xray-api.py
+rm -f /usr/local/bin/bot-admin.py
+rm -f /usr/local/bin/badvpn-udpgw
+rm -f /usr/bin/menu
 
-echo -e "\n[4/7] Menghapus Caddy & Paket L2TP/SSH..."
-apt purge caddy strongswan xl2tpd dropbear -y > /dev/null 2>&1
-apt autoremove -y > /dev/null 2>&1
-rm -rf /etc/caddy /var/lib/caddy /var/log/caddy /etc/apt/sources.list.d/caddy-stable.list
+echo -e "\n[6/8] Membersihkan Aturan Firewall (UFW) & NAT..."
+ufw delete allow 22/tcp 2>/dev/null
+ufw delete allow 80/tcp 2>/dev/null
+ufw delete allow 109/tcp 2>/dev/null
+ufw delete allow 143/tcp 2>/dev/null
+ufw delete allow 443/tcp 2>/dev/null
+ufw delete allow 500/udp 2>/dev/null
+ufw delete allow 4500/udp 2>/dev/null
+ufw delete allow 1701/udp 2>/dev/null
+ufw delete allow 1194/tcp 2>/dev/null
+ufw delete allow 2200/udp 2>/dev/null
+ufw delete allow 7100/udp 2>/dev/null
+ufw delete allow 7200/udp 2>/dev/null
+ufw delete allow 7300/udp 2>/dev/null
 
-echo -e "\n[5/7] Membersihkan Aturan Firewall (NAT)..."
 ETH=$(ip route ls | grep default | awk '{print $5}' | head -n 1)
 iptables -t nat -D POSTROUTING -s 192.168.42.0/24 -o $ETH -j MASQUERADE 2>/dev/null
+iptables -t nat -D POSTROUTING -s 10.8.0.0/24 -o $ETH -j MASQUERADE 2>/dev/null
+iptables -t nat -D POSTROUTING -s 10.9.0.0/24 -o $ETH -j MASQUERADE 2>/dev/null
 iptables-save > /etc/iptables/rules.v4 2>/dev/null
 
-echo -e "\n[6/7] Membersihkan Cronjob & Auto-Start..."
+echo -e "\n[7/8] Membersihkan Swap Memory..."
+if [ -f "/swapfile" ]; then
+    swapoff /swapfile 2>/dev/null
+    rm -f /swapfile
+    sed -i '/\/swapfile/d' /etc/fstab
+fi
+
+echo -e "\n[8/8] Membersihkan Cronjob & Auto-Start..."
 rm -f /etc/cron.d/xray_autobackup
 rm -f /etc/cron.d/srpcom_autokill
-crontab -l 2>/dev/null | grep -v "xray" | crontab -
+crontab -l 2>/dev/null | grep -v "xray" | grep -v "srpcom" | crontab - 2>/dev/null
 sed -i '/menu/d' /root/.profile 2>/dev/null
 sed -i '/menu/d' /root/.bashrc 2>/dev/null
-sed -i '/menu/d' /etc/bash.bashrc 2>/dev/null
-
-echo -e "\n[7/7] Finalisasi pembersihan..."
-systemctl restart cron
-hash -r
 
 clear
 echo "======================================================"
-echo "    PROSES UNINSTALL SELESAI! "
+echo "      UNINSTALL SELESAI! VPS KEMBALI BERSIH!          "
+echo "======================================================"
+echo "Sistem VPN Multiport V5 beserta OpenVPN, BadVPN,"
+echo "dan Bot Telegram telah dihapus sepenuhnya."
+echo "Sangat disarankan untuk melakukan REBOOT server."
 echo "======================================================"
