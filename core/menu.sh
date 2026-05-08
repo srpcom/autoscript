@@ -1,6 +1,8 @@
 #!/bin/bash
 # ==========================================
+# menu.sh
 # MODULE: MAIN MENU (ROUTER)
+# Menampilkan antarmuka CLI utama dan perutean menu
 # ==========================================
 
 # Memuat Semua Modul
