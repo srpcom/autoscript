@@ -36,7 +36,8 @@ done
 echo -e "\n[1/11] Memperbarui sistem & dependensi..."
 export DEBIAN_FRONTEND=noninteractive
 apt update && apt upgrade -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold"
-apt install curl wget unzip uuid-runtime jq tzdata ufw cron gnupg2 gnupg python3 python3-flask python3-pip strongswan xl2tpd iptables dropbear openvpn cmake make gcc git -y
+# Menambahkan net-tools untuk kebutuhan monitoring dan autokill SSH
+apt install curl wget unzip uuid-runtime jq tzdata ufw cron gnupg2 gnupg python3 python3-flask python3-pip strongswan xl2tpd iptables dropbear openvpn cmake make gcc git net-tools -y
 timedatectl set-timezone Asia/Jakarta
 
 # Menginstal Modul Python Telegram Bot
