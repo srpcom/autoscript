@@ -7,6 +7,7 @@
 
 from flask import Flask, request, jsonify
 import json, os, subprocess, uuid, datetime, base64
+import urllib.request
 
 app = Flask(__name__)
 
@@ -16,6 +17,7 @@ XRAY_CONF = '/usr/local/etc/xray/config.json'
 EXP_FILE = '/usr/local/etc/xray/expiry.txt'
 LOCK_FILE = '/usr/local/etc/xray/locked.json'
 ENV_FILE = '/usr/local/etc/srpcom/env.conf'
+BOT_CONF = '/usr/local/etc/xray/bot_setting.conf'
 
 # Fungsi untuk membaca Domain dan IP dari konfigurasi bash environment
 def get_env(key):
@@ -25,7 +27,6 @@ def get_env(key):
         with open(ENV_FILE, 'r') as f:
             for line in f:
                 if line.startswith(f"{key}="):
-                    # Mengambil value setelah tanda '=' dan membersihkan tanda kutip
                     return line.split('=', 1)[1].strip().strip('"').strip("'")
     except Exception:
         pass
@@ -57,35 +58,56 @@ def save_json(p, d):
 def restart_xray():
     subprocess.run(['systemctl', 'restart', 'xray'])
 
+def send_telegram(text):
+    try:
+        bot_token = ""
+        chat_id = ""
+        autosend = "OFF"
+        if os.path.exists(BOT_CONF):
+            with open(BOT_CONF, 'r') as f:
+                for line in f:
+                    line = line.strip()
+                    if line.startswith('BOT_TOKEN='): bot_token = line.split('=', 1)[1].strip('"').strip("'")
+                    elif line.startswith('CHAT_ID='): chat_id = line.split('=', 1)[1].strip('"').strip("'")
+                    elif line.startswith('AUTOSEND_STATUS='): autosend = line.split('=', 1)[1].strip('"').strip("'")
+
+        if autosend == "ON" and bot_token and chat_id:
+            url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
+            payload = {"chat_id": chat_id, "text": text, "parse_mode": "Markdown"}
+            req = urllib.request.Request(url, data=json.dumps(payload).encode('utf-8'), headers={'Content-Type': 'application/json'})
+            urllib.request.urlopen(req, timeout=5)
+    except Exception as e:
+        pass # Abaikan error telegram agar API website tidak terganggu
+
 def generate_account_detail(protocol, user, uid, exp_date_str, is_trial=False):
     trial_txt = " TRIAL" if is_trial else ""
-    res = f"━━━━━━━━━━━━━━━━━━━━\n❖ XRAY/{protocol.upper()} WS{trial_txt} ❖\n━━━━━━━━━━━━━━━━━━━━\n"
-    res += f"Remarks : {user}\n"
-    res += f"IP Address : {IP_ADD}\n"
-    res += f"Domain : {DOMAIN}\n"
-    res += f"Port TLS : 443\n"
     
     if protocol == 'vmess':
-        res += f"Port NONE-TLS : 80\nID : {uid}\nNetwork : Websocket\nWebsocket Path : /vmessws\n━━━━━━━━━━━━━━━━━━━━\n"
         tls_dict = {"v":"2","ps":user,"add":DOMAIN,"port":"443","id":uid,"aid":"0","net":"ws","type":"none","host":DOMAIN,"path":"/vmessws","tls":"tls","sni":DOMAIN}
         none_tls_dict = {"v":"2","ps":user,"add":DOMAIN,"port":"80","id":uid,"aid":"0","net":"ws","type":"none","host":DOMAIN,"path":"/vmessws","tls":"","sni":""}
         link_tls = "vmess://" + base64.b64encode(json.dumps(tls_dict, separators=(',', ':')).encode('utf-8')).decode('utf-8')
         link_none = "vmess://" + base64.b64encode(json.dumps(none_tls_dict, separators=(',', ':')).encode('utf-8')).decode('utf-8')
-        res += f"LINK WS TLS : {link_tls}\n━━━━━━━━━━━━━━━━━━━━\nLINK WS NONE-TLS : {link_none}\n━━━━━━━━━━━━━━━━━━━━\n"
+        
+        msg_web = f"━━━━━━━━━━━━━━━━━━━━\n❖ XRAY/VMESS WS{trial_txt} ❖\n━━━━━━━━━━━━━━━━━━━━\nRemarks : {user}\nIP Address : {IP_ADD}\nDomain : {DOMAIN}\nPort TLS : 443\nPort NONE-TLS : 80\nID : {uid}\nNetwork : Websocket\nWebsocket Path : /vmessws\n━━━━━━━━━━━━━━━━━━━━\nLINK WS TLS : {link_tls}\n━━━━━━━━━━━━━━━━━━━━\nLINK WS NONE-TLS : {link_none}\n━━━━━━━━━━━━━━━━━━━━\n"
+        msg_tg = f"━━━━━━━━━━━━━━━━━━━━\n❖ XRAY/VMESS WS{trial_txt} ❖\n━━━━━━━━━━━━━━━━━━━━\nRemarks : `{user}`\nIP Address : {IP_ADD}\nDomain : {DOMAIN}\nPort TLS : 443\nPort NONE-TLS : 80\nID : `{uid}`\nNetwork : Websocket\nWebsocket Path : /vmessws\n━━━━━━━━━━━━━━━━━━━━\nLINK WS TLS : `{link_tls}`\n━━━━━━━━━━━━━━━━━━━━\nLINK WS NONE-TLS : `{link_none}`\n━━━━━━━━━━━━━━━━━━━━\n"
         
     elif protocol == 'vless':
-        res += f"Port NONE-TLS : 80\nID : {uid}\nNetwork : Websocket\nWebsocket Path : /vlessws\n━━━━━━━━━━━━━━━━━━━━\n"
         link_tls = f"vless://{uid}@{DOMAIN}:443?path=/vlessws&security=tls&encryption=none&host={DOMAIN}&type=ws&sni={DOMAIN}#{user}"
         link_none = f"vless://{uid}@{DOMAIN}:80?path=/vlessws&security=none&encryption=none&host={DOMAIN}&type=ws#{user}"
-        res += f"LINK WS TLS : {link_tls}\n━━━━━━━━━━━━━━━━━━━━\nLINK WS NONE-TLS : {link_none}\n━━━━━━━━━━━━━━━━━━━━\n"
+        
+        msg_web = f"━━━━━━━━━━━━━━━━━━━━\n❖ XRAY/VLESS WS{trial_txt} ❖\n━━━━━━━━━━━━━━━━━━━━\nRemarks : {user}\nIP Address : {IP_ADD}\nDomain : {DOMAIN}\nPort TLS : 443\nPort NONE-TLS : 80\nID : {uid}\nNetwork : Websocket\nWebsocket Path : /vlessws\n━━━━━━━━━━━━━━━━━━━━\nLINK WS TLS : {link_tls}\n━━━━━━━━━━━━━━━━━━━━\nLINK WS NONE-TLS : {link_none}\n━━━━━━━━━━━━━━━━━━━━\n"
+        msg_tg = f"━━━━━━━━━━━━━━━━━━━━\n❖ XRAY/VLESS WS{trial_txt} ❖\n━━━━━━━━━━━━━━━━━━━━\nRemarks : `{user}`\nIP Address : {IP_ADD}\nDomain : {DOMAIN}\nPort TLS : 443\nPort NONE-TLS : 80\nID : `{uid}`\nNetwork : Websocket\nWebsocket Path : /vlessws\n━━━━━━━━━━━━━━━━━━━━\nLINK WS TLS : `{link_tls}`\n━━━━━━━━━━━━━━━━━━━━\nLINK WS NONE-TLS : `{link_none}`\n━━━━━━━━━━━━━━━━━━━━\n"
         
     elif protocol == 'trojan':
-        res += f"Password : {uid}\nNetwork : Websocket\nWebsocket Path : /trojanws\n━━━━━━━━━━━━━━━━━━━━\n"
         link_tls = f"trojan://{uid}@{DOMAIN}:443?path=/trojanws&security=tls&host={DOMAIN}&type=ws&sni={DOMAIN}#{user}"
-        res += f"LINK WS TLS : {link_tls}\n━━━━━━━━━━━━━━━━━━━━\n"
         
-    res += f"Expired On : {exp_date_str}"
-    return res
+        msg_web = f"━━━━━━━━━━━━━━━━━━━━\n❖ XRAY/TROJAN WS{trial_txt} ❖\n━━━━━━━━━━━━━━━━━━━━\nRemarks : {user}\nIP Address : {IP_ADD}\nDomain : {DOMAIN}\nPort TLS : 443\nPassword : {uid}\nNetwork : Websocket\nWebsocket Path : /trojanws\n━━━━━━━━━━━━━━━━━━━━\nLINK WS TLS : {link_tls}\n━━━━━━━━━━━━━━━━━━━━\n"
+        msg_tg = f"━━━━━━━━━━━━━━━━━━━━\n❖ XRAY/TROJAN WS{trial_txt} ❖\n━━━━━━━━━━━━━━━━━━━━\nRemarks : `{user}`\nIP Address : {IP_ADD}\nDomain : {DOMAIN}\nPort TLS : 443\nPassword : `{uid}`\nNetwork : Websocket\nWebsocket Path : /trojanws\n━━━━━━━━━━━━━━━━━━━━\nLINK WS TLS : `{link_tls}`\n━━━━━━━━━━━━━━━━━━━━\n"
+        
+    msg_web_final = msg_web + f"Expired On : {exp_date_str} WIB"
+    msg_tg_final = msg_tg + f"EXPIRED ON : {exp_date_str} WIB"
+    
+    return msg_web_final, msg_tg_final
 
 @app.route('/user_legend/add-<protocol>ws', methods=['POST'])
 def add_user(protocol):
@@ -115,8 +137,11 @@ def add_user(protocol):
         f.write(f"{user} {dt_str}\n")
     
     restart_xray()
-    detail_msg = generate_account_detail(protocol, user, uid, dt_str)
-    return jsonify({"stdout": detail_msg})
+    
+    msg_web, msg_tg = generate_account_detail(protocol, user, uid, dt_str)
+    send_telegram(msg_tg) # Trigger Autosend ke Telegram
+    
+    return jsonify({"stdout": msg_web})
 
 @app.route('/user_legend/trial-<protocol>ws', methods=['POST'])
 def trial_user(protocol):
@@ -144,8 +169,11 @@ def trial_user(protocol):
         f.write(f"{user} {dt_str}\n")
     
     restart_xray()
-    detail_msg = generate_account_detail(protocol, user, uid, dt_str, True)
-    return jsonify({"stdout": detail_msg})
+    
+    msg_web, msg_tg = generate_account_detail(protocol, user, uid, dt_str, True)
+    send_telegram(msg_tg) # Trigger Autosend ke Telegram untuk Trial
+    
+    return jsonify({"stdout": msg_web})
 
 @app.route('/user_legend/del-<protocol>ws', methods=['DELETE'])
 def del_user(protocol):
@@ -221,8 +249,8 @@ def detail_user(protocol):
                         parts = line.strip().split(' ', 1)
                         if len(parts) > 1: exp_date_str = parts[1]
                         break
-        detail_msg = generate_account_detail(protocol, user, uid, exp_date_str)
-        return jsonify({"stdout": detail_msg})
+        msg_web, _ = generate_account_detail(protocol, user, uid, exp_date_str)
+        return jsonify({"stdout": msg_web})
         
     return jsonify({"stdout": "Error: User not found"})
 
