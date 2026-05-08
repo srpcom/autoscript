@@ -12,6 +12,7 @@ import datetime
 import subprocess
 import requests
 import telebot
+import logging
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton, ForceReply
 
 # --- KONFIGURASI PATH ---
@@ -70,6 +71,10 @@ def load_json(p):
 
 # --- INISIALISASI BOT ---
 bot = telebot.TeleBot(BOT_TOKEN)
+
+# Mengaktifkan Log Level DEBUG untuk Telebot
+telebot.logger.setLevel(logging.DEBUG)
+
 PROT_MAP = {'vmess': 'vmessws', 'vless': 'vlessws', 'trojan': 'trojanws', 'ssh': 'ssh', 'l2tp': 'l2tp'}
 
 def is_admin(message):
