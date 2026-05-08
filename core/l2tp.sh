@@ -145,6 +145,61 @@ list_l2tp() {
     pause
 }
 
+detail_l2tp() {
+    clear
+    echo "======================================"
+    echo "         DETAIL L2TP ACCOUNT          "
+    echo "======================================"
+    if [ ! -s "$L2TP_EXP" ]; then
+        echo "Tidak ada akun L2TP."
+        pause; return
+    fi
+
+    mapfile -t users < <(awk '{print $1}' $L2TP_EXP)
+    for i in "${!users[@]}"; do
+        echo "$((i+1)). ${users[$i]}"
+    done
+    echo "0. Back"
+    echo "======================================"
+    read -p "Select Account [0-${#users[@]}]: " choice
+    
+    if [[ "$choice" == "0" ]]; then return; fi
+
+    if [[ "$choice" -gt 0 && "$choice" -le "${#users[@]}" ]]; then
+        user="${users[$((choice-1))]}"
+        
+        # Get data
+        current_data=$(grep "^$user " $L2TP_EXP)
+        pass=$(echo "$current_data" | awk '{print $2}')
+        exp_date=$(echo "$current_data" | awk '{print $3}')
+        exp_time=$(echo "$current_data" | awk '{print $4}')
+        
+        if [ -z "$exp_date" ]; then 
+            exp_date="Lifetime / No Exp"
+        else 
+            exp_date="${exp_date} ${exp_time} WIB"
+        fi
+        
+        clear
+        echo "━━━━━━━━━━━━━━━━━━━━"
+        echo "❖ L2TP / IPsec VPN ❖"
+        echo "━━━━━━━━━━━━━━━━━━━━"
+        echo "Remarks : ${user}"
+        echo "IP Address : ${IP_ADD}"
+        echo "Domain : ${DOMAIN}"
+        echo "IPsec PSK : ${IPSEC_PSK}"
+        echo "Username : ${user}"
+        echo "Password : ${pass}"
+        echo "━━━━━━━━━━━━━━━━━━━━"
+        echo "EXPIRED ON : ${exp_date}"
+        echo ""
+        pause
+        detail_l2tp
+    else
+        echo -e "\n=> Pilihan tidak valid!"; sleep 1; detail_l2tp
+    fi
+}
+
 menu_l2tp() {
     while true; do
         clear
@@ -155,14 +210,16 @@ menu_l2tp() {
         echo "2. Delete L2TP Account"
         echo "3. Renew L2TP Account"
         echo "4. List L2TP Account"
+        echo "5. Detail L2TP Account"
         echo "0. Back to Main Menu"
         echo "======================================"
-        read -p "Please select an option [0-4]: " opt
+        read -p "Please select an option [0-5]: " opt
         case $opt in
             1) add_l2tp ;; 
             2) del_l2tp ;; 
             3) renew_l2tp ;; 
             4) list_l2tp ;;
+            5) detail_l2tp ;;
             0) break ;;
             *) echo -e "\n=> Pilihan tidak valid!"; sleep 1 ;;
         esac
