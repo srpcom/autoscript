@@ -16,12 +16,15 @@ menu_settings() {
         echo "▶ BACKUP & RESTORE / SETTINGS"
         echo " [1] Manual Backup ke Telegram"
         echo " [2] Pengaturan Auto Backup Bot"
+        echo " [3] Pengaturan Auto Send Akun"
         echo " [0] Kembali ke Menu Utama"
-        read -p " Pilih opsi [0-2]: " opt
+        read -p " Pilih opsi [0-3]: " opt
         case $opt in
             1) manual_backup_telegram ;;
-            2) echo "TODO: Buka fungsi autosend bot"; pause ;;
+            2) menu_autobackup ;;
+            3) menu_autosend ;;
             0) break ;;
+            *) echo "Pilihan tidak valid!"; sleep 1 ;;
         esac
     done
 }
