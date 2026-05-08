@@ -27,13 +27,22 @@ menu_bot_admin() {
         echo "Current BOT_TOKEN : ${bot_token:-Belum disetting}"
         echo "Current ADMIN_ID  : ${admin_id:-Belum disetting}"
         echo "======================================"
-        echo "1. Ubah Token & ID lalu Jalankan Bot"
-        echo "2. Hentikan Bot (Disable)"
+        echo "1. Mulai / Restart Bot Admin"
+        echo "2. Ubah Token & ID Bot"
+        echo "3. Hentikan Bot (Disable)"
         echo "0. Kembali ke Settings"
         echo "======================================"
-        read -p "Pilih opsi [0-2]: " opt
+        read -p "Pilih opsi [0-3]: " opt
         case $opt in
             1)
+                if [[ -n "$bot_token" && -n "$admin_id" ]]; then
+                    systemctl restart srpcom-bot
+                    echo -e "\n\e[32m=> Bot Admin berhasil dijalankan!\e[0m"; sleep 2
+                else
+                    echo -e "\n\e[31m=> Token atau ID belum disetting! Pilih opsi 2.\e[0m"; sleep 2
+                fi
+                ;;
+            2)
                 read -p "Masukkan TOKEN BOT ADMIN : " new_token
                 read -p "Masukkan CHAT ID ADMIN   : " new_id
                 if [[ -n "$new_token" && -n "$new_id" ]]; then
@@ -47,7 +56,7 @@ EOF
                     echo -e "\n=> Token atau ID tidak boleh kosong!"; sleep 2
                 fi
                 ;;
-            2)
+            3)
                 systemctl stop srpcom-bot
                 echo -e "\n=> Bot Admin berhasil dihentikan!"; sleep 2
                 ;;
