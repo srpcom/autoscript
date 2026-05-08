@@ -33,10 +33,9 @@ while true; do
     fi
 done
 
-echo -e "\n[1/10] Memperbarui sistem & dependensi..."
+echo -e "\n[1/11] Memperbarui sistem & dependensi..."
 export DEBIAN_FRONTEND=noninteractive
 apt update && apt upgrade -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold"
-# Menambahkan cmake, make, gcc, git (untuk build BadVPN) dan openvpn
 apt install curl wget unzip uuid-runtime jq tzdata ufw cron gnupg2 gnupg python3 python3-flask strongswan xl2tpd iptables dropbear openvpn cmake make gcc git -y
 timedatectl set-timezone Asia/Jakarta
 
@@ -49,11 +48,38 @@ DOMAIN="$DOMAIN"
 IP_ADD="$VPS_IP"
 EOF
 
-echo -e "\n[2/10] Menginstal Xray-core..."
+echo -e "\n[2/11] Optimasi Performa Server (BBR & Swap RAM)..."
+# 2A. Membuat Swap Memory 2GB (Mencegah VPS RAM kecil Crash/OOM)
+if [ ! -f "/swapfile" ]; then
+    echo "=> Membuat Swap Memory 2GB..."
+    dd if=/dev/zero of=/swapfile bs=1M count=2048 status=none
+    chmod 600 /swapfile
+    mkswap /swapfile >/dev/null 2>&1
+    swapon /swapfile
+    if ! grep -q "/swapfile" /etc/fstab; then
+        echo "/swapfile swap swap defaults 0 0" >> /etc/fstab
+    fi
+else
+    echo "=> Swap Memory sudah aktif."
+fi
+
+# 2B. Mengaktifkan TCP BBR (Meningkatkan Speed & Menurunkan Ping)
+echo "=> Mengaktifkan TCP BBR..."
+if ! grep -q "net.ipv4.tcp_congestion_control=bbr" /etc/sysctl.conf; then
+    cat >> /etc/sysctl.conf << EOF
+
+# Optimasi TCP BBR & Network
+net.core.default_qdisc=fq
+net.ipv4.tcp_congestion_control=bbr
+EOF
+    sysctl -p >/dev/null 2>&1
+fi
+
+echo -e "\n[3/11] Menginstal Xray-core..."
 bash -c "$(curl -L https://github.com/XTLS/Xray-install/raw/main/install-release.sh)" @ install
 systemctl enable xray
 
-echo -e "\n[3/10] Mengonfigurasi Xray Core (Limit & Kuota Enabled)..."
+echo -e "\n[4/11] Mengonfigurasi Xray Core (Limit & Kuota Enabled)..."
 mkdir -p /var/log/xray
 touch /var/log/xray/access.log
 touch /var/log/xray/error.log
@@ -87,7 +113,7 @@ AUTOSEND_STATUS="OFF"
 EOF
 echo "SANGATRAHASIA123" > /usr/local/etc/xray/api_key.conf
 
-echo -e "\n[4/10] Mengonfigurasi L2TP & IPsec..."
+echo -e "\n[5/11] Mengonfigurasi L2TP & IPsec..."
 mkdir -p /etc/xl2tpd
 mkdir -p /etc/ppp
 cat > /etc/ipsec.conf << EOF
@@ -148,8 +174,8 @@ EOF
 touch /usr/local/etc/srpcom/l2tp_expiry.txt
 systemctl enable ipsec xl2tpd
 
-echo -e "\n[5/10] Mengonfigurasi SSH, Dropbear, SSH-WS, BadVPN & OpenVPN..."
-# 5A. Dropbear
+echo -e "\n[6/11] Mengonfigurasi SSH, Dropbear, SSH-WS, BadVPN & OpenVPN..."
+# 6A. Dropbear
 cat > /etc/default/dropbear << 'EOF'
 NO_START=0
 DROPBEAR_PORT=109
@@ -160,7 +186,7 @@ EOF
 systemctl restart dropbear
 systemctl enable dropbear
 
-# 5B. SSH-WS Proxy
+# 6B. SSH-WS Proxy
 cat > /usr/local/bin/ssh-ws.py << 'EOF'
 import socket, threading, sys
 def handle_client(client_socket):
@@ -211,12 +237,12 @@ systemctl start ssh-ws
 touch /usr/local/etc/srpcom/ssh_expiry.txt
 touch /usr/local/etc/srpcom/ssh_limit.txt
 
-# 5C. Kompilasi BadVPN (UDP Custom)
+# 6C. Kompilasi BadVPN (UDP Custom)
 echo -e "Membuat layanan BadVPN (UDP Custom)..."
-git clone https://github.com/ambrop72/badvpn.git /tmp/badvpn
+git clone https://github.com/ambrop72/badvpn.git /tmp/badvpn >/dev/null 2>&1
 mkdir -p /tmp/badvpn/build && cd /tmp/badvpn/build
-cmake .. -DBUILD_NOTHING_BY_DEFAULT=1 -DBUILD_UDPGW=1
-make
+cmake .. -DBUILD_NOTHING_BY_DEFAULT=1 -DBUILD_UDPGW=1 >/dev/null 2>&1
+make >/dev/null 2>&1
 cp udpgw/badvpn-udpgw /usr/local/bin/
 
 for port in 7100 7200 7300; do
@@ -238,11 +264,10 @@ systemctl enable badvpn-$port
 systemctl start badvpn-$port
 done
 
-# 5D. Setup OpenVPN
+# 6D. Setup OpenVPN
 echo -e "Menyiapkan OpenVPN dan Sertifikatnya..."
 mkdir -p /etc/openvpn/server/keys
 cd /etc/openvpn/server/keys
-# Fast Elliptic Curve Cert Generation
 openssl ecparam -genkey -name prime256v1 -out ca.key
 openssl req -new -x509 -days 3650 -key ca.key -out ca.crt -subj "/CN=SRPCOM_CA"
 openssl ecparam -genkey -name prime256v1 -out server.key
@@ -313,7 +338,6 @@ mkdir -p /usr/local/etc/srpcom/ovpn
 CA_CERT=$(cat /etc/openvpn/server/keys/ca.crt)
 TA_CERT=$(cat /etc/openvpn/server/keys/ta.key)
 
-# Generate Client UDP
 cat > /usr/local/etc/srpcom/ovpn/udp.ovpn << EOF
 client
 dev tun
@@ -335,7 +359,6 @@ $TA_CERT
 </tls-auth>
 EOF
 
-# Generate Client TCP
 cat > /usr/local/etc/srpcom/ovpn/tcp.ovpn << EOF
 client
 dev tun
@@ -357,7 +380,7 @@ $TA_CERT
 </tls-auth>
 EOF
 
-echo -e "\n[6/10] Mendownload Modul Sistem dari GitHub..."
+echo -e "\n[7/11] Mendownload Modul Sistem dari GitHub..."
 wget -q -O /usr/local/bin/srpcom/utils.sh "$GITHUB_RAW/core/utils.sh"
 wget -q -O /usr/local/bin/srpcom/telegram.sh "$GITHUB_RAW/core/telegram.sh"
 wget -q -O /usr/local/bin/srpcom/xray.sh "$GITHUB_RAW/core/xray.sh"
@@ -372,7 +395,7 @@ chmod +x /usr/local/bin/srpcom/*.sh
 chmod +x /usr/local/bin/xray-api.py
 ln -sf /usr/local/bin/srpcom/menu.sh /usr/bin/menu
 
-echo -e "\n[7/10] Mengonfigurasi Layanan API..."
+echo -e "\n[8/11] Mengonfigurasi Layanan API..."
 cat > /etc/systemd/system/xray-api.service << EOF
 [Unit]
 Description=Xray Python API Backend
@@ -389,7 +412,7 @@ systemctl daemon-reload
 systemctl enable xray-api
 systemctl start xray-api
 
-echo -e "\n[8/10] Mengonfigurasi Firewall (UFW & Iptables NAT L2TP/OVPN)..."
+echo -e "\n[9/11] Mengonfigurasi Firewall (UFW & Iptables NAT L2TP/OVPN)..."
 ufw allow 22/tcp
 ufw allow 80/tcp
 ufw allow 109/tcp
@@ -425,13 +448,12 @@ systemctl start vpn-nat
 sed -i '/net.ipv4.ip_forward/s/^#//g' /etc/sysctl.conf
 sysctl -p
 
-echo -e "\n[9/10] Menginstal & Mengonfigurasi Caddy..."
+echo -e "\n[10/11] Menginstal & Mengonfigurasi Caddy..."
 apt install -y debian-keyring debian-archive-keyring apt-transport-https
 curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | gpg --dearmor --yes -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
 curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | tee /etc/apt/sources.list.d/caddy-stable.list
 apt update && apt install caddy -y
 
-# Menambahkan rute Caddy untuk mendownload file OpenVPN
 cat > /etc/caddy/Caddyfile << EOF
 http://$DOMAIN, https://$DOMAIN {
     handle /user_legend/* {
@@ -459,7 +481,7 @@ http://$DOMAIN, https://$DOMAIN {
 }
 EOF
 
-echo -e "\n[10/10] Setup Cronjob Selesai..."
+echo -e "\n[11/11] Setup Cronjob Selesai..."
 if ! grep -q "menu" /root/.profile; then echo "menu" >> /root/.profile; fi
 
 systemctl restart xray caddy cron xray-api ipsec xl2tpd dropbear ssh-ws
@@ -469,5 +491,6 @@ echo "======================================================"
 echo "    INSTALASI SELESAI & BERHASIL! (V5 FINAL)          "
 echo "======================================================"
 echo "Protokol: VMESS, VLESS, TROJAN, L2TP, SSH, OVPN, UDPGW"
+echo "Optimasi: TCP BBR & Swap RAM 2GB Aktif!"
 echo "Ketik 'menu' untuk masuk ke dashboard manajemen."
 echo "======================================================"
