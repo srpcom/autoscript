@@ -70,7 +70,8 @@ def send_telegram(text):
 
         if autosend == "ON" and bot_token and chat_id:
             url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
-            payload = {"chat_id": chat_id, "text": text, "parse_mode": "Markdown"}
+            # Mengirim tanpa parse_mode Markdown agar backtick tidak diproses jika ada
+            payload = {"chat_id": chat_id, "text": text}
             req = urllib.request.Request(url, data=json.dumps(payload).encode('utf-8'), headers={'Content-Type': 'application/json'})
             urllib.request.urlopen(req, timeout=5)
     except: pass
@@ -80,7 +81,7 @@ def generate_account_detail(protocol, user, uid, exp_date_str, is_trial=False, l
     lim_ip_str = f"{limit_ip} IP" if limit_ip > 0 else "Unlimited"
     lim_q_str = f"{limit_quota} GB" if limit_quota > 0 else "Unlimited"
     
-    # FORMAT: Remarks, ID, dan Link dibungkus backticks agar gampang di klik-salin
+    # PERBAIKAN: Menghapus Backticks dari semua output
     if protocol == 'vmess':
         tls_dict = {"v":"2","ps":user,"add":DOMAIN,"port":"443","id":uid,"aid":"0","net":"ws","type":"none","host":DOMAIN,"path":"/vmessws","tls":"tls","sni":DOMAIN}
         none_tls_dict = {"v":"2","ps":user,"add":DOMAIN,"port":"80","id":uid,"aid":"0","net":"ws","type":"none","host":DOMAIN,"path":"/vmessws","tls":"","sni":""}
@@ -91,21 +92,21 @@ def generate_account_detail(protocol, user, uid, exp_date_str, is_trial=False, l
             f"━━━━━━━━━━━━━━━━━━━━\n"
             f"❖ XRAY/VMESS WS{trial_txt} ❖\n"
             f"━━━━━━━━━━━━━━━━━━━━\n"
-            f"Remarks : `{user}`\n"
+            f"Remarks : {user}\n"
             f"IP Address : {IP_ADD}\n"
             f"Domain : {DOMAIN}\n"
             f"Port TLS : 443\n"
             f"Port NONE-TLS : 80\n"
-            f"ID : `{uid}`\n"
+            f"ID : {uid}\n"
             f"Network : Websocket\n"
             f"Websocket Path : /vmessws\n"
             f"━━━━━━━━━━━━━━━━━━━━\n"
             f"Limit IP : {lim_ip_str}\n"
             f"Limit Kuota : {lim_q_str}\n"
             f"━━━━━━━━━━━━━━━━━━━━\n"
-            f"LINK WS TLS : `{link_tls}`\n"
+            f"LINK WS TLS : {link_tls}\n"
             f"━━━━━━━━━━━━━━━━━━━━\n"
-            f"LINK WS NONE-TLS : `{link_none}`\n"
+            f"LINK WS NONE-TLS : {link_none}\n"
             f"━━━━━━━━━━━━━━━━━━━━\n"
             f"Expired On : {exp_date_str} WIB"
         )
@@ -118,21 +119,21 @@ def generate_account_detail(protocol, user, uid, exp_date_str, is_trial=False, l
             f"━━━━━━━━━━━━━━━━━━━━\n"
             f"❖ XRAY/VLESS WS{trial_txt} ❖\n"
             f"━━━━━━━━━━━━━━━━━━━━\n"
-            f"Remarks : `{user}`\n"
+            f"Remarks : {user}\n"
             f"IP Address : {IP_ADD}\n"
             f"Domain : {DOMAIN}\n"
             f"Port TLS : 443\n"
             f"Port NONE-TLS : 80\n"
-            f"ID : `{uid}`\n"
+            f"ID : {uid}\n"
             f"Network : Websocket\n"
             f"Websocket Path : /vlessws\n"
             f"━━━━━━━━━━━━━━━━━━━━\n"
             f"Limit IP : {lim_ip_str}\n"
             f"Limit Kuota : {lim_q_str}\n"
             f"━━━━━━━━━━━━━━━━━━━━\n"
-            f"LINK WS TLS : `{link_tls}`\n"
+            f"LINK WS TLS : {link_tls}\n"
             f"━━━━━━━━━━━━━━━━━━━━\n"
-            f"LINK WS NONE-TLS : `{link_none}`\n"
+            f"LINK WS NONE-TLS : {link_none}\n"
             f"━━━━━━━━━━━━━━━━━━━━\n"
             f"Expired On : {exp_date_str} WIB"
         )
@@ -144,18 +145,18 @@ def generate_account_detail(protocol, user, uid, exp_date_str, is_trial=False, l
             f"━━━━━━━━━━━━━━━━━━━━\n"
             f"❖ XRAY/TROJAN WS{trial_txt} ❖\n"
             f"━━━━━━━━━━━━━━━━━━━━\n"
-            f"Remarks : `{user}`\n"
+            f"Remarks : {user}\n"
             f"IP Address : {IP_ADD}\n"
             f"Domain : {DOMAIN}\n"
             f"Port TLS : 443\n"
-            f"Password : `{uid}`\n"
+            f"Password : {uid}\n"
             f"Network : Websocket\n"
             f"Websocket Path : /trojanws\n"
             f"━━━━━━━━━━━━━━━━━━━━\n"
             f"Limit IP : {lim_ip_str}\n"
             f"Limit Kuota : {lim_q_str}\n"
             f"━━━━━━━━━━━━━━━━━━━━\n"
-            f"LINK WS TLS : `{link_tls}`\n"
+            f"LINK WS TLS : {link_tls}\n"
             f"━━━━━━━━━━━━━━━━━━━━\n"
             f"Expired On : {exp_date_str} WIB"
         )
@@ -240,7 +241,7 @@ def del_user(protocol):
                 for line in lines:
                     if not line.startswith(user + ' '): f.write(line)
     restart_xray()
-    return jsonify({"stdout": f"Success: User `{user}` deleted."})
+    return jsonify({"stdout": f"Success: User {user} deleted."})
 
 @app.route('/user_legend/renew-<protocol>ws', methods=['POST'])
 def renew_user(protocol):
@@ -263,7 +264,7 @@ def renew_user(protocol):
                         updated = True
                         continue
                 f.write(line)
-    if updated: return jsonify({"stdout": f"Success: User `{user}` renewed."})
+    if updated: return jsonify({"stdout": f"Success: User {user} renewed."})
     return jsonify({"stdout": f"Error: User {user} not found."})
 
 @app.route('/user_legend/detail-<protocol>ws', methods=['GET', 'POST'])
@@ -312,13 +313,6 @@ def cek_ssh():
     if not check_auth(): return jsonify({"stdout": "Unauthorized"}), 401
     out = subprocess.run("ps aux | grep -iE 'dropbear|sshd' | grep -v grep | wc -l", shell=True, capture_output=True, text=True).stdout.strip()
     return jsonify({"stdout": f"Active SSH/Dropbear Processes: {out}"})
-
-@app.route('/user_legend/lock-ssh', methods=['POST'])
-def lock_ssh():
-    if not check_auth(): return jsonify({"stdout": "Unauthorized"}), 401
-    user = (request.json or {}).get('user')
-    subprocess.run(['usermod', '-L', user])
-    return jsonify({"stdout": f"Success: User `{user}` locked."})
 
 if __name__ == '__main__':
     app.run(host='127.0.0.1', port=5000)
