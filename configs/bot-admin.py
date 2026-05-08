@@ -74,18 +74,17 @@ def handle_query(call):
         elif data.startswith("prot_"):
             prot = data.split("_")[1]
             markup = InlineKeyboardMarkup(row_width=2)
-            markup.add(InlineKeyboardButton("➕ Add Account", callback_data=f"act_add_{prot}"), InlineKeyboardButton("⏱️ Trial", callback_data=f"act_trial_{prot}"))
-            markup.add(InlineKeyboardButton("📄 Detail", callback_data=f"act_detail_{prot}"), InlineKeyboardButton("🗑️ Delete", callback_data=f"act_del_{prot}"))
+            markup.add(InlineKeyboardButton("➕ Add", callback_data=f"act_add_{prot}"), InlineKeyboardButton("⏱️ Trial", callback_data=f"act_trial_{prot}"))
+            markup.add(InlineKeyboardButton("📄 Detail", callback_data=f"act_detail_{prot}"), InlineKeyboardButton("🗑️ Del", callback_data=f"act_del_{prot}"))
             markup.add(InlineKeyboardButton("🔙 Back", callback_data="menu_main"))
             bot.edit_message_text(f"🔧 *MANAGE {prot.upper()}*", chat_id, msg_id, reply_markup=markup, parse_mode="Markdown")
         elif data.startswith("act_"):
             p = data.split("_"); act, prot, api_ep = p[1], p[2], PROT_MAP.get(p[2])
             if act == "trial": 
-                # API akan mengembalikan msg_tg yang ada backtick-nya
                 res = api_req(f"trial-{api_ep}", "POST", {"exp": 60})
                 bot.send_message(chat_id, res, parse_mode="Markdown")
             else:
-                t = f"✏️ Input data {act.upper()} {prot.upper()}\nContoh: `budi 30 2 50`"
+                t = f"✏️ Data {act.upper()} {prot.upper()}\nContoh: `budi 30 2 50`"
                 msg = bot.send_message(chat_id, t, parse_mode="Markdown", reply_markup=telebot.types.ForceReply())
                 bot.register_next_step_handler(msg, process_action_input, act, prot, api_ep)
     except Exception as e: bot.send_message(chat_id, f"Error: {e}")
@@ -94,9 +93,10 @@ def process_action_input(message, action, prot, api_ep):
     if not message.text: return
     parts = message.text.split(); payload = {}; method = "POST"; endpoint = f"{action}-{api_ep}"
     try:
+        # Menangani input space-separated (budi 30 2 50)
         payload = {'user': parts[0], 'exp': int(parts[1]) if len(parts)>1 else 30, 'limit_ip': int(parts[2]) if len(parts)>2 else 0, 'limit_quota': int(parts[3]) if len(parts)>3 else 0}
         if action == "del": method = "DELETE"
-        # Kirim hasil ke Telegram dengan parse_mode Markdown agar backtick bisa diklik-salin
+        # Kirim hasil ke Telegram dengan parse_mode Markdown agar backtick berfungsi
         bot.send_message(message.chat.id, api_req(endpoint, method, payload), parse_mode="Markdown")
     except: bot.send_message(message.chat.id, "❌ Format salah!")
 
