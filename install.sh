@@ -1,7 +1,7 @@
 #!/bin/bash
 # ==========================================
 # install.sh
-# MODULE: AUTO INSTALLER XRAY & CADDY BY SRPCOM (V2 MODULAR)
+# MODULE: AUTO INSTALLER XRAY, CADDY, & L2TP BY SRPCOM
 # OS Support: Ubuntu 20.04 / 22.04 / 24.04 LTS
 # ==========================================
 
@@ -16,7 +16,7 @@ fi
 
 clear
 echo "=========================================="
-echo "    MEMULAI INSTALASI XRAY & CADDY (MODULAR)"
+echo "    MEMULAI INSTALASI XRAY, CADDY & L2TP"
 echo "    SUPPORT UBUNTU 20/22/24 LTS"
 echo "=========================================="
 
@@ -39,9 +39,10 @@ while true; do
     fi
 done
 
-echo -e "\n[1/7] Memperbarui sistem & dependensi..."
+echo -e "\n[1/9] Memperbarui sistem & dependensi..."
 apt update && apt upgrade -y
-apt install curl wget unzip uuid-runtime jq tzdata ufw cron gnupg2 gnupg python3 python3-flask -y
+# Tambahan dependensi untuk L2TP: strongswan, xl2tpd, iptables-persistent
+DEBIAN_FRONTEND=noninteractive apt install curl wget unzip uuid-runtime jq tzdata ufw cron gnupg2 gnupg python3 python3-flask strongswan xl2tpd iptables iptables-persistent -y
 timedatectl set-timezone Asia/Jakarta
 
 # Membuat Struktur Folder SRPCOM
@@ -55,12 +56,11 @@ DOMAIN="$DOMAIN"
 IP_ADD="$VPS_IP"
 EOF
 
-echo -e "\n[2/7] Menginstal Xray-core..."
+echo -e "\n[2/9] Menginstal Xray-core..."
 bash -c "$(curl -L https://github.com/XTLS/Xray-install/raw/main/install-release.sh)" @ install
 systemctl enable xray
 
-echo -e "\n[3/7] Mengonfigurasi Xray Core..."
-# PERBAIKAN: Pembuatan Log dan Permission dilakukan SETELAH instalasi Xray
+echo -e "\n[3/9] Mengonfigurasi Xray Core..."
 mkdir -p /var/log/xray
 touch /var/log/xray/access.log
 touch /var/log/xray/error.log
@@ -88,10 +88,77 @@ AUTOSEND_STATUS="OFF"
 EOF
 echo "SANGATRAHASIA123" > /usr/local/etc/xray/api_key.conf
 
-echo -e "\n[4/7] Mendownload Modul Sistem dari GitHub..."
+echo -e "\n[4/9] Mengonfigurasi L2TP & IPsec..."
+# Konfigurasi IPsec (StrongSwan)
+cat > /etc/ipsec.conf << EOF
+config setup
+    charondebug="ike 1, knl 1, cfg 0"
+    uniqueids=no
+conn L2TP-PSK-NAT
+    rightsubnet=vhost:%priv
+    also=L2TP-PSK-noNAT
+conn L2TP-PSK-noNAT
+    authby=secret
+    pfs=no
+    auto=add
+    keyingtries=3
+    rekey=no
+    ikelifetime=8h
+    keylife=1h
+    type=transport
+    left=%defaultroute
+    leftid=%any
+    leftprotoport=17/1701
+    right=%any
+    rightid=%any
+    rightprotoport=17/%any
+    dpddelay=40
+    dpdtimeout=130
+    dpdaction=clear
+EOF
+
+# Membuat Preshared Key (PSK)
+echo "%any %any : PSK \"srpcom_vpn\"" > /etc/ipsec.secrets
+
+# Konfigurasi XL2TPD
+cat > /etc/xl2tpd/xl2tpd.conf << EOF
+[global]
+port = 1701
+[lns default]
+ip range = 192.168.42.10-192.168.42.250
+local ip = 192.168.42.1
+require chap = yes
+refuse pap = yes
+require authentication = yes
+name = l2tpd
+pppoptfile = /etc/ppp/options.xl2tpd
+length bit = yes
+EOF
+
+# Konfigurasi PPP Options untuk L2TP
+cat > /etc/ppp/options.xl2tpd << EOF
+ipcp-accept-local
+ipcp-accept-remote
+ms-dns 8.8.8.8
+ms-dns 8.8.4.4
+noccp
+auth
+idle 1800
+mtu 1410
+mru 1410
+nodefaultroute
+debug
+proxyarp
+connect-delay 5000
+EOF
+touch /usr/local/etc/srpcom/l2tp_expiry.txt
+systemctl enable ipsec xl2tpd
+
+echo -e "\n[5/9] Mendownload Modul Sistem dari GitHub..."
 wget -q -O /usr/local/bin/srpcom/utils.sh "$GITHUB_RAW/core/utils.sh"
 wget -q -O /usr/local/bin/srpcom/telegram.sh "$GITHUB_RAW/core/telegram.sh"
 wget -q -O /usr/local/bin/srpcom/xray.sh "$GITHUB_RAW/core/xray.sh"
+wget -q -O /usr/local/bin/srpcom/l2tp.sh "$GITHUB_RAW/core/l2tp.sh"
 wget -q -O /usr/local/bin/srpcom/menu.sh "$GITHUB_RAW/core/menu.sh"
 wget -q -O /usr/local/bin/xray-api.py "$GITHUB_RAW/configs/xray-api.py"
 
@@ -101,7 +168,7 @@ chmod +x /usr/local/bin/xray-api.py
 # Membuat symlink agar user bisa ketik 'menu'
 ln -sf /usr/local/bin/srpcom/menu.sh /usr/bin/menu
 
-echo -e "\n[5/7] Mengonfigurasi Layanan API & Firewall..."
+echo -e "\n[6/9] Mengonfigurasi Layanan API..."
 cat > /etc/systemd/system/xray-api.service << EOF
 [Unit]
 Description=Xray Python API Backend
@@ -121,9 +188,24 @@ systemctl daemon-reload
 systemctl enable xray-api
 systemctl start xray-api
 
-ufw allow 22/tcp; ufw allow 80/tcp; ufw allow 443/tcp; ufw --force enable
+echo -e "\n[7/9] Mengonfigurasi Firewall (UFW & Iptables NAT L2TP)..."
+ufw allow 22/tcp
+ufw allow 80/tcp
+ufw allow 443/tcp
+ufw allow 500/udp
+ufw allow 4500/udp
+ufw allow 1701/udp
+ufw --force enable
 
-echo -e "\n[6/7] Menginstal & Mengonfigurasi Caddy..."
+# Iptables forwarding untuk VPN L2TP
+iptables -t nat -A POSTROUTING -s 192.168.42.0/24 -o eth0 -j MASQUERADE
+iptables-save > /etc/iptables/rules.v4
+
+# Aktifkan IP Forwarding di sysctl
+sed -i '/net.ipv4.ip_forward/s/^#//g' /etc/sysctl.conf
+sysctl -p
+
+echo -e "\n[8/9] Menginstal & Mengonfigurasi Caddy..."
 apt install -y debian-keyring debian-archive-keyring apt-transport-https
 curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
 curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | tee /etc/apt/sources.list.d/caddy-stable.list
@@ -149,15 +231,16 @@ http://$DOMAIN, https://$DOMAIN {
 }
 EOF
 
-echo -e "\n[7/7] Setup Cronjob Selesai..."
+echo -e "\n[9/9] Setup Cronjob Selesai..."
 # Auto start menu
 if ! grep -q "menu" /root/.profile; then echo "menu" >> /root/.profile; fi
 
-systemctl restart xray caddy cron xray-api
+systemctl restart xray caddy cron xray-api ipsec xl2tpd
 
 clear
 echo "======================================================"
-echo "    INSTALASI SELESAI & BERHASIL! (V2 MODULAR)        "
+echo "    INSTALASI SELESAI & BERHASIL! "
 echo "======================================================"
+echo "Protokol Terinstal : VMESS, VLESS, TROJAN, L2TP/IPsec"
 echo "Ketik 'menu' untuk masuk ke dashboard manajemen."
 echo "======================================================"
