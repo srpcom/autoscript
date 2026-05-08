@@ -230,11 +230,16 @@ def handle_query(call):
                 bot.send_message(chat_id, api_req(f"trial-{api_ep}", "POST", payload), parse_mode="Markdown")
             else:
                 if act == "add":
-                    if prot in ['vmess', 'vless', 'trojan']: t = "✏️ `User Expired(Hari) Limit_IP Limit_Quota`"
-                    elif prot == "ssh": t = "✏️ `User Pass Expired Limit_IP`"
-                    else: t = "✏️ `User Pass Expired`"
-                elif act == "renew": t = "🔄 `User Tambah(Hari)`"
-                else: t = f"🗑️/📄 *{act.upper()}* `User`"
+                    if prot in ['vmess', 'vless', 'trojan']: 
+                        t = "✏️ User Expired(Hari) Limit_IP Limit_Quota\ncontoh : `budi 30 2 50`"
+                    elif prot == "ssh": 
+                        t = "✏️ User Pass Expired Limit_IP\ncontoh : `budi 123 30 2`"
+                    else: 
+                        t = "✏️ User Pass Expired\ncontoh : `budi 123 30`"
+                elif act == "renew": 
+                    t = "🔄 User Tambah(Hari)\ncontoh : `budi 30`"
+                else: 
+                    t = f"🗑️/📄 *{act.upper()}* User\ncontoh : `budi`"
                 msg = bot.send_message(chat_id, t, parse_mode="Markdown", reply_markup=telebot.types.ForceReply())
                 bot.register_next_step_handler(msg, process_action_input, act, prot, api_ep)
     except Exception as e: bot.send_message(chat_id, f"Error: {e}")
@@ -253,7 +258,6 @@ def process_action_input(message, action, prot, api_ep):
         elif action == "renew": payload = {'user': parts[0], 'exp': int(parts[1]) if len(parts)>1 else 30}
         elif action == "del": payload = {'user': parts[0]}; method = "DELETE"
         elif action == "detail": payload = {'user': parts[0]}
-        # Perbaikan: Kirim dengan parse_mode="Markdown" agar backtick berfungsi
         bot.send_message(message.chat.id, api_req(endpoint, method, payload), parse_mode="Markdown")
     except: bot.send_message(message.chat.id, "❌ Format input salah!")
 
