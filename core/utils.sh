@@ -37,8 +37,10 @@ print_header() {
     REG=$(curl -sS --max-time 3 ipinfo.io/city)
     TZ=$(cat /etc/timezone)
 
-    # Menghitung Total Akun Xray
-    XRAY_C=$(jq '[.inbounds[].settings.clients | length] | add' /usr/local/etc/xray/config.json 2>/dev/null || echo 0)
+    # Menghitung Total Akun Berdasarkan Protokol
+    XRAY_C=$(jq '[.inbounds[] | select(.protocol=="vmess" or .protocol=="vless" or .protocol=="trojan") | .settings.clients | length] | add' /usr/local/etc/xray/config.json 2>/dev/null || echo 0)
+    SSH_C=$(wc -l < /usr/local/etc/srpcom/ssh_expiry.txt 2>/dev/null || echo 0)
+    L2TP_C=$(wc -l < /usr/local/etc/srpcom/l2tp_expiry.txt 2>/dev/null || echo 0)
 
     clear
     echo -e "${CYAN}╔════════════════════════════════════╗${NC}"
@@ -52,6 +54,6 @@ print_header() {
     echo " IP ADDRESS    : ${IP_ADD}"
     echo " ISP           : ${ISP_NAME}"
     echo -e "${CYAN}╔════════════════════════════════════╗${NC}"
-    printf "${CYAN}║       XRAY ACCOUNT ➠ %-14s║\n${NC}" "${XRAY_C}"
+    printf "${CYAN}║ XRAY : %-3s | SSH : %-3s | L2TP : %-3s ║\n${NC}" "${XRAY_C:-0}" "${SSH_C:-0}" "${L2TP_C:-0}"
     echo -e "${CYAN}╚════════════════════════════════════╝${NC}"
 }
