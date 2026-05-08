@@ -44,12 +44,10 @@ apt update && apt upgrade -y
 apt install curl wget unzip uuid-runtime jq tzdata ufw cron gnupg2 gnupg python3 python3-flask -y
 timedatectl set-timezone Asia/Jakarta
 
-# Membuat Struktur Folder
+# Membuat Struktur Folder SRPCOM
 mkdir -p /usr/local/etc/srpcom
 mkdir -p /usr/local/bin/srpcom
 mkdir -p /usr/local/etc/xray
-mkdir -p /var/log/xray
-chown -R nobody:nogroup /var/log/xray
 
 # Menyimpan Data Global (Environment Variable)
 cat > /usr/local/etc/srpcom/env.conf << EOF
@@ -62,6 +60,13 @@ bash -c "$(curl -L https://github.com/XTLS/Xray-install/raw/main/install-release
 systemctl enable xray
 
 echo -e "\n[3/7] Mengonfigurasi Xray Core..."
+# PERBAIKAN: Pembuatan Log dan Permission dilakukan SETELAH instalasi Xray
+mkdir -p /var/log/xray
+touch /var/log/xray/access.log
+touch /var/log/xray/error.log
+chown -R nobody:nogroup /var/log/xray
+chmod -R 777 /var/log/xray
+
 cat > /usr/local/etc/xray/config.json << EOF
 {
   "log": {"access": "/var/log/xray/access.log", "error": "/var/log/xray/error.log", "loglevel": "warning"},
@@ -124,7 +129,6 @@ curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | gpg --dearmo
 curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | tee /etc/apt/sources.list.d/caddy-stable.list
 apt update && apt install caddy -y
 
-# PERBAIKAN CADDYFILE: Format multiline yang disetujui Caddy
 cat > /etc/caddy/Caddyfile << EOF
 http://$DOMAIN, https://$DOMAIN {
     handle /user_legend/* {
