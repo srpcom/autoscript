@@ -36,8 +36,11 @@ done
 echo -e "\n[1/11] Memperbarui sistem & dependensi..."
 export DEBIAN_FRONTEND=noninteractive
 apt update && apt upgrade -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold"
-apt install curl wget unzip uuid-runtime jq tzdata ufw cron gnupg2 gnupg python3 python3-flask strongswan xl2tpd iptables dropbear openvpn cmake make gcc git -y
+apt install curl wget unzip uuid-runtime jq tzdata ufw cron gnupg2 gnupg python3 python3-flask python3-pip strongswan xl2tpd iptables dropbear openvpn cmake make gcc git -y
 timedatectl set-timezone Asia/Jakarta
+
+# Menginstal Modul Python Telegram Bot
+pip3 install pyTelegramBotAPI requests --break-system-packages 2>/dev/null || pip3 install pyTelegramBotAPI requests
 
 mkdir -p /usr/local/etc/srpcom
 mkdir -p /usr/local/bin/srpcom
@@ -48,8 +51,13 @@ DOMAIN="$DOMAIN"
 IP_ADD="$VPS_IP"
 EOF
 
+# File Konfigurasi Kosong untuk Bot Admin (Disetting via menu VPS nanti)
+cat > /usr/local/etc/xray/bot_admin.conf << 'EOF'
+BOT_TOKEN=""
+ADMIN_ID=""
+EOF
+
 echo -e "\n[2/11] Optimasi Performa Server (BBR & Swap RAM)..."
-# 2A. Membuat Swap Memory 2GB (Mencegah VPS RAM kecil Crash/OOM)
 if [ ! -f "/swapfile" ]; then
     echo "=> Membuat Swap Memory 2GB..."
     dd if=/dev/zero of=/swapfile bs=1M count=2048 status=none
@@ -63,7 +71,6 @@ else
     echo "=> Swap Memory sudah aktif."
 fi
 
-# 2B. Mengaktifkan TCP BBR (Meningkatkan Speed & Menurunkan Ping)
 echo "=> Mengaktifkan TCP BBR..."
 if ! grep -q "net.ipv4.tcp_congestion_control=bbr" /etc/sysctl.conf; then
     cat >> /etc/sysctl.conf << EOF
@@ -175,7 +182,6 @@ touch /usr/local/etc/srpcom/l2tp_expiry.txt
 systemctl enable ipsec xl2tpd
 
 echo -e "\n[6/11] Mengonfigurasi SSH, Dropbear, SSH-WS, BadVPN & OpenVPN..."
-# 6A. Dropbear
 cat > /etc/default/dropbear << 'EOF'
 NO_START=0
 DROPBEAR_PORT=109
@@ -186,7 +192,6 @@ EOF
 systemctl restart dropbear
 systemctl enable dropbear
 
-# 6B. SSH-WS Proxy
 cat > /usr/local/bin/ssh-ws.py << 'EOF'
 import socket, threading, sys
 def handle_client(client_socket):
@@ -237,7 +242,6 @@ systemctl start ssh-ws
 touch /usr/local/etc/srpcom/ssh_expiry.txt
 touch /usr/local/etc/srpcom/ssh_limit.txt
 
-# 6C. Kompilasi BadVPN (UDP Custom)
 echo -e "Membuat layanan BadVPN (UDP Custom)..."
 git clone https://github.com/ambrop72/badvpn.git /tmp/badvpn >/dev/null 2>&1
 mkdir -p /tmp/badvpn/build && cd /tmp/badvpn/build
@@ -264,7 +268,6 @@ systemctl enable badvpn-$port
 systemctl start badvpn-$port
 done
 
-# 6D. Setup OpenVPN
 echo -e "Menyiapkan OpenVPN dan Sertifikatnya..."
 mkdir -p /etc/openvpn/server/keys
 cd /etc/openvpn/server/keys
@@ -277,7 +280,6 @@ openvpn --genkey secret ta.key
 
 PAM_PLUGIN=$(find /usr -name "openvpn-plugin-auth-pam.so" | head -n 1)
 
-# OVPN UDP Config
 cat > /etc/openvpn/server/server-udp.conf << EOF
 port 2200
 proto udp
@@ -303,7 +305,6 @@ verify-client-cert none
 username-as-common-name
 EOF
 
-# OVPN TCP Config
 cat > /etc/openvpn/server/server-tcp.conf << EOF
 port 1194
 proto tcp
@@ -333,7 +334,6 @@ systemctl enable openvpn-server@server-tcp
 systemctl start openvpn-server@server-udp
 systemctl start openvpn-server@server-tcp
 
-# Create OVPN Download Directory
 mkdir -p /usr/local/etc/srpcom/ovpn
 CA_CERT=$(cat /etc/openvpn/server/keys/ca.crt)
 TA_CERT=$(cat /etc/openvpn/server/keys/ta.key)
@@ -390,12 +390,14 @@ wget -q -O /usr/local/bin/srpcom/monitor.sh "$GITHUB_RAW/core/monitor.sh"
 wget -q -O /usr/local/bin/srpcom/autokill.sh "$GITHUB_RAW/core/autokill.sh"
 wget -q -O /usr/local/bin/srpcom/menu.sh "$GITHUB_RAW/core/menu.sh"
 wget -q -O /usr/local/bin/xray-api.py "$GITHUB_RAW/configs/xray-api.py"
+wget -q -O /usr/local/bin/bot-admin.py "$GITHUB_RAW/configs/bot-admin.py"
 
 chmod +x /usr/local/bin/srpcom/*.sh
 chmod +x /usr/local/bin/xray-api.py
+chmod +x /usr/local/bin/bot-admin.py
 ln -sf /usr/local/bin/srpcom/menu.sh /usr/bin/menu
 
-echo -e "\n[8/11] Mengonfigurasi Layanan API..."
+echo -e "\n[8/11] Mengonfigurasi Layanan API & Bot Admin..."
 cat > /etc/systemd/system/xray-api.service << EOF
 [Unit]
 Description=Xray Python API Backend
@@ -408,9 +410,26 @@ Environment=PYTHONUNBUFFERED=1
 [Install]
 WantedBy=multi-user.target
 EOF
+
+cat > /etc/systemd/system/srpcom-bot.service << EOF
+[Unit]
+Description=Telegram Admin Interactive Bot
+After=network.target xray-api.service
+[Service]
+ExecStart=/usr/bin/python3 /usr/local/bin/bot-admin.py
+Restart=always
+RestartSec=5
+User=root
+Environment=PYTHONUNBUFFERED=1
+[Install]
+WantedBy=multi-user.target
+EOF
+
 systemctl daemon-reload
 systemctl enable xray-api
 systemctl start xray-api
+systemctl enable srpcom-bot
+# srpcom-bot tidak di-start di sini agar tidak memunculkan log error karena token kosong.
 
 echo -e "\n[9/11] Mengonfigurasi Firewall (UFW & Iptables NAT L2TP/OVPN)..."
 ufw allow 22/tcp
@@ -493,4 +512,6 @@ echo "======================================================"
 echo "Protokol: VMESS, VLESS, TROJAN, L2TP, SSH, OVPN, UDPGW"
 echo "Optimasi: TCP BBR & Swap RAM 2GB Aktif!"
 echo "Ketik 'menu' untuk masuk ke dashboard manajemen."
+echo "Untuk mengaktifkan Bot Telegram Admin, masuk ke menu:"
+echo "-> [5] Settings -> [8] Setting Telegram Admin Bot"
 echo "======================================================"
