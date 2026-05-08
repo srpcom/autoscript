@@ -44,8 +44,8 @@ def get_api_key():
         with open(API_KEY_FILE, 'r') as f: return f.read().strip()
     except: return "DEFAULT_KEY"
 
-# Inisialisasi Bot
-bot = telebot.Telebot(BOT_TOKEN)
+# Inisialisasi Bot (Perbaikan Typo TeleBot)
+bot = telebot.TeleBot(BOT_TOKEN)
 
 # Mapping Protokol ke Endpoint API
 PROT_MAP = {
@@ -107,7 +107,7 @@ def protocol_menu_keyboard(prot):
     markup.add(
         InlineKeyboardButton("📄 Detail Account", callback_data=f"act_detail_{prot}")
     )
-    markup.add(InlineKeyboardButton("🔙 KEMBALI KE MENU UTAMA", callback_data="menu_main"))
+    markup.add(InlineKeyboardButton("🔙 KEMBALI", callback_data="menu_main"))
     return markup
 
 def monitor_menu_keyboard():
