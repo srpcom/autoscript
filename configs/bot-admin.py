@@ -310,7 +310,7 @@ def process_action_input(message, action, prot, api_ep):
             payload = {'user': parts[0], 'exp': int(parts[1]) if len(parts) > 1 else 30}
         elif action == "del":
             payload = {'user': parts[0]}
-            method = "POST" # <--- SUDAH DIPERBAIKI DARI DELETE MENJADI POST
+            method = "POST" # <--- Diperbaiki agar menggunakan format yang didukung backend
         elif action == "detail":
             payload = {'user': parts[0]}
         
