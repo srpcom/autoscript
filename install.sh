@@ -5,13 +5,7 @@
 # OS Support: Ubuntu 20.04 / 22.04 / 24.04 LTS
 # ==========================================
 
-# OS Support: Ubuntu 20.04 / 22.04 / 24.04 LTS
-# ==========================================
-# File ini hanya bertugas menginstal dependencies, 
-# menyiapkan sistem, dan mendownload modul dari GitHub.
-
 # --- KONFIGURASI GITHUB ANDA ---
-# Ubah URL ini sesuai dengan repositori GitHub Anda nantinya
 GITHUB_RAW="https://raw.githubusercontent.com/syamsul18782/xray2026/main"
 
 # Memastikan script dijalankan sebagai root
@@ -68,7 +62,6 @@ bash -c "$(curl -L https://github.com/XTLS/Xray-install/raw/main/install-release
 systemctl enable xray
 
 echo -e "\n[3/7] Mengonfigurasi Xray Core..."
-# Menyiapkan konfigurasi dasar Xray (Anda bisa memindahkannya juga ke GitHub configs/xray.json nantinya)
 cat > /usr/local/etc/xray/config.json << EOF
 {
   "log": {"access": "/var/log/xray/access.log", "error": "/var/log/xray/error.log", "loglevel": "warning"},
@@ -131,13 +124,24 @@ curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | gpg --dearmo
 curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | tee /etc/apt/sources.list.d/caddy-stable.list
 apt update && apt install caddy -y
 
+# PERBAIKAN CADDYFILE: Format multiline yang disetujui Caddy
 cat > /etc/caddy/Caddyfile << EOF
 http://$DOMAIN, https://$DOMAIN {
-    handle /user_legend/* { reverse_proxy localhost:5000 }
-    handle / { respond "Server is running normally." 200 }
-    handle /vmessws* { reverse_proxy localhost:10001 }
-    handle /vlessws* { reverse_proxy localhost:10002 }
-    handle /trojanws* { reverse_proxy localhost:10003 }
+    handle /user_legend/* {
+        reverse_proxy localhost:5000
+    }
+    handle / {
+        respond "Server is running normally." 200
+    }
+    handle /vmessws* {
+        reverse_proxy localhost:10001
+    }
+    handle /vlessws* {
+        reverse_proxy localhost:10002
+    }
+    handle /trojanws* {
+        reverse_proxy localhost:10003
+    }
 }
 EOF
 
