@@ -2,7 +2,7 @@
 # ==========================================
 # xray-api.py
 # MODULE: PYTHON API BACKEND
-# Menangani API request antara website billing dan server Xray
+# Menangani API request antara website billing dan server Xray & L2TP
 # ==========================================
 
 from flask import Flask, request, jsonify
@@ -18,6 +18,11 @@ EXP_FILE = '/usr/local/etc/xray/expiry.txt'
 LOCK_FILE = '/usr/local/etc/xray/locked.json'
 ENV_FILE = '/usr/local/etc/srpcom/env.conf'
 BOT_CONF = '/usr/local/etc/xray/bot_setting.conf'
+
+# Kredensial L2TP
+CHAP_SECRETS = '/etc/ppp/chap-secrets'
+L2TP_EXP = '/usr/local/etc/srpcom/l2tp_expiry.txt'
+IPSEC_PSK = "srpcom_vpn"
 
 # Fungsi untuk membaca Domain dan IP dari konfigurasi bash environment
 def get_env(key):
@@ -57,6 +62,9 @@ def save_json(p, d):
 
 def restart_xray():
     subprocess.run(['systemctl', 'restart', 'xray'])
+
+def restart_l2tp():
+    subprocess.run(['systemctl', 'restart', 'ipsec', 'xl2tpd'])
 
 def send_telegram(text):
     try:
@@ -109,6 +117,10 @@ def generate_account_detail(protocol, user, uid, exp_date_str, is_trial=False):
     
     return msg_web_final, msg_tg_final
 
+# ===============================================
+# ROUTE API: XRAY (VMESS, VLESS, TROJAN)
+# ===============================================
+
 @app.route('/user_legend/add-<protocol>ws', methods=['POST'])
 def add_user(protocol):
     if not check_auth(): return jsonify({"stdout": "Unauthorized"}), 401
@@ -137,9 +149,8 @@ def add_user(protocol):
         f.write(f"{user} {dt_str}\n")
     
     restart_xray()
-    
     msg_web, msg_tg = generate_account_detail(protocol, user, uid, dt_str)
-    send_telegram(msg_tg) # Trigger Autosend ke Telegram
+    send_telegram(msg_tg)
     
     return jsonify({"stdout": msg_web})
 
@@ -169,9 +180,8 @@ def trial_user(protocol):
         f.write(f"{user} {dt_str}\n")
     
     restart_xray()
-    
     msg_web, msg_tg = generate_account_detail(protocol, user, uid, dt_str, True)
-    send_telegram(msg_tg) # Trigger Autosend ke Telegram untuk Trial
+    send_telegram(msg_tg)
     
     return jsonify({"stdout": msg_web})
 
@@ -221,8 +231,7 @@ def renew_user(protocol):
                         continue
                 f.write(line)
                 
-    if updated: 
-        return jsonify({"stdout": f"Success: {user} renewed."})
+    if updated: return jsonify({"stdout": f"Success: {user} renewed."})
     return jsonify({"stdout": f"Error: User {user} not found."})
 
 @app.route('/user_legend/detail-<protocol>ws', methods=['GET', 'POST'])
@@ -239,7 +248,6 @@ def detail_user(protocol):
                 if c.get('email') == user:
                     uid = c.get('id') if protocol != 'trojan' else c.get('password')
                     break
-    
     if uid:
         exp_date_str = "Lifetime / No Exp"
         if os.path.exists(EXP_FILE):
@@ -251,8 +259,103 @@ def detail_user(protocol):
                         break
         msg_web, _ = generate_account_detail(protocol, user, uid, exp_date_str)
         return jsonify({"stdout": msg_web})
-        
     return jsonify({"stdout": "Error: User not found"})
+
+# ===============================================
+# ROUTE API: L2TP / IPSEC
+# ===============================================
+
+@app.route('/user_legend/add-l2tp', methods=['POST'])
+def api_add_l2tp():
+    if not check_auth(): return jsonify({"stdout": "Unauthorized"}), 401
+    data = request.json or {}
+    user = data.get('user')
+    password = data.get('password', str(uuid.uuid4())[:8])
+    exp = int(data.get('exp', 30))
+    if not user: return jsonify({"stdout": "Error: User required"}), 400
+    
+    # Cek apakah user sudah ada
+    if os.path.exists(CHAP_SECRETS):
+        with open(CHAP_SECRETS, 'r') as f:
+            if f'"{user}"' in f.read():
+                return jsonify({"stdout": "Error: User already exists"}), 400
+                
+    dt = datetime.datetime.now() + datetime.timedelta(days=exp)
+    dt_str = dt.strftime('%Y-%m-%d %H:%M:%S')
+    
+    # Write to chap-secrets
+    with open(CHAP_SECRETS, 'a') as f:
+        f.write(f'"{user}" l2tpd "{password}" *\n')
+        
+    # Write to L2TP Expiry
+    if not os.path.exists(os.path.dirname(L2TP_EXP)):
+        os.makedirs(os.path.dirname(L2TP_EXP), exist_ok=True)
+    with open(L2TP_EXP, 'a') as f:
+        f.write(f"{user} {password} {dt_str}\n")
+        
+    restart_l2tp()
+    
+    msg_web = f"━━━━━━━━━━━━━━━━━━━━\n❖ L2TP / IPsec VPN ❖\n━━━━━━━━━━━━━━━━━━━━\nRemarks : {user}\nIP Address : {IP_ADD}\nDomain : {DOMAIN}\nIPsec PSK : {IPSEC_PSK}\nUsername : {user}\nPassword : {password}\n━━━━━━━━━━━━━━━━━━━━\nExpired On : {dt_str} WIB"
+    msg_tg = f"━━━━━━━━━━━━━━━━━━━━\n❖ L2TP / IPsec VPN ❖\n━━━━━━━━━━━━━━━━━━━━\nRemarks : `{user}`\nIP Address : {IP_ADD}\nDomain : {DOMAIN}\nIPsec PSK : `{IPSEC_PSK}`\nUsername : `{user}`\nPassword : `{password}`\n━━━━━━━━━━━━━━━━━━━━\nEXPIRED ON : {dt_str} WIB"
+    
+    send_telegram(msg_tg)
+    return jsonify({"stdout": msg_web})
+
+@app.route('/user_legend/del-l2tp', methods=['DELETE'])
+def api_del_l2tp():
+    if not check_auth(): return jsonify({"stdout": "Unauthorized"}), 401
+    data = request.json or {}
+    user = data.get('user')
+    if not user: return jsonify({"stdout": "Error: User required"}), 400
+    
+    # Hapus dari chap-secrets
+    if os.path.exists(CHAP_SECRETS):
+        with open(CHAP_SECRETS, 'r') as f: lines = f.readlines()
+        with open(CHAP_SECRETS, 'w') as f:
+            for line in lines:
+                if not line.startswith(f'"{user}" l2tpd'): f.write(line)
+                
+    # Hapus dari L2TP Expiry
+    if os.path.exists(L2TP_EXP):
+        with open(L2TP_EXP, 'r') as f: lines = f.readlines()
+        with open(L2TP_EXP, 'w') as f:
+            for line in lines:
+                if not line.startswith(user + ' '): f.write(line)
+                
+    restart_l2tp()
+    return jsonify({"stdout": f"Success: {user} deleted."})
+
+@app.route('/user_legend/renew-l2tp', methods=['POST'])
+def api_renew_l2tp():
+    if not check_auth(): return jsonify({"stdout": "Unauthorized"}), 401
+    data = request.json or {}
+    user = data.get('user')
+    add_days = int(data.get('exp', 30))
+    if not user: return jsonify({"stdout": "Error: User required"}), 400
+    
+    updated = False
+    if os.path.exists(L2TP_EXP):
+        with open(L2TP_EXP, 'r') as f: lines = f.readlines()
+        with open(L2TP_EXP, 'w') as f:
+            for line in lines:
+                if line.startswith(user + ' '):
+                    parts = line.strip().split()
+                    if len(parts) >= 4:
+                        curr_pass = parts[1]
+                        curr_dt = datetime.datetime.strptime(f"{parts[2]} {parts[3]}", '%Y-%m-%d %H:%M:%S')
+                        new_dt = curr_dt + datetime.timedelta(days=add_days)
+                        f.write(f"{user} {curr_pass} {new_dt.strftime('%Y-%m-%d %H:%M:%S')}\n")
+                        updated = True
+                        continue
+                f.write(line)
+                
+    if updated: return jsonify({"stdout": f"Success: {user} renewed."})
+    return jsonify({"stdout": f"Error: User {user} not found."})
+
+
+# ===============================================
+# ROUTE API: LAINNYA
+# ===============================================
 
 @app.route('/user_legend/change-uuid', methods=['POST'])
 def change_uuid():
@@ -288,10 +391,8 @@ def cek_xray():
 def lock_xray():
     if not check_auth(): return jsonify({"stdout": "Unauthorized"}), 401
     user = (request.json or {}).get('user')
-    
     cfg = load_json(XRAY_CONF)
     locked = load_json(LOCK_FILE) if os.path.exists(LOCK_FILE) else {}
-    
     found = False
     for ib in cfg.get('inbounds', []):
         cls = ib['settings'].get('clients', [])
@@ -312,7 +413,6 @@ def lock_xray():
 def unlock_xray():
     if not check_auth(): return jsonify({"stdout": "Unauthorized"}), 401
     user = (request.json or {}).get('user')
-    
     locked = load_json(LOCK_FILE) if os.path.exists(LOCK_FILE) else {}
     if user in locked:
         info = locked[user]
