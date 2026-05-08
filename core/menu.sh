@@ -12,6 +12,44 @@ source /usr/local/bin/srpcom/telegram.sh
 source /usr/local/bin/srpcom/xray.sh
 source /usr/local/bin/srpcom/l2tp.sh
 source /usr/local/bin/srpcom/ssh.sh
+source /usr/local/bin/srpcom/monitor.sh
+
+menu_autokill() {
+    while true; do
+        clear
+        status_cron=$(grep "autokill.sh" /etc/cron.d/srpcom_autokill 2>/dev/null)
+        if [ -n "$status_cron" ]; then st="\e[32m[ ON ]\e[0m"; else st="\e[31m[ OFF ]\e[0m"; fi
+        
+        echo "======================================"
+        echo "    AUTO KILL & LIMIT SETTINGS        "
+        echo "======================================"
+        echo -e "Status Daemon (3 Menit) : $st"
+        echo "======================================"
+        echo "Fitur ini akan mengecek log Xray dan"
+        echo "SSH secara otomatis di background."
+        echo "Jika ada akun melebihi Limit IP atau"
+        echo "Kuota, akun akan dikunci (Locked) dan"
+        echo "Bot Telegram akan mengirim notifikasi."
+        echo "======================================"
+        echo "1. Turn ON Auto Kill Daemon"
+        echo "2. Turn OFF Auto Kill Daemon"
+        echo "0. Back to Settings"
+        echo "======================================"
+        read -p "Select Option [0-2]: " opt
+        case $opt in
+            1) 
+                echo "*/3 * * * * root /usr/local/bin/srpcom/autokill.sh run_kill >/dev/null 2>&1" > /etc/cron.d/srpcom_autokill
+                systemctl restart cron
+                echo -e "\n=> Auto Kill Daemon BERHASIL DIAKTIFKAN!"; sleep 2 ;;
+            2) 
+                rm -f /etc/cron.d/srpcom_autokill
+                systemctl restart cron
+                echo -e "\n=> Auto Kill Daemon DIMATIKAN!"; sleep 2 ;;
+            0) break ;;
+            *) echo -e "\n=> Pilihan tidak valid!"; sleep 1 ;;
+        esac
+    done
+}
 
 change_domain() {
     clear
@@ -43,14 +81,9 @@ change_domain() {
     fi
 
     echo -e "\n=> Memperbarui konfigurasi domain..."
-    
-    # 1. Update env.conf
     sed -i "s/^DOMAIN=.*/DOMAIN=\"$new_domain\"/g" /usr/local/etc/srpcom/env.conf
-    
-    # Reload env
     source /usr/local/etc/srpcom/env.conf
 
-    # 2. Update Caddyfile
     cat > /etc/caddy/Caddyfile << EOF
 http://$DOMAIN, https://$DOMAIN {
     handle /user_legend/* {
@@ -74,7 +107,6 @@ http://$DOMAIN, https://$DOMAIN {
 }
 EOF
 
-    # 3. Restart Services
     echo "=> Restarting Web Server & API..."
     systemctl restart caddy
     systemctl restart xray-api
@@ -91,9 +123,6 @@ menu_api_key() {
     current_key=$(cat /usr/local/etc/xray/api_key.conf 2>/dev/null)
     echo "Current API Key: ${current_key}"
     echo "======================================"
-    echo "Ini adalah kunci akses rahasia agar website billing"
-    echo "Anda bisa mengontrol Xray di server ini."
-    echo "======================================"
     read -p "Input New API Key (tekan 'x' untuk batal): " new_key
     if [[ "$new_key" != "x" && "$new_key" != "X" && -n "$new_key" ]]; then
         echo "$new_key" > /usr/local/etc/xray/api_key.conf
@@ -108,10 +137,6 @@ restore_xray() {
     clear
     echo "======================================"
     echo "          RESTORE DATA via VPS        "
-    echo "======================================"
-    echo "PENTING: Pastikan Anda sudah mengupload"
-    echo "file backup (.tar.gz) ke folder /root/ "
-    echo "menggunakan MobaXterm/SFTP."
     echo "======================================"
     read -p "Nama file backup (misal: xray-backup.tar.gz) atau 'x' untuk batal : " backup_name
     
@@ -136,21 +161,15 @@ restore_xray() {
             echo -e "\nMenggabungkan data (Merging)..."
             mkdir -p /tmp/restore_temp
             tar -xzf "/root/$backup_name" -C /tmp/restore_temp 2>/dev/null
-            
             jq -s '.[0].inbounds[0].settings.clients = (.[0].inbounds[0].settings.clients + .[1].inbounds[0].settings.clients | unique_by(.email)) | .[0]' \
                /usr/local/etc/xray/config.json /tmp/restore_temp/usr/local/etc/xray/config.json > /tmp/merged_v1.json
-            
             jq -s '.[0].inbounds[1].settings.clients = (.[0].inbounds[1].settings.clients + .[1].inbounds[1].settings.clients | unique_by(.email)) | .[0]' \
                /tmp/merged_v1.json /tmp/restore_temp/usr/local/etc/xray/config.json > /tmp/merged_v2.json
-            
             jq -s '.[0].inbounds[2].settings.clients = (.[0].inbounds[2].settings.clients + .[1].inbounds[2].settings.clients | unique_by(.email)) | .[0]' \
                /tmp/merged_v2.json /tmp/restore_temp/usr/local/etc/xray/config.json > /tmp/merged_v3.json
-            
             mv /tmp/merged_v3.json /usr/local/etc/xray/config.json
-            
             cat /usr/local/etc/xray/expiry.txt /tmp/restore_temp/usr/local/etc/xray/expiry.txt | sort -k1,1 -k2,2r | sort -u -k1,1 > /tmp/merged_exp.txt
             mv /tmp/merged_exp.txt /usr/local/etc/xray/expiry.txt
-            
             rm -rf /tmp/restore_temp
             echo -e "\n\e[32m[SUCCESS]\e[0m Restore Merge Berhasil!"
             ;;
@@ -172,9 +191,10 @@ menu_settings() {
         echo " [4] RESTORE DATA via VPS"
         echo " [5] SETTING API KEY FOR WEBSITE"
         echo " [6] GANTI DOMAIN VPS"
+        echo " [7] SETTING AUTO-KILL MULTI LOGIN"
         echo " [0/x] Back to Main Menu"
         echo ""
-        read -p " Select option [0-6 or x]: " opt
+        read -p " Select option [0-7 or x]: " opt
         case $opt in
             1) menu_autobackup ;;
             2) menu_autosend ;;
@@ -182,6 +202,7 @@ menu_settings() {
             4) restore_xray ;;
             5) menu_api_key ;;
             6) change_domain ;;
+            7) menu_autokill ;;
             0|x|X) break ;;
             *) echo "Pilihan tidak valid!"; sleep 1 ;;
         esac
@@ -195,23 +216,25 @@ main_menu() {
         echo "1. MENU XRAY (Vmess, Vless, Trojan)"
         echo "2. MENU SSH & OVPN"
         echo "3. MENU L2TP"
-        echo "4. SETTINGS (Backup/Bot/API/Domain)"
-        echo "5. RESTART SERVICES (All)"
-        echo "6. CEK STATUS SERVICES"
+        echo "4. MONITORING (Cek Aktif & Kuota)"
+        echo "5. SETTINGS (Backup/Autokill/Domain)"
+        echo "6. RESTART SERVICES (All)"
+        echo "7. CEK STATUS SERVICES"
         echo "0. Exit CLI"
         echo ""
-        read -p "Pilih opsi [0-6]: " opt
+        read -p "Pilih opsi [0-7]: " opt
         case $opt in
             1) menu_xray ;;
             2) menu_ssh ;;
             3) menu_l2tp ;;
-            4) menu_settings ;;
-            5) 
+            4) menu_monitor ;;
+            5) menu_settings ;;
+            6) 
                 echo -e "\n=> Restarting Services..."
                 systemctl restart xray caddy cron xray-api ipsec xl2tpd dropbear ssh-ws 2>/dev/null
                 echo -e "=> Done!"
                 sleep 1.5 ;;
-            6)
+            7)
                 clear
                 echo "======================================"
                 echo "          STATUS SERVICES             "
