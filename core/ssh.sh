@@ -2,12 +2,10 @@
 # ==========================================
 # ssh.sh
 # MODULE: SSH & OVPN LOGIC
-# Manajemen User SSH, Dropbear, BadVPN, OVPN
+# Mengelola akun OpenSSH, Dropbear, SSH-WS, OVPN, BadVPN
 # ==========================================
 
 source /usr/local/etc/srpcom/env.conf
-
-SSH_EXP="/usr/local/etc/srpcom/ssh_expiry.txt"
 
 add_ssh() {
     clear
@@ -17,77 +15,87 @@ add_ssh() {
     read -p "Username (x = Batal) : " user
     if [[ "$user" == "x" || "$user" == "X" ]]; then return; fi
     
+    # Cek apakah user sudah ada di OS
     if id "$user" &>/dev/null; then
-        echo -e "\n=> Error: Username '$user' sudah ada di sistem!"
+        echo -e "\n\e[31m[ERROR]\e[0m Username '$user' sudah digunakan!"
         sleep 2; return
     fi
     
-    read -p "Password             : " pass
-    read -p "Expired (Days)       : " masaaktif
-    read -p "Limit IP (0 = Unli)  : " limit_ip
+    read -p "Password       : " password
+    read -p "Limit IP       : " limit_ip
+    read -p "Expired (Days) : " masaaktif
     
     if [ -z "$limit_ip" ]; then limit_ip=0; fi
     
     exp_date=$(date -d "$masaaktif days" +"%Y-%m-%d")
     exp_time=$(date -d "$masaaktif days" +"%H:%M:%S")
     
+    # Buat user di Linux
     useradd -e "$exp_date" -s /bin/false -M "$user"
-    echo -e "$pass\n$pass" | passwd "$user" &> /dev/null
+    echo "$user:$password" | chpasswd
     
-    echo "$user $pass $exp_date $exp_time" >> $SSH_EXP
+    # Simpan ke database
+    echo "$user $password $exp_date $exp_time" >> /usr/local/etc/srpcom/ssh_expiry.txt
     echo "$user $limit_ip" >> /usr/local/etc/srpcom/ssh_limit.txt
-
-    lim_ip_str="${limit_ip} IP"
-    if [ "$limit_ip" == "0" ]; then lim_ip_str="Unlimited"; fi
-
-    msg_cli=$(echo -e "━━━━━━━━━━━━━━━━━━━━\n❖ SSH & OVPN ACCOUNT ❖\n━━━━━━━━━━━━━━━━━━━━\nRemarks : ${user}\nIP Address : ${IP_ADD}\nDomain : ${DOMAIN}\nUsername : ${user}\nPassword : ${pass}\n━━━━━━━━━━━━━━━━━━━━\nPort OpenSSH : 22\nPort Dropbear : 109, 143\nPort SSH-WS TLS : 443 (Path: /sshws)\nPort SSH-WS NTLS : 80 (Path: /sshws)\nPort UDP Custom : 7100, 7200, 7300\nPort OVPN UDP : 2200\nPort OVPN TCP : 1194\n━━━━━━━━━━━━━━━━━━━━\nLimit IP : ${lim_ip_str}\n━━━━━━━━━━━━━━━━━━━━\nLINK OVPN UDP : http://${DOMAIN}/ovpn/udp.ovpn\nLINK OVPN TCP : http://${DOMAIN}/ovpn/tcp.ovpn\n━━━━━━━━━━━━━━━━━━━━\nEXPIRED ON : ${exp_date} ${exp_time} WIB (${masaaktif} days)")
     
-    msg_tg=$(echo -e "━━━━━━━━━━━━━━━━━━━━\n❖ SSH & OVPN ACCOUNT ❖\n━━━━━━━━━━━━━━━━━━━━\nRemarks : \`${user}\`\nIP Address : ${IP_ADD}\nDomain : ${DOMAIN}\nUsername : \`${user}\`\nPassword : \`${pass}\`\n━━━━━━━━━━━━━━━━━━━━\nPort OpenSSH : 22\nPort Dropbear : 109, 143\nPort SSH-WS TLS : 443 (Path: /sshws)\nPort SSH-WS NTLS : 80 (Path: /sshws)\nPort UDP Custom : 7100, 7200, 7300\nPort OVPN UDP : 2200\nPort OVPN TCP : 1194\n━━━━━━━━━━━━━━━━━━━━\nLimit IP : ${lim_ip_str}\n━━━━━━━━━━━━━━━━━━━━\nLINK OVPN UDP : http://${DOMAIN}/ovpn/udp.ovpn\nLINK OVPN TCP : http://${DOMAIN}/ovpn/tcp.ovpn\n━━━━━━━━━━━━━━━━━━━━\nEXPIRED ON : ${exp_date} ${exp_time} WIB (${masaaktif} days)")
+    lim_str="${limit_ip} IP"
+    if [ "$limit_ip" -eq 0 ]; then lim_str="Unlimited"; fi
+
+    msg_cli=$(echo -e "━━━━━━━━━━━━━━━━━━━━\n❖ SSH & OVPN ACCOUNT ❖\n━━━━━━━━━━━━━━━━━━━━\nRemarks : ${user}\nIP Address : ${IP_ADD}\nDomain : ${DOMAIN}\nUsername : ${user}\nPassword : ${password}\n━━━━━━━━━━━━━━━━━━━━\nPort OpenSSH : 22\nPort Dropbear : 109, 143\nPort SSH-WS TLS : 443 (Path: /sshws)\nPort SSH-WS NTLS : 80 (Path: /sshws)\nPort UDP Custom : 7100, 7200, 7300\nPort OVPN UDP : 2200\nPort OVPN TCP : 1194\n━━━━━━━━━━━━━━━━━━━━\nLimit IP : ${lim_str}\n━━━━━━━━━━━━━━━━━━━━\nLINK OVPN UDP : http://${DOMAIN}/ovpn/udp.ovpn\nLINK OVPN TCP : http://${DOMAIN}/ovpn/tcp.ovpn\n━━━━━━━━━━━━━━━━━━━━\nEXPIRED ON : ${exp_date} ${exp_time} WIB (${masaaktif} days)")
+    
+    msg_tg=$(echo -e "━━━━━━━━━━━━━━━━━━━━\n❖ SSH & OVPN ACCOUNT ❖\n━━━━━━━━━━━━━━━━━━━━\nRemarks : \`${user}\`\nIP Address : ${IP_ADD}\nDomain : ${DOMAIN}\nUsername : \`${user}\`\nPassword : \`${password}\`\n━━━━━━━━━━━━━━━━━━━━\nPort OpenSSH : 22\nPort Dropbear : 109, 143\nPort SSH-WS TLS : 443 (Path: /sshws)\nPort SSH-WS NTLS : 80 (Path: /sshws)\nPort UDP Custom : 7100, 7200, 7300\nPort OVPN UDP : 2200\nPort OVPN TCP : 1194\n━━━━━━━━━━━━━━━━━━━━\nLimit IP : ${lim_str}\n━━━━━━━━━━━━━━━━━━━━\nLINK OVPN UDP : \`http://${DOMAIN}/ovpn/udp.ovpn\`\nLINK OVPN TCP : \`http://${DOMAIN}/ovpn/tcp.ovpn\`\n━━━━━━━━━━━━━━━━━━━━\nEXPIRED ON : ${exp_date} ${exp_time} WIB (${masaaktif} days)")
     
     clear; echo "$msg_cli"
     send_telegram "$msg_tg"
     pause
 }
 
-trial_ssh() {
+add_trial_ssh() {
     clear
     echo "======================================"
-    echo "      CREATE TRIAL SSH & OVPN (60M)   "
+    echo "     CREATE TRIAL SSH ACCOUNT (60M)   "
     echo "======================================"
-    user="trial-$(date +%m%d%H%M)"
-    pass="1"
-    masaaktif="60 Menit"
+    
+    user="trialsrp-$(date +%m%d%H%M)"
+    password="1"
     limit_ip=1
+    masaaktif="60 Minutes"
     
     exp_date=$(date -d "+60 minutes" +"%Y-%m-%d")
     exp_time=$(date -d "+60 minutes" +"%H:%M:%S")
     
     useradd -e "$exp_date" -s /bin/false -M "$user"
-    echo -e "$pass\n$pass" | passwd "$user" &> /dev/null
+    echo "$user:$password" | chpasswd
     
-    echo "$user $pass $exp_date $exp_time" >> $SSH_EXP
+    echo "$user $password $exp_date $exp_time" >> /usr/local/etc/srpcom/ssh_expiry.txt
     echo "$user $limit_ip" >> /usr/local/etc/srpcom/ssh_limit.txt
-
-    msg_cli=$(echo -e "━━━━━━━━━━━━━━━━━━━━\n❖ TRIAL SSH & OVPN ACCOUNT ❖\n━━━━━━━━━━━━━━━━━━━━\nUsername : ${user}\nPassword : ${pass}\nDomain : ${DOMAIN}\nIP : ${IP_ADD}\n━━━━━━━━━━━━━━━━━━━━\nPort Dropbear : 109, 143\nPort SSH-WS : 80, 443 (Path: /sshws)\nPort UDP Custom : 7100, 7200\nPort OVPN : UDP(2200), TCP(1194)\n━━━━━━━━━━━━━━━━━━━━\nLINK OVPN UDP : http://${DOMAIN}/ovpn/udp.ovpn\n━━━━━━━━━━━━━━━━━━━━\nEXPIRED ON : ${exp_date} ${exp_time} WIB (${masaaktif})")
     
-    msg_tg=$(echo -e "━━━━━━━━━━━━━━━━━━━━\n❖ TRIAL SSH & OVPN ACCOUNT ❖\n━━━━━━━━━━━━━━━━━━━━\nUsername : \`${user}\`\nPassword : \`${pass}\`\nDomain : ${DOMAIN}\nIP : ${IP_ADD}\n━━━━━━━━━━━━━━━━━━━━\nPort Dropbear : 109, 143\nPort SSH-WS : 80, 443 (Path: /sshws)\nPort UDP Custom : 7100, 7200\nPort OVPN : UDP(2200), TCP(1194)\n━━━━━━━━━━━━━━━━━━━━\nLINK OVPN UDP : http://${DOMAIN}/ovpn/udp.ovpn\n━━━━━━━━━━━━━━━━━━━━\nEXPIRED ON : ${exp_date} ${exp_time} WIB (${masaaktif})")
+    msg_cli=$(echo -e "━━━━━━━━━━━━━━━━━━━━\n❖ TRIAL SSH & OVPN ❖\n━━━━━━━━━━━━━━━━━━━━\nUsername : ${user}\nPassword : ${password}\nDomain : ${DOMAIN}\nIP : ${IP_ADD}\n━━━━━━━━━━━━━━━━━━━━\nLimit IP : ${limit_ip} IP\n━━━━━━━━━━━━━━━━━━━━\nEXPIRED ON : ${exp_date} ${exp_time} WIB (${masaaktif})")
+    
+    msg_tg=$(echo -e "━━━━━━━━━━━━━━━━━━━━\n❖ TRIAL SSH & OVPN ❖\n━━━━━━━━━━━━━━━━━━━━\nUsername : \`${user}\`\nPassword : \`${password}\`\nDomain : ${DOMAIN}\nIP : ${IP_ADD}\n━━━━━━━━━━━━━━━━━━━━\nLimit IP : ${limit_ip} IP\n━━━━━━━━━━━━━━━━━━━━\nEXPIRED ON : ${exp_date} ${exp_time} WIB (${masaaktif})")
     
     clear; echo "$msg_cli"
     send_telegram "$msg_tg"
     pause
 }
 
-del_ssh() {
+delete_ssh() {
     clear
     echo "======================================"
-    echo "          DELETE SSH ACCOUNT          "
+    echo "         DELETE SSH ACCOUNT           "
     echo "======================================"
-    if [ ! -s "$SSH_EXP" ]; then
-        echo "Tidak ada akun SSH."
+    if [ ! -f "/usr/local/etc/srpcom/ssh_expiry.txt" ]; then
+        echo "Belum ada akun SSH yang dibuat."
+        pause; return
+    fi
+    
+    mapfile -t users < <(awk '{print $1}' /usr/local/etc/srpcom/ssh_expiry.txt)
+    
+    if [ ${#users[@]} -eq 0 ]; then
+        echo "Tidak ada akun untuk dihapus."
         pause; return
     fi
 
-    mapfile -t users < <(awk '{print $1}' $SSH_EXP)
     for i in "${!users[@]}"; do
         echo "$((i+1)). ${users[$i]}"
     done
@@ -100,14 +108,15 @@ del_ssh() {
     if [[ "$choice" -gt 0 && "$choice" -le "${#users[@]}" ]]; then
         user="${users[$((choice-1))]}"
         
+        # Hapus user dari OS dan file TXT
         userdel -f "$user" 2>/dev/null
-        sed -i "/^$user /d" $SSH_EXP
-        sed -i "/^$user /d" /usr/local/etc/srpcom/ssh_limit.txt 2>/dev/null
+        sed -i "/^$user /d" /usr/local/etc/srpcom/ssh_expiry.txt
+        sed -i "/^$user /d" /usr/local/etc/srpcom/ssh_limit.txt
         
-        echo -e "\n=> Akun SSH '$user' berhasil dihapus!"
+        echo -e "\n\e[32m=> Akun SSH '$user' berhasil dihapus!\e[0m"
         sleep 2
     else
-        echo -e "\n=> Pilihan tidak valid!"; sleep 1; del_ssh
+        echo -e "\n=> Pilihan tidak valid!"; sleep 1; delete_ssh
     fi
 }
 
@@ -116,21 +125,33 @@ renew_ssh() {
     echo "======================================"
     echo "          RENEW SSH ACCOUNT           "
     echo "======================================"
-    if [ ! -s "$SSH_EXP" ]; then echo "Tidak ada akun SSH."; pause; return; fi
+    if [ ! -f "/usr/local/etc/srpcom/ssh_expiry.txt" ]; then
+        echo "Belum ada akun SSH yang dibuat."
+        pause; return
+    fi
+    
+    mapfile -t users < <(awk '{print $1}' /usr/local/etc/srpcom/ssh_expiry.txt)
+    
+    if [ ${#users[@]} -eq 0 ]; then
+        echo "Tidak ada akun untuk diperpanjang."
+        pause; return
+    fi
 
-    mapfile -t users < <(awk '{print $1}' $SSH_EXP)
-    for i in "${!users[@]}"; do echo "$((i+1)). ${users[$i]}"; done
+    for i in "${!users[@]}"; do
+        echo "$((i+1)). ${users[$i]}"
+    done
     echo "0. Back"
     echo "======================================"
     read -p "Pilih nomor akun [1-${#users[@]}]: " choice
+    
     if [[ "$choice" == "0" ]]; then return; fi
 
     if [[ "$choice" -gt 0 && "$choice" -le "${#users[@]}" ]]; then
         user="${users[$((choice-1))]}"
         read -p "Tambah Masa Aktif (Hari): " masaaktif
         
-        current_data=$(grep "^$user " $SSH_EXP)
-        pass=$(echo "$current_data" | awk '{print $2}')
+        current_data=$(grep "^$user " /usr/local/etc/srpcom/ssh_expiry.txt)
+        pw=$(echo "$current_data" | awk '{print $2}')
         current_date=$(echo "$current_data" | awk '{print $3}')
         current_time=$(echo "$current_data" | awk '{print $4}')
         
@@ -140,12 +161,14 @@ renew_ssh() {
         new_exp_date=$(date -d "$current_date $current_time + $masaaktif days" +"%Y-%m-%d")
         new_exp_time=$(date -d "$current_date $current_time + $masaaktif days" +"%H:%M:%S")
         
+        # Update OS expiry parameter
         chage -E "$new_exp_date" "$user"
         
-        sed -i "/^$user /d" $SSH_EXP
-        echo "$user $pass $new_exp_date $new_exp_time" >> $SSH_EXP
+        # Update TXT database
+        sed -i "/^$user /d" /usr/local/etc/srpcom/ssh_expiry.txt
+        echo "$user $pw $new_exp_date $new_exp_time" >> /usr/local/etc/srpcom/ssh_expiry.txt
         
-        echo -e "\n=> Akun '$user' diperpanjang $masaaktif Hari!"
+        echo -e "\n\e[32m=> Akun SSH '$user' diperpanjang $masaaktif Hari!\e[0m"
         echo "=> Expired Baru: $new_exp_date $new_exp_time WIB"
         sleep 2
     else
@@ -158,14 +181,12 @@ list_ssh() {
     echo "======================================"
     echo "          LIST SSH ACCOUNTS           "
     echo "======================================"
-    echo -e "\n\e[32m[ SSH / Dropbear / OVPN ]\e[0m"
-    echo "--------------------------------------"
-    if [ ! -s "$SSH_EXP" ]; then 
-        echo "Tidak ada akun."
-    else 
-        awk '{print "- "$1" (Exp: "$3" "$4" WIB)"}' $SSH_EXP
+    if [ ! -f "/usr/local/etc/srpcom/ssh_expiry.txt" ]; then
+        echo "Belum ada akun SSH."
+    else
+        awk '{print "- " $1 " (Exp: " $3 ")"}' /usr/local/etc/srpcom/ssh_expiry.txt
     fi
-    echo -e "\n======================================"
+    echo "======================================"
     pause
 }
 
@@ -174,26 +195,38 @@ detail_ssh() {
     echo "======================================"
     echo "         DETAIL SSH ACCOUNT           "
     echo "======================================"
-    if [ ! -s "$SSH_EXP" ]; then echo "Tidak ada akun SSH."; pause; return; fi
+    if [ ! -f "/usr/local/etc/srpcom/ssh_expiry.txt" ]; then
+        echo "Belum ada akun SSH yang dibuat."
+        pause; return
+    fi
+    
+    mapfile -t users < <(awk '{print $1}' /usr/local/etc/srpcom/ssh_expiry.txt)
+    
+    if [ ${#users[@]} -eq 0 ]; then
+        echo "Tidak ada akun."
+        pause; return
+    fi
 
-    mapfile -t users < <(awk '{print $1}' $SSH_EXP)
-    for i in "${!users[@]}"; do echo "$((i+1)). ${users[$i]}"; done
+    for i in "${!users[@]}"; do
+        echo "$((i+1)). ${users[$i]}"
+    done
     echo "0. Back"
     echo "======================================"
-    read -p "Select Account [0-${#users[@]}]: " choice
+    read -p "Pilih nomor akun [1-${#users[@]}]: " choice
+    
     if [[ "$choice" == "0" ]]; then return; fi
 
     if [[ "$choice" -gt 0 && "$choice" -le "${#users[@]}" ]]; then
         user="${users[$((choice-1))]}"
-        current_data=$(grep "^$user " $SSH_EXP)
-        pass=$(echo "$current_data" | awk '{print $2}')
-        exp_date=$(echo "$current_data" | awk '{print $3}')
-        exp_time=$(echo "$current_data" | awk '{print $4}')
         
-        limit_ip=$(grep "^$user " /usr/local/etc/srpcom/ssh_limit.txt 2>/dev/null | awk '{print $2}')
-        lim_ip_str="${limit_ip} IP"
-        if [ -z "$limit_ip" ] || [ "$limit_ip" == "0" ]; then lim_ip_str="Unlimited"; fi
+        current_data=$(grep "^$user " /usr/local/etc/srpcom/ssh_expiry.txt)
+        pw=$(echo "$current_data" | awk '{print $2}')
+        dt_str=$(echo "$current_data" | awk '{print $3 " " $4}')
         
+        limit_ip=$(grep "^$user " /usr/local/etc/srpcom/ssh_limit.txt | awk '{print $2}')
+        lim_str="${limit_ip} IP"
+        if [[ -z "$limit_ip" || "$limit_ip" -eq 0 ]]; then lim_str="Unlimited"; fi
+
         clear
         echo "━━━━━━━━━━━━━━━━━━━━"
         echo "❖ SSH & OVPN ACCOUNT ❖"
@@ -202,57 +235,18 @@ detail_ssh() {
         echo "IP Address : ${IP_ADD}"
         echo "Domain : ${DOMAIN}"
         echo "Username : ${user}"
-        echo "Password : ${pass}"
+        echo "Password : ${pw}"
         echo "━━━━━━━━━━━━━━━━━━━━"
-        echo "Port OpenSSH : 22"
-        echo "Port Dropbear : 109, 143"
-        echo "Port SSH-WS TLS : 443 (Path: /sshws)"
-        echo "Port SSH-WS NTLS : 80 (Path: /sshws)"
-        echo "Port UDP Custom : 7100, 7200, 7300"
-        echo "Port OVPN UDP : 2200"
-        echo "Port OVPN TCP : 1194"
-        echo "━━━━━━━━━━━━━━━━━━━━"
-        echo "Limit IP : ${lim_ip_str}"
+        echo "Limit IP : ${lim_str}"
         echo "━━━━━━━━━━━━━━━━━━━━"
         echo "LINK OVPN UDP : http://${DOMAIN}/ovpn/udp.ovpn"
         echo "LINK OVPN TCP : http://${DOMAIN}/ovpn/tcp.ovpn"
         echo "━━━━━━━━━━━━━━━━━━━━"
-        echo "EXPIRED ON : ${exp_date} ${exp_time} WIB"
+        echo "EXPIRED ON : ${dt_str} WIB"
         echo ""
         pause
-        detail_ssh
     else
         echo -e "\n=> Pilihan tidak valid!"; sleep 1; detail_ssh
-    fi
-}
-
-lock_unlock_ssh() {
-    action=$1
-    clear
-    echo "======================================"
-    if [ "$action" == "lock" ]; then echo "          LOCK SSH ACCOUNT"; else echo "         UNLOCK SSH ACCOUNT"; fi
-    echo "======================================"
-    if [ ! -s "$SSH_EXP" ]; then echo "Tidak ada akun SSH."; pause; return; fi
-
-    mapfile -t users < <(awk '{print $1}' $SSH_EXP)
-    for i in "${!users[@]}"; do echo "$((i+1)). ${users[$i]}"; done
-    echo "0. Back"
-    echo "======================================"
-    read -p "Pilih nomor akun [1-${#users[@]}]: " choice
-    if [[ "$choice" == "0" ]]; then return; fi
-
-    if [[ "$choice" -gt 0 && "$choice" -le "${#users[@]}" ]]; then
-        user="${users[$((choice-1))]}"
-        if [ "$action" == "lock" ]; then
-            usermod -L "$user"
-            echo -e "\n=> Akun '$user' berhasil di-LOCK (Tidak bisa login)!"
-        else
-            usermod -U "$user"
-            echo -e "\n=> Akun '$user' berhasil di-UNLOCK (Bisa login kembali)!"
-        fi
-        sleep 2
-    else
-        echo -e "\n=> Pilihan tidak valid!"; sleep 1; lock_unlock_ssh "$action"
     fi
 }
 
@@ -260,28 +254,24 @@ menu_ssh() {
     while true; do
         clear
         echo "╔════════════════════════════════════╗"
-        echo "║         MENU SSH & OVPN            ║"
+        echo "║            MENU SSH & OVPN         ║"
         echo "╚════════════════════════════════════╝"
-        echo "1. Create SSH & OVPN Account"
-        echo "2. Create Trial SSH & OVPN"
+        echo "1. Create SSH Account"
+        echo "2. Create Trial Account (60M)"
         echo "3. Delete SSH Account"
         echo "4. Renew SSH Account"
         echo "5. List SSH Account"
         echo "6. Detail SSH Account"
-        echo "7. Lock SSH Account"
-        echo "8. Unlock SSH Account"
         echo "0. Back to Main Menu"
         echo "======================================"
-        read -p "Please select an option [0-8]: " opt
+        read -p "Please select an option [0-6]: " opt
         case $opt in
             1) add_ssh ;; 
-            2) trial_ssh ;;
-            3) del_ssh ;; 
-            4) renew_ssh ;; 
+            2) add_trial_ssh ;; 
+            3) delete_ssh ;; 
+            4) renew_ssh ;;
             5) list_ssh ;;
             6) detail_ssh ;;
-            7) lock_unlock_ssh "lock" ;;
-            8) lock_unlock_ssh "unlock" ;;
             0) break ;;
             *) echo -e "\n=> Pilihan tidak valid!"; sleep 1 ;;
         esac
