@@ -103,6 +103,41 @@ menu_autokill() {
     done
 }
 
+menu_auto_expired() {
+    while true; do
+        clear
+        status_cron=$(grep "auto_expired.sh" /etc/cron.d/auto_expired 2>/dev/null)
+        if [ -n "$status_cron" ]; then st="\e[32m[ ON ]\e[0m"; else st="\e[31m[ OFF ]\e[0m"; fi
+        
+        echo "======================================"
+        echo "      AUTO EXPIRED SETTINGS           "
+        echo "======================================"
+        echo -e "Status Daemon (Tiap 1 Jam) : $st"
+        echo "======================================"
+        echo "Fitur ini akan mengecek dan menghapus"
+        echo "akun VPN yang masa aktifnya sudah habis"
+        echo "secara otomatis setiap jam."
+        echo "======================================"
+        echo "1. Turn ON Auto Expired Daemon"
+        echo "2. Turn OFF Auto Expired Daemon"
+        echo "0. Back to Settings"
+        echo "======================================"
+        read -p "Select Option [0-2]: " opt
+        case $opt in
+            1) 
+                echo "0 * * * * root /usr/local/bin/srpcom/auto_expired.sh >/dev/null 2>&1" > /etc/cron.d/auto_expired
+                systemctl restart cron
+                echo -e "\n=> Auto Expired Daemon BERHASIL DIAKTIFKAN!"; sleep 2 ;;
+            2) 
+                rm -f /etc/cron.d/auto_expired
+                systemctl restart cron
+                echo -e "\n=> Auto Expired Daemon DIMATIKAN!"; sleep 2 ;;
+            0) break ;;
+            *) echo -e "\n=> Pilihan tidak valid!"; sleep 1 ;;
+        esac
+    done
+}
+
 change_domain() {
     clear
     echo "======================================"
@@ -305,7 +340,7 @@ restore_data() {
         *) echo "Batal."; sleep 1; return ;;
     esac
 
-    systemctl restart xray ipsec xl2tpd dropbear ssh-ws srpcom-bot
+    systemctl restart xray caddy xray-api ipsec xl2tpd dropbear ssh-ws srpcom-bot
     pause
 }
 
@@ -321,10 +356,11 @@ menu_settings() {
         echo " [5] SETTING API KEY FOR WEBSITE"
         echo " [6] GANTI DOMAIN VPS"
         echo " [7] SETTING AUTO-KILL MULTI LOGIN"
-        echo " [8] SETTING TELEGRAM ADMIN BOT"
+        echo " [8] SETTING AUTO-DELETE EXPIRED"
+        echo " [9] SETTING TELEGRAM ADMIN BOT"
         echo " [0/x] Back to Main Menu"
         echo ""
-        read -p " Select option [0-8 or x]: " opt
+        read -p " Select option [0-9 or x]: " opt
         case $opt in
             1) menu_autobackup ;;
             2) menu_autosend ;;
@@ -333,7 +369,8 @@ menu_settings() {
             5) menu_api_key ;;
             6) change_domain ;;
             7) menu_autokill ;;
-            8) menu_bot_admin ;;
+            8) menu_auto_expired ;;
+            9) menu_bot_admin ;;
             0|x|X) break ;;
             *) echo "Pilihan tidak valid!"; sleep 1 ;;
         esac
@@ -342,7 +379,7 @@ menu_settings() {
 
 main_menu() {
     while true; do
-        print_header # Berasal dari utils.sh
+        print_header
         
         echo "1. MENU XRAY (Vmess, Vless, Trojan)"
         echo "2. MENU SSH & OVPN"
