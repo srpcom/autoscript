@@ -80,29 +80,87 @@ def generate_account_detail(protocol, user, uid, exp_date_str, is_trial=False, l
     lim_ip_str = f"{limit_ip} IP" if limit_ip > 0 else "Unlimited"
     lim_q_str = f"{limit_quota} GB" if limit_quota > 0 else "Unlimited"
     
-    # PERBAIKAN: Menambahkan Backticks pada nilai penting
+    # FORMAT: Remarks, ID, dan Link dibungkus backticks agar gampang di klik-salin
     if protocol == 'vmess':
         tls_dict = {"v":"2","ps":user,"add":DOMAIN,"port":"443","id":uid,"aid":"0","net":"ws","type":"none","host":DOMAIN,"path":"/vmessws","tls":"tls","sni":DOMAIN}
         none_tls_dict = {"v":"2","ps":user,"add":DOMAIN,"port":"80","id":uid,"aid":"0","net":"ws","type":"none","host":DOMAIN,"path":"/vmessws","tls":"","sni":""}
         link_tls = "vmess://" + base64.b64encode(json.dumps(tls_dict, separators=(',', ':')).encode('utf-8')).decode('utf-8')
         link_none = "vmess://" + base64.b64encode(json.dumps(none_tls_dict, separators=(',', ':')).encode('utf-8')).decode('utf-8')
         
-        msg_web = f"━━━━━━━━━━━━━━━━━━━━\n❖ XRAY/VMESS WS{trial_txt} ❖\n━━━━━━━━━━━━━━━━━━━━\nRemarks : `{user}`\nIP Address : {IP_ADD}\nDomain : {DOMAIN}\nPort TLS : 443\nPort NONE-TLS : 80\nID : `{uid}`\nNetwork : Websocket\nWebsocket Path : /vmessws\n━━━━━━━━━━━━━━━━━━━━\nLimit IP : {lim_ip_str}\nLimit Kuota : {lim_q_str}\n━━━━━━━━━━━━━━━━━━━━\nLINK WS TLS : `{link_tls}`\n━━━━━━━━━━━━━━━━━━━━\nLINK WS NONE-TLS : `{link_none}`\n━━━━━━━━━━━━━━━━━━━━\n"
-        msg_tg = msg_web
+        msg_out = (
+            f"━━━━━━━━━━━━━━━━━━━━\n"
+            f"❖ XRAY/VMESS WS{trial_txt} ❖\n"
+            f"━━━━━━━━━━━━━━━━━━━━\n"
+            f"Remarks : `{user}`\n"
+            f"IP Address : {IP_ADD}\n"
+            f"Domain : {DOMAIN}\n"
+            f"Port TLS : 443\n"
+            f"Port NONE-TLS : 80\n"
+            f"ID : `{uid}`\n"
+            f"Network : Websocket\n"
+            f"Websocket Path : /vmessws\n"
+            f"━━━━━━━━━━━━━━━━━━━━\n"
+            f"Limit IP : {lim_ip_str}\n"
+            f"Limit Kuota : {lim_q_str}\n"
+            f"━━━━━━━━━━━━━━━━━━━━\n"
+            f"LINK WS TLS : `{link_tls}`\n"
+            f"━━━━━━━━━━━━━━━━━━━━\n"
+            f"LINK WS NONE-TLS : `{link_none}`\n"
+            f"━━━━━━━━━━━━━━━━━━━━\n"
+            f"Expired On : {exp_date_str} WIB"
+        )
         
     elif protocol == 'vless':
         link_tls = f"vless://{uid}@{DOMAIN}:443?path=/vlessws&security=tls&encryption=none&host={DOMAIN}&type=ws&sni={DOMAIN}#{user}"
         link_none = f"vless://{uid}@{DOMAIN}:80?path=/vlessws&security=none&encryption=none&host={DOMAIN}&type=ws#{user}"
-        msg_web = f"━━━━━━━━━━━━━━━━━━━━\n❖ XRAY/VLESS WS{trial_txt} ❖\n━━━━━━━━━━━━━━━━━━━━\nRemarks : `{user}`\nIP Address : {IP_ADD}\nDomain : {DOMAIN}\nPort TLS : 443\nPort NONE-TLS : 80\nID : `{uid}`\nNetwork : Websocket\nWebsocket Path : /vlessws\n━━━━━━━━━━━━━━━━━━━━\nLimit IP : {lim_ip_str}\nLimit Kuota : {lim_q_str}\n━━━━━━━━━━━━━━━━━━━━\nLINK WS TLS : `{link_tls}`\n━━━━━━━━━━━━━━━━━━━━\nLINK WS NONE-TLS : `{link_none}`\n━━━━━━━━━━━━━━━━━━━━\n"
-        msg_tg = msg_web
+        
+        msg_out = (
+            f"━━━━━━━━━━━━━━━━━━━━\n"
+            f"❖ XRAY/VLESS WS{trial_txt} ❖\n"
+            f"━━━━━━━━━━━━━━━━━━━━\n"
+            f"Remarks : `{user}`\n"
+            f"IP Address : {IP_ADD}\n"
+            f"Domain : {DOMAIN}\n"
+            f"Port TLS : 443\n"
+            f"Port NONE-TLS : 80\n"
+            f"ID : `{uid}`\n"
+            f"Network : Websocket\n"
+            f"Websocket Path : /vlessws\n"
+            f"━━━━━━━━━━━━━━━━━━━━\n"
+            f"Limit IP : {lim_ip_str}\n"
+            f"Limit Kuota : {lim_q_str}\n"
+            f"━━━━━━━━━━━━━━━━━━━━\n"
+            f"LINK WS TLS : `{link_tls}`\n"
+            f"━━━━━━━━━━━━━━━━━━━━\n"
+            f"LINK WS NONE-TLS : `{link_none}`\n"
+            f"━━━━━━━━━━━━━━━━━━━━\n"
+            f"Expired On : {exp_date_str} WIB"
+        )
         
     elif protocol == 'trojan':
         link_tls = f"trojan://{uid}@{DOMAIN}:443?path=/trojanws&security=tls&host={DOMAIN}&type=ws&sni={DOMAIN}#{user}"
-        msg_web = f"━━━━━━━━━━━━━━━━━━━━\n❖ XRAY/TROJAN WS{trial_txt} ❖\n━━━━━━━━━━━━━━━━━━━━\nRemarks : `{user}`\nIP Address : {IP_ADD}\nDomain : {DOMAIN}\nPort TLS : 443\nPassword : `{uid}`\nNetwork : Websocket\nWebsocket Path : /trojanws\n━━━━━━━━━━━━━━━━━━━━\nLimit IP : {lim_ip_str}\nLimit Kuota : {lim_q_str}\n━━━━━━━━━━━━━━━━━━━━\nLINK WS TLS : `{link_tls}`\n━━━━━━━━━━━━━━━━━━━━\n"
-        msg_tg = msg_web
         
-    msg_web_final = msg_web + f"Expired On : {exp_date_str} WIB"
-    return msg_web_final, msg_web_final
+        msg_out = (
+            f"━━━━━━━━━━━━━━━━━━━━\n"
+            f"❖ XRAY/TROJAN WS{trial_txt} ❖\n"
+            f"━━━━━━━━━━━━━━━━━━━━\n"
+            f"Remarks : `{user}`\n"
+            f"IP Address : {IP_ADD}\n"
+            f"Domain : {DOMAIN}\n"
+            f"Port TLS : 443\n"
+            f"Password : `{uid}`\n"
+            f"Network : Websocket\n"
+            f"Websocket Path : /trojanws\n"
+            f"━━━━━━━━━━━━━━━━━━━━\n"
+            f"Limit IP : {lim_ip_str}\n"
+            f"Limit Kuota : {lim_q_str}\n"
+            f"━━━━━━━━━━━━━━━━━━━━\n"
+            f"LINK WS TLS : `{link_tls}`\n"
+            f"━━━━━━━━━━━━━━━━━━━━\n"
+            f"Expired On : {exp_date_str} WIB"
+        )
+        
+    return msg_out, msg_out
 
 # ===============================================
 # ROUTE API: XRAY, SSH, L2TP
@@ -133,8 +191,8 @@ def add_user(protocol):
     with open(EXP_FILE, 'a') as f: f.write(f"{user} {dt_str}\n")
     with open(LIMIT_FILE, 'a') as f: f.write(f"{user} {limit_ip} {limit_quota}\n")
     restart_xray()
-    msg_web, msg_tg = generate_account_detail(protocol, user, uid, dt_str, False, limit_ip, limit_quota)
-    send_telegram(msg_tg)
+    msg_web, _ = generate_account_detail(protocol, user, uid, dt_str, False, limit_ip, limit_quota)
+    send_telegram(_)
     return jsonify({"stdout": msg_web})
 
 @app.route('/user_legend/trial-<protocol>ws', methods=['POST'])
@@ -160,8 +218,8 @@ def trial_user(protocol):
     with open(EXP_FILE, 'a') as f: f.write(f"{user} {dt_str}\n")
     with open(LIMIT_FILE, 'a') as f: f.write(f"{user} {limit_ip} 1\n")
     restart_xray()
-    msg_web, msg_tg = generate_account_detail(protocol, user, uid, dt_str, True, limit_ip, 1)
-    send_telegram(msg_tg)
+    msg_web, _ = generate_account_detail(protocol, user, uid, dt_str, True, limit_ip, 1)
+    send_telegram(_)
     return jsonify({"stdout": msg_web})
 
 @app.route('/user_legend/del-<protocol>ws', methods=['DELETE'])
@@ -182,7 +240,7 @@ def del_user(protocol):
                 for line in lines:
                     if not line.startswith(user + ' '): f.write(line)
     restart_xray()
-    return jsonify({"stdout": f"Success: {user} deleted."})
+    return jsonify({"stdout": f"Success: User `{user}` deleted."})
 
 @app.route('/user_legend/renew-<protocol>ws', methods=['POST'])
 def renew_user(protocol):
@@ -205,7 +263,7 @@ def renew_user(protocol):
                         updated = True
                         continue
                 f.write(line)
-    if updated: return jsonify({"stdout": f"Success: {user} renewed."})
+    if updated: return jsonify({"stdout": f"Success: User `{user}` renewed."})
     return jsonify({"stdout": f"Error: User {user} not found."})
 
 @app.route('/user_legend/detail-<protocol>ws', methods=['GET', 'POST'])
@@ -260,7 +318,7 @@ def lock_ssh():
     if not check_auth(): return jsonify({"stdout": "Unauthorized"}), 401
     user = (request.json or {}).get('user')
     subprocess.run(['usermod', '-L', user])
-    return jsonify({"stdout": f"Success: {user} locked."})
+    return jsonify({"stdout": f"Success: User `{user}` locked."})
 
 if __name__ == '__main__':
     app.run(host='127.0.0.1', port=5000)
