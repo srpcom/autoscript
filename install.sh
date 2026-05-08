@@ -40,9 +40,10 @@ while true; do
 done
 
 echo -e "\n[1/9] Memperbarui sistem & dependensi..."
-apt update && apt upgrade -y
-# Instalasi dependensi gabungan (Xray + L2TP/IPsec)
-DEBIAN_FRONTEND=noninteractive apt install curl wget unzip uuid-runtime jq tzdata ufw cron gnupg2 gnupg python3 python3-flask strongswan xl2tpd iptables iptables-persistent -y
+export DEBIAN_FRONTEND=noninteractive
+apt update && apt upgrade -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold"
+# PERBAIKAN: Menghapus iptables-persistent yang bentrok dengan UFW di Ubuntu 24
+apt install curl wget unzip uuid-runtime jq tzdata ufw cron gnupg2 gnupg python3 python3-flask strongswan xl2tpd iptables -y
 timedatectl set-timezone Asia/Jakarta
 
 # Membuat Struktur Folder SRPCOM
@@ -90,6 +91,8 @@ EOF
 echo "SANGATRAHASIA123" > /usr/local/etc/xray/api_key.conf
 
 echo -e "\n[4/9] Mengonfigurasi L2TP & IPsec..."
+mkdir -p /etc/xl2tpd
+mkdir -p /etc/ppp
 # Konfigurasi IPsec (StrongSwan)
 cat > /etc/ipsec.conf << EOF
 config setup
@@ -198,9 +201,27 @@ ufw allow 4500/udp
 ufw allow 1701/udp
 ufw --force enable
 
-# Iptables forwarding untuk VPN L2TP
-iptables -t nat -A POSTROUTING -s 192.168.42.0/24 -o eth0 -j MASQUERADE
-iptables-save > /etc/iptables/rules.v4
+# PERBAIKAN: Membuat Service NAT Custom (Pengganti iptables-persistent)
+# Mencari nama interface internet secara otomatis (misal: eth0, ens3, dll)
+ETH=$(ip route ls | grep default | awk '{print $5}' | head -n 1)
+
+cat > /etc/systemd/system/l2tp-nat.service << EOF
+[Unit]
+Description=L2TP NAT IPTables Rules
+After=network.target ufw.service
+
+[Service]
+Type=oneshot
+ExecStart=/sbin/iptables -t nat -A POSTROUTING -s 192.168.42.0/24 -o $ETH -j MASQUERADE
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+systemctl daemon-reload
+systemctl enable l2tp-nat
+systemctl start l2tp-nat
 
 # Aktifkan IP Forwarding di sysctl
 sed -i '/net.ipv4.ip_forward/s/^#//g' /etc/sysctl.conf
@@ -208,7 +229,8 @@ sysctl -p
 
 echo -e "\n[8/9] Menginstal & Mengonfigurasi Caddy..."
 apt install -y debian-keyring debian-archive-keyring apt-transport-https
-curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
+# PERBAIKAN: Menambahkan --yes untuk memaksa overwrite GPG Caddy tanpa prompt
+curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | gpg --dearmor --yes -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
 curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | tee /etc/apt/sources.list.d/caddy-stable.list
 apt update && apt install caddy -y
 
