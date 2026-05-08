@@ -66,10 +66,12 @@ delete_l2tp() {
         echo "$((i+1)). ${users[$i]}"
     done
     echo "0. Back"
+    echo "x. Back to Main Menu"
     echo "======================================"
-    read -p "Pilih nomor akun untuk dihapus [1-${#users[@]}]: " choice
+    read -p "Pilih nomor akun untuk dihapus [1-${#users[@]} or 0/x]: " choice
     
     if [[ "$choice" == "0" ]]; then return; fi
+    if [[ "$choice" == "x" || "$choice" == "X" ]]; then exec menu; fi
 
     if [[ "$choice" -gt 0 && "$choice" -le "${#users[@]}" ]]; then
         user="${users[$((choice-1))]}"
@@ -107,10 +109,12 @@ renew_l2tp() {
         echo "$((i+1)). ${users[$i]}"
     done
     echo "0. Back"
+    echo "x. Back to Main Menu"
     echo "======================================"
-    read -p "Pilih nomor akun [1-${#users[@]}]: " choice
+    read -p "Pilih nomor akun [1-${#users[@]} or 0/x]: " choice
     
     if [[ "$choice" == "0" ]]; then return; fi
+    if [[ "$choice" == "x" || "$choice" == "X" ]]; then exec menu; fi
 
     if [[ "$choice" -gt 0 && "$choice" -le "${#users[@]}" ]]; then
         user="${users[$((choice-1))]}"
@@ -174,10 +178,12 @@ detail_l2tp() {
         echo "$((i+1)). ${users[$i]}"
     done
     echo "0. Back"
+    echo "x. Back to Main Menu"
     echo "======================================"
-    read -p "Pilih nomor akun [1-${#users[@]}]: " choice
+    read -p "Pilih nomor akun [1-${#users[@]} or 0/x]: " choice
     
     if [[ "$choice" == "0" ]]; then return; fi
+    if [[ "$choice" == "x" || "$choice" == "X" ]]; then exec menu; fi
 
     if [[ "$choice" -gt 0 && "$choice" -le "${#users[@]}" ]]; then
         user="${users[$((choice-1))]}"
@@ -216,16 +222,16 @@ menu_l2tp() {
         echo "3. Renew L2TP Account"
         echo "4. List L2TP Account"
         echo "5. Detail L2TP Account"
-        echo "0. Back to Main Menu"
+        echo "0/x. Back to Main Menu"
         echo "======================================"
-        read -p "Please select an option [0-5]: " opt
+        read -p "Please select an option [0-5 or x]: " opt
         case $opt in
             1) add_l2tp ;; 
             2) delete_l2tp ;; 
             3) renew_l2tp ;;
             4) list_l2tp ;;
             5) detail_l2tp ;;
-            0) break ;;
+            0|x|X) break ;;
             *) echo -e "\n=> Pilihan tidak valid!"; sleep 1 ;;
         esac
     done
