@@ -17,7 +17,6 @@ add_ssh() {
     read -p "Username (x = Batal) : " user
     if [[ "$user" == "x" || "$user" == "X" ]]; then return; fi
     
-    # Cek apakah user sudah ada di sistem Linux
     if id "$user" &>/dev/null; then
         echo -e "\n=> Error: Username '$user' sudah ada di sistem!"
         sleep 2; return
@@ -25,20 +24,21 @@ add_ssh() {
     
     read -p "Password             : " pass
     read -p "Expired (Days)       : " masaaktif
+    read -p "Limit IP (0 = Unli)  : " limit_ip
+    
+    if [ -z "$limit_ip" ]; then limit_ip=0; fi
     
     exp_date=$(date -d "$masaaktif days" +"%Y-%m-%d")
     exp_time=$(date -d "$masaaktif days" +"%H:%M:%S")
     
-    # Membuat user Linux baru (tanpa akses shell interaktif)
     useradd -e "$exp_date" -s /bin/false -M "$user"
     echo -e "$pass\n$pass" | passwd "$user" &> /dev/null
     
-    # Simpan ke database txt kita
     echo "$user $pass $exp_date $exp_time" >> $SSH_EXP
+    echo "$user $limit_ip" >> /usr/local/etc/srpcom/ssh_limit.txt
 
-    msg_cli=$(echo -e "━━━━━━━━━━━━━━━━━━━━\n❖ SSH & OVPN ACCOUNT ❖\n━━━━━━━━━━━━━━━━━━━━\nRemarks : ${user}\nIP Address : ${IP_ADD}\nDomain : ${DOMAIN}\nUsername : ${user}\nPassword : ${pass}\n━━━━━━━━━━━━━━━━━━━━\nPort OpenSSH : 22\nPort Dropbear : 109, 143\nPort SSH-WS TLS : 443 (Path: /sshws)\nPort SSH-WS NTLS : 80 (Path: /sshws)\nPort UDP Custom : 1-65535\n━━━━━━━━━━━━━━━━━━━━\nEXPIRED ON : ${exp_date} ${exp_time} WIB (${masaaktif} days)")
-    
-    msg_tg=$(echo -e "━━━━━━━━━━━━━━━━━━━━\n❖ SSH & OVPN ACCOUNT ❖\n━━━━━━━━━━━━━━━━━━━━\nRemarks : \`${user}\`\nIP Address : ${IP_ADD}\nDomain : ${DOMAIN}\nUsername : \`${user}\`\nPassword : \`${pass}\`\n━━━━━━━━━━━━━━━━━━━━\nPort OpenSSH : 22\nPort Dropbear : 109, 143\nPort SSH-WS TLS : 443 (Path: /sshws)\nPort SSH-WS NTLS : 80 (Path: /sshws)\nPort UDP Custom : 1-65535\n━━━━━━━━━━━━━━━━━━━━\nEXPIRED ON : ${exp_date} ${exp_time} WIB (${masaaktif} days)")
+    msg_cli=$(echo -e "━━━━━━━━━━━━━━━━━━━━\n❖ SSH & OVPN ACCOUNT ❖\n━━━━━━━━━━━━━━━━━━━━\nRemarks : ${user}\nIP Address : ${IP_ADD}\nDomain : ${DOMAIN}\nUsername : ${user}\nPassword : ${pass}\n━━━━━━━━━━━━━━━━━━━━\nPort OpenSSH : 22\nPort Dropbear : 109, 143\nPort SSH-WS TLS : 443 (Path: /sshws)\nPort SSH-WS NTLS : 80 (Path: /sshws)\n━━━━━━━━━━━━━━━━━━━━\nLimit IP : ${limit_ip} IP\n━━━━━━━━━━━━━━━━━━━━\nEXPIRED ON : ${exp_date} ${exp_time} WIB (${masaaktif} days)")
+    msg_tg=$(echo -e "━━━━━━━━━━━━━━━━━━━━\n❖ SSH & OVPN ACCOUNT ❖\n━━━━━━━━━━━━━━━━━━━━\nRemarks : \`${user}\`\nIP Address : ${IP_ADD}\nDomain : ${DOMAIN}\nUsername : \`${user}\`\nPassword : \`${pass}\`\n━━━━━━━━━━━━━━━━━━━━\nPort OpenSSH : 22\nPort Dropbear : 109, 143\nPort SSH-WS TLS : 443 (Path: /sshws)\nPort SSH-WS NTLS : 80 (Path: /sshws)\n━━━━━━━━━━━━━━━━━━━━\nLimit IP : ${limit_ip} IP\n━━━━━━━━━━━━━━━━━━━━\nEXPIRED ON : ${exp_date} ${exp_time} WIB (${masaaktif} days)")
     
     clear; echo "$msg_cli"
     send_telegram "$msg_tg"
@@ -94,9 +94,9 @@ del_ssh() {
     if [[ "$choice" -gt 0 && "$choice" -le "${#users[@]}" ]]; then
         user="${users[$((choice-1))]}"
         
-        # Hapus user dari sistem Linux dan file txt
         userdel -f "$user" 2>/dev/null
         sed -i "/^$user /d" $SSH_EXP
+        sed -i "/^$user /d" /usr/local/etc/srpcom/ssh_limit.txt 2>/dev/null
         
         echo -e "\n=> Akun SSH '$user' berhasil dihapus!"
         sleep 2
