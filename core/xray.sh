@@ -7,11 +7,60 @@
 
 source /usr/local/etc/srpcom/env.conf
 
+# Fungsi Pintar untuk membuat Tabel Daftar User Xray
+print_user_table() {
+    local back_type=$1
+    printf " %-4s | %-20s | %-12s | %-10s\n" "No" "Username" "Expired" "Sisa Hari"
+    echo "---------------------------------------------------------"
+    for i in "${!users[@]}"; do
+        local user="${users[$i]}"
+        local exp_data=$(grep "^$user " /usr/local/etc/xray/expiry.txt 2>/dev/null)
+        local exp_date=""
+        local sisa_hari=""
+        
+        if [ -z "$exp_data" ]; then
+            exp_date="Lifetime"
+            sisa_hari="~"
+        else
+            exp_date=$(echo "$exp_data" | awk '{print $2}')
+            local exp_time=$(echo "$exp_data" | awk '{print $3}')
+            local exp_sec=$(date -d "$exp_date $exp_time" +%s 2>/dev/null)
+            local now_sec=$(date +%s)
+            
+            if [ -n "$exp_sec" ]; then
+                local diff=$((exp_sec - now_sec))
+                if [ "$diff" -lt 0 ]; then
+                    sisa_hari="Expired"
+                else
+                    sisa_hari=$((diff / 86400))
+                    if [ "$sisa_hari" -eq 0 ]; then
+                        sisa_hari="< 1 Hari"
+                    else
+                        sisa_hari="${sisa_hari} Hari"
+                    fi
+                fi
+            else
+                exp_date="Unknown"
+                sisa_hari="~"
+            fi
+        fi
+        printf " %-4s | %-20s | %-12s | %-10s\n" "$((i+1))." "$user" "$exp_date" "$sisa_hari"
+    done
+    
+    if [ "$back_type" == "hide_back" ]; then
+        : # Tidak print tombol back
+    elif [ "$back_type" == "back_to_protocol" ]; then
+        echo " 0.   | Back to Protocol Selection"
+    else
+        echo " 0.   | Back"
+    fi
+}
+
 add_vmess_ws() {
     clear
-    echo "======================================"
-    echo "       CREATE VMESS WS ACCOUNT        "
-    echo "======================================"
+    echo "========================================================="
+    echo "                 CREATE VMESS WS ACCOUNT                 "
+    echo "========================================================="
     read -p "Username (x = Batal) : " user
     if [[ "$user" == "x" || "$user" == "X" ]]; then return; fi
     read -p "Expired (Days) : " masaaktif
@@ -41,9 +90,9 @@ add_vmess_ws() {
 
 add_vless_ws() {
     clear
-    echo "======================================"
-    echo "       CREATE VLESS WS ACCOUNT        "
-    echo "======================================"
+    echo "========================================================="
+    echo "                 CREATE VLESS WS ACCOUNT                 "
+    echo "========================================================="
     read -p "Username (x = Batal) : " user
     if [[ "$user" == "x" || "$user" == "X" ]]; then return; fi
     read -p "Expired (Days) : " masaaktif
@@ -71,9 +120,9 @@ add_vless_ws() {
 
 add_trojan_ws() {
     clear
-    echo "======================================"
-    echo "       CREATE TROJAN WS ACCOUNT       "
-    echo "======================================"
+    echo "========================================================="
+    echo "                 CREATE TROJAN WS ACCOUNT                "
+    echo "========================================================="
     read -p "Username (x = Batal) : " user
     if [[ "$user" == "x" || "$user" == "X" ]]; then return; fi
     read -p "Expired (Days) : " masaaktif
@@ -100,9 +149,9 @@ add_trojan_ws() {
 
 add_trial() {
     clear
-    echo "======================================"
-    echo "       CREATE TRIAL ACCOUNT (60M)     "
-    echo "======================================"
+    echo "========================================================="
+    echo "                CREATE TRIAL ACCOUNT (60M)               "
+    echo "========================================================="
     echo "1. VMESS WS"
     echo "2. VLESS WS"
     echo "3. TROJAN WS"
@@ -123,7 +172,7 @@ add_trial() {
     elif [[ "$prot_opt" == "2" ]]; then
         prot="vless"
         jq '(.inbounds[] | select(.protocol=="vless") | .settings.clients) += [{"id": "'$uuid'", "email": "'$user'"}]' /usr/local/etc/xray/config.json > /tmp/config.json
-    elif [[ "$prot_opt" == "3" ]]; then
+    elif [[ "$prot" == "3" ]]; then
         prot="trojan"
         jq '(.inbounds[] | select(.protocol=="trojan") | .settings.clients) += [{"password": "'$uuid'", "email": "'$user'"}]' /usr/local/etc/xray/config.json > /tmp/config.json
     else
@@ -174,15 +223,15 @@ add_trial() {
 
 create_xray() {
     clear
-    echo "╔════════════════════════════════════╗"
-    echo "║             CREATE XRAY            ║"
-    echo "╚════════════════════════════════════╝"
+    echo "╔════════════════════════════════════════════════════════╗"
+    echo "║                      CREATE XRAY                       ║"
+    echo "╚════════════════════════════════════════════════════════╝"
     echo "1.  VMESS WS"
     echo "2.  VLESS WS"
     echo "3.  TROJAN WS"
     echo "4.  TRIAL ACCOUNT (60 Minutes)"
     echo "0.  Back"
-    echo "======================================"
+    echo "========================================================="
     read -p "Please select an option [0-4]: " opt
     case $opt in
         1) add_vmess_ws ;;
@@ -196,9 +245,9 @@ create_xray() {
 
 delete_xray() {
     clear
-    echo "======================================"
-    echo "          DELETE XRAY ACCOUNT         "
-    echo "======================================"
+    echo "========================================================="
+    echo "                   DELETE XRAY ACCOUNT                   "
+    echo "========================================================="
     mapfile -t users < <(jq -r '.inbounds[].settings.clients[].email' /usr/local/etc/xray/config.json | sort -u)
     
     if [ ${#users[@]} -eq 0 ] || [ -z "${users[0]}" ] || [ "${users[0]}" == "null" ]; then
@@ -206,11 +255,8 @@ delete_xray() {
         pause; return
     fi
 
-    for i in "${!users[@]}"; do
-        echo "$((i+1)). ${users[$i]}"
-    done
-    echo "0. Back"
-    echo "======================================"
+    print_user_table "normal_back"
+    echo "========================================================="
     read -p "Pilih nomor akun untuk dihapus [1-${#users[@]}]: " choice
     
     if [[ "$choice" == "0" ]]; then return; fi
@@ -230,9 +276,9 @@ delete_xray() {
 
 renew_xray() {
     clear
-    echo "======================================"
-    echo "          RENEW XRAY ACCOUNT          "
-    echo "======================================"
+    echo "========================================================="
+    echo "                   RENEW XRAY ACCOUNT                    "
+    echo "========================================================="
     mapfile -t users < <(jq -r '.inbounds[].settings.clients[].email' /usr/local/etc/xray/config.json | sort -u)
     
     if [ ${#users[@]} -eq 0 ] || [ -z "${users[0]}" ] || [ "${users[0]}" == "null" ]; then
@@ -240,11 +286,8 @@ renew_xray() {
         pause; return
     fi
 
-    for i in "${!users[@]}"; do
-        echo "$((i+1)). ${users[$i]}"
-    done
-    echo "0. Back"
-    echo "======================================"
+    print_user_table "normal_back"
+    echo "========================================================="
     read -p "Pilih nomor akun [1-${#users[@]}]: " choice
     
     if [[ "$choice" == "0" ]]; then return; fi
@@ -276,25 +319,22 @@ renew_xray() {
 
 list_xray() {
     clear
-    echo "======================================"
-    echo "          LIST XRAY ACCOUNTS          "
-    echo "======================================"
+    echo "========================================================="
+    echo "                   LIST XRAY ACCOUNTS                    "
+    echo "========================================================="
     echo -e "\n\e[32m[ VMESS WS ]\e[0m"
-    echo "--------------------------------------"
-    vmess_users=$(jq -r '.inbounds[] | select(.protocol=="vmess") | .settings.clients[].email' /usr/local/etc/xray/config.json 2>/dev/null)
-    if [ -z "$vmess_users" ] || [ "$vmess_users" == "null" ]; then echo "Tidak ada akun."; else echo "$vmess_users" | awk '{print "- " $0}'; fi
+    mapfile -t users < <(jq -r '.inbounds[] | select(.protocol=="vmess") | .settings.clients[].email' /usr/local/etc/xray/config.json 2>/dev/null)
+    if [ ${#users[@]} -eq 0 ] || [ -z "${users[0]}" ] || [ "${users[0]}" == "null" ]; then echo "Tidak ada akun."; else print_user_table "hide_back"; fi
     
     echo -e "\n\e[32m[ VLESS WS ]\e[0m"
-    echo "--------------------------------------"
-    vless_users=$(jq -r '.inbounds[] | select(.protocol=="vless") | .settings.clients[].email' /usr/local/etc/xray/config.json 2>/dev/null)
-    if [ -z "$vless_users" ] || [ "$vless_users" == "null" ]; then echo "Tidak ada akun."; else echo "$vless_users" | awk '{print "- " $0}'; fi
+    mapfile -t users < <(jq -r '.inbounds[] | select(.protocol=="vless") | .settings.clients[].email' /usr/local/etc/xray/config.json 2>/dev/null)
+    if [ ${#users[@]} -eq 0 ] || [ -z "${users[0]}" ] || [ "${users[0]}" == "null" ]; then echo "Tidak ada akun."; else print_user_table "hide_back"; fi
     
     echo -e "\n\e[32m[ TROJAN WS ]\e[0m"
-    echo "--------------------------------------"
-    trojan_users=$(jq -r '.inbounds[] | select(.protocol=="trojan") | .settings.clients[].email' /usr/local/etc/xray/config.json 2>/dev/null)
-    if [ -z "$trojan_users" ] || [ "$trojan_users" == "null" ]; then echo "Tidak ada akun."; else echo "$trojan_users" | awk '{print "- " $0}'; fi
+    mapfile -t users < <(jq -r '.inbounds[] | select(.protocol=="trojan") | .settings.clients[].email' /usr/local/etc/xray/config.json 2>/dev/null)
+    if [ ${#users[@]} -eq 0 ] || [ -z "${users[0]}" ] || [ "${users[0]}" == "null" ]; then echo "Tidak ada akun."; else print_user_table "hide_back"; fi
     
-    echo -e "\n======================================"
+    echo -e "\n========================================================="
     pause
 }
 
@@ -357,20 +397,20 @@ show_detail() {
 detail_list() {
     prot=$1
     clear
-    echo "======================================"
-    echo "       SELECT ${prot^^} ACCOUNT       "
-    echo "======================================"
+    echo "========================================================="
+    echo "                 SELECT ${prot^^} ACCOUNT                 "
+    echo "========================================================="
     mapfile -t users < <(jq -r '.inbounds[] | select(.protocol=="'$prot'") | .settings.clients[].email' /usr/local/etc/xray/config.json 2>/dev/null)
     if [ ${#users[@]} -eq 0 ] || [ -z "${users[0]}" ] || [ "${users[0]}" == "null" ]; then
         echo "Tidak ada akun di protokol ini."
-        echo "======================================"
+        echo "========================================================="
         pause
         detail_xray
         return
     fi
-    for i in "${!users[@]}"; do echo "$((i+1)). ${users[$i]}"; done
-    echo "0. Back to Protocol Selection"
-    echo "======================================"
+    
+    print_user_table "back_to_protocol"
+    echo "========================================================="
     read -p "Select Account [0-${#users[@]}]: " acc_opt
     
     if [[ "$acc_opt" == "0" ]]; then detail_xray; return
@@ -384,9 +424,9 @@ detail_list() {
 
 detail_xray() {
     clear
-    echo "======================================"
-    echo "          DETAIL XRAY ACCOUNT         "
-    echo "======================================"
+    echo "========================================================="
+    echo "                   DETAIL XRAY ACCOUNT                   "
+    echo "========================================================="
     c_vm=$(jq '[.inbounds[] | select(.protocol=="vmess") | .settings.clients[]] | length' /usr/local/etc/xray/config.json 2>/dev/null || echo 0)
     c_vl=$(jq '[.inbounds[] | select(.protocol=="vless") | .settings.clients[]] | length' /usr/local/etc/xray/config.json 2>/dev/null || echo 0)
     c_tr=$(jq '[.inbounds[] | select(.protocol=="trojan") | .settings.clients[]] | length' /usr/local/etc/xray/config.json 2>/dev/null || echo 0)
@@ -395,7 +435,7 @@ detail_xray() {
     echo "2. VLESS ($c_vl)"
     echo "3. TROJAN ($c_tr)"
     echo "0. Back to XRAY Menu"
-    echo "======================================"
+    echo "========================================================="
     read -p "Select Protocol [0-3]: " prot_opt
     case $prot_opt in
         1) detail_list "vmess" ;;
@@ -409,20 +449,20 @@ detail_xray() {
 change_protocol_uuid() {
     prot=$1
     clear
-    echo "======================================"
-    echo "     CHANGE UUID/PASS ${prot^^} WS    "
-    echo "======================================"
+    echo "========================================================="
+    echo "               CHANGE UUID/PASS ${prot^^} WS             "
+    echo "========================================================="
     mapfile -t users < <(jq -r '.inbounds[] | select(.protocol=="'$prot'") | .settings.clients[].email' /usr/local/etc/xray/config.json 2>/dev/null)
     if [ ${#users[@]} -eq 0 ] || [ -z "${users[0]}" ] || [ "${users[0]}" == "null" ]; then
         echo "Tidak ada akun di protokol ini."
-        echo "======================================"
+        echo "========================================================="
         pause
         menu_change_uuid
         return
     fi
-    for i in "${!users[@]}"; do echo "$((i+1)). ${users[$i]}"; done
-    echo "0. Back"
-    echo "======================================"
+    
+    print_user_table "back_to_protocol"
+    echo "========================================================="
     read -p "Select Account [0-${#users[@]}]: " acc_opt
     
     if [[ "$acc_opt" == "0" ]]; then menu_change_uuid; return
@@ -448,15 +488,15 @@ change_protocol_uuid() {
 
 menu_change_uuid() {
     clear
-    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-    echo "   CHANGE UUID OR PASSWORD XRAY   "
-    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo "╔════════════════════════════════════════════════════════╗"
+    echo "║              CHANGE UUID OR PASSWORD XRAY              ║"
+    echo "╚════════════════════════════════════════════════════════╝"
     echo " [1]  CHANGE UUID/PASS FOR VMESS WS"
     echo " [2]  CHANGE UUID/PASS FOR VLESS WS"
     echo " [3]  CHANGE UUID/PASS FOR TROJAN WS"
-    echo "----------------------------------"
+    echo "---------------------------------------------------------"
     echo " [0]  Back"
-    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo "========================================================="
     echo ""
     read -p "  Select From Options [1-3 or 0] : " opt
     case $opt in
@@ -473,11 +513,11 @@ menu_xray() {
     if [[ -z "$XRAY_VER" ]]; then XRAY_VER="Xray 24.11.11"; fi
     while true; do
         clear
-        echo "╔════════════════════════════════════╗"
-        echo "║              MENU XRAY             ║"
-        echo "╚════════════════════════════════════╝"
+        echo "╔════════════════════════════════════════════════════════╗"
+        echo "║                       MENU XRAY                        ║"
+        echo "╚════════════════════════════════════════════════════════╝"
         echo "Xray Version: ${XRAY_VER}"
-        echo "======================================"
+        echo "========================================================="
         echo "1. Create XRAY Account"
         echo "2. Delete XRAY Account"
         echo "3. Renew XRAY Account"
@@ -485,7 +525,7 @@ menu_xray() {
         echo "5. Detail XRAY Account"
         echo "6. Change UUID/Password"
         echo "0. Back to Main Menu"
-        echo "======================================"
+        echo "========================================================="
         read -p "Please select an option [0-6]: " opt
         case $opt in
             1) create_xray ;; 
