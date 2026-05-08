@@ -154,7 +154,7 @@ def trial_user(protocol):
     save_json(XRAY_CONF, cfg)
     dt_str = dt.strftime('%Y-%m-%d %H:%M:%S')
     with open(EXP_FILE, 'a') as f: f.write(f"{user} {dt_str}\n")
-    with open(LIMIT_FILE, 'a') as f: f.write(f"{user} {limit_ip} 1\n") # Trial default 1 GB
+    with open(LIMIT_FILE, 'a') as f: f.write(f"{user} {limit_ip} 1\n")
     restart_xray()
     msg_web, msg_tg = generate_account_detail(protocol, user, uid, dt_str, True, limit_ip, 1)
     send_telegram(msg_tg)
@@ -357,8 +357,8 @@ def api_add_ssh():
     with open(SSH_LIMIT, 'a') as f: f.write(f"{user} {limit_ip}\n")
     
     lim_ip_str = f"{limit_ip} IP" if limit_ip > 0 else "Unlimited"
-    msg_web = f"━━━━━━━━━━━━━━━━━━━━\n❖ SSH & OVPN ACCOUNT ❖\n━━━━━━━━━━━━━━━━━━━━\nRemarks : {user}\nIP Address : {IP_ADD}\nDomain : {DOMAIN}\nUsername : {user}\nPassword : {password}\n━━━━━━━━━━━━━━━━━━━━\nPort OpenSSH : 22\nPort Dropbear : 109, 143\nPort SSH-WS TLS : 443 (Path: /sshws)\nPort SSH-WS NTLS : 80 (Path: /sshws)\n━━━━━━━━━━━━━━━━━━━━\nLimit IP : {lim_ip_str}\n━━━━━━━━━━━━━━━━━━━━\nExpired On : {dt_str} WIB"
-    msg_tg = f"━━━━━━━━━━━━━━━━━━━━\n❖ SSH & OVPN ACCOUNT ❖\n━━━━━━━━━━━━━━━━━━━━\nRemarks : `{user}`\nIP Address : {IP_ADD}\nDomain : {DOMAIN}\nUsername : `{user}`\nPassword : `{password}`\n━━━━━━━━━━━━━━━━━━━━\nPort OpenSSH : 22\nPort Dropbear : 109, 143\nPort SSH-WS TLS : 443 (Path: /sshws)\nPort SSH-WS NTLS : 80 (Path: /sshws)\n━━━━━━━━━━━━━━━━━━━━\nLimit IP : {lim_ip_str}\n━━━━━━━━━━━━━━━━━━━━\nEXPIRED ON : {dt_str} WIB"
+    msg_web = f"━━━━━━━━━━━━━━━━━━━━\n❖ SSH & OVPN ACCOUNT ❖\n━━━━━━━━━━━━━━━━━━━━\nRemarks : {user}\nIP Address : {IP_ADD}\nDomain : {DOMAIN}\nUsername : {user}\nPassword : {password}\n━━━━━━━━━━━━━━━━━━━━\nPort OpenSSH : 22\nPort Dropbear : 109, 143\nPort SSH-WS TLS : 443 (Path: /sshws)\nPort SSH-WS NTLS : 80 (Path: /sshws)\nPort UDP Custom : 7100, 7200, 7300\nPort OVPN UDP : 2200\nPort OVPN TCP : 1194\n━━━━━━━━━━━━━━━━━━━━\nLimit IP : {lim_ip_str}\n━━━━━━━━━━━━━━━━━━━━\nLINK OVPN UDP : http://{DOMAIN}/ovpn/udp.ovpn\nLINK OVPN TCP : http://{DOMAIN}/ovpn/tcp.ovpn\n━━━━━━━━━━━━━━━━━━━━\nExpired On : {dt_str} WIB"
+    msg_tg = f"━━━━━━━━━━━━━━━━━━━━\n❖ SSH & OVPN ACCOUNT ❖\n━━━━━━━━━━━━━━━━━━━━\nRemarks : `{user}`\nIP Address : {IP_ADD}\nDomain : {DOMAIN}\nUsername : `{user}`\nPassword : `{password}`\n━━━━━━━━━━━━━━━━━━━━\nPort OpenSSH : 22\nPort Dropbear : 109, 143\nPort SSH-WS TLS : 443 (Path: /sshws)\nPort SSH-WS NTLS : 80 (Path: /sshws)\nPort UDP Custom : 7100, 7200, 7300\nPort OVPN UDP : 2200\nPort OVPN TCP : 1194\n━━━━━━━━━━━━━━━━━━━━\nLimit IP : {lim_ip_str}\n━━━━━━━━━━━━━━━━━━━━\nLINK OVPN UDP : http://{DOMAIN}/ovpn/udp.ovpn\nLINK OVPN TCP : http://{DOMAIN}/ovpn/tcp.ovpn\n━━━━━━━━━━━━━━━━━━━━\nEXPIRED ON : {dt_str} WIB"
     send_telegram(msg_tg)
     return jsonify({"stdout": msg_web})
 
@@ -382,7 +382,7 @@ def api_trial_ssh():
     with open(SSH_EXP, 'a') as f: f.write(f"{user} {password} {dt_str}\n")
     with open(SSH_LIMIT, 'a') as f: f.write(f"{user} {limit_ip}\n")
     
-    msg_web = f"━━━━━━━━━━━━━━━━━━━━\n❖ TRIAL SSH ACCOUNT ❖\n━━━━━━━━━━━━━━━━━━━━\nUsername : {user}\nPassword : {password}\nDomain : {DOMAIN}\nIP : {IP_ADD}\n━━━━━━━━━━━━━━━━━━━━\nPort SSH/Dropbear : 22, 109, 143\nPort SSH-WS : 80, 443 (Path: /sshws)\n━━━━━━━━━━━━━━━━━━━━\nLimit IP : {limit_ip} IP\n━━━━━━━━━━━━━━━━━━━━\nExpired On : {dt_str} WIB"
+    msg_web = f"━━━━━━━━━━━━━━━━━━━━\n❖ TRIAL SSH ACCOUNT ❖\n━━━━━━━━━━━━━━━━━━━━\nUsername : {user}\nPassword : {password}\nDomain : {DOMAIN}\nIP : {IP_ADD}\n━━━━━━━━━━━━━━━━━━━━\nPort SSH/Dropbear : 22, 109, 143\nPort SSH-WS : 80, 443 (Path: /sshws)\nPort UDP Custom : 7100, 7200, 7300\nPort OVPN : UDP(2200), TCP(1194)\n━━━━━━━━━━━━━━━━━━━━\nLimit IP : {limit_ip} IP\n━━━━━━━━━━━━━━━━━━━━\nLINK OVPN UDP : http://{DOMAIN}/ovpn/udp.ovpn\nLINK OVPN TCP : http://{DOMAIN}/ovpn/tcp.ovpn\n━━━━━━━━━━━━━━━━━━━━\nExpired On : {dt_str} WIB"
     return jsonify({"stdout": msg_web})
 
 @app.route('/user_legend/del-ssh', methods=['DELETE'])
