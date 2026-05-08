@@ -62,13 +62,28 @@ manual_backup_telegram() {
     fi
     
     XRAY_C=$(jq '[.inbounds[].settings.clients | length] | add' /usr/local/etc/xray/config.json 2>/dev/null || echo 0)
-    BACKUP_NAME="xray-backup-$(date +"%Y%m%d_%H%M%S").tar.gz"
+    SSH_C=$(wc -l < /usr/local/etc/srpcom/ssh_expiry.txt 2>/dev/null || echo 0)
+    L2TP_C=$(wc -l < /usr/local/etc/srpcom/l2tp_expiry.txt 2>/dev/null || echo 0)
+    TOTAL_ACC=$((XRAY_C + SSH_C + L2TP_C))
+    
+    BACKUP_NAME="srpcom-backup-$(date +"%Y%m%d_%H%M%S").tar.gz"
     BACKUP_FILE="/root/$BACKUP_NAME"
 
-    tar -czf "$BACKUP_FILE" -C / usr/local/etc/xray/config.json usr/local/etc/xray/expiry.txt usr/local/etc/xray/bot_setting.conf usr/local/etc/srpcom/env.conf 2>/dev/null
+    # PERBAIKAN: Memasukkan semua file Xray, SSH, L2TP, dan Limit ke dalam Backup
+    tar -czf "$BACKUP_FILE" -C / \
+        usr/local/etc/xray/config.json \
+        usr/local/etc/xray/expiry.txt \
+        usr/local/etc/xray/limit.txt \
+        usr/local/etc/xray/locked.json \
+        usr/local/etc/xray/bot_setting.conf \
+        usr/local/etc/srpcom/env.conf \
+        usr/local/etc/srpcom/l2tp_expiry.txt \
+        usr/local/etc/srpcom/ssh_expiry.txt \
+        usr/local/etc/srpcom/ssh_limit.txt \
+        etc/ppp/chap-secrets 2>/dev/null
     
     echo "Sedang mengirim file backup ke Telegram..."
-    curl -s -F chat_id="${CHAT_ID}" -F document=@"${BACKUP_FILE}" -F caption="Manual Backup XRAY | ${XRAY_C} account | IP: ${IP_ADD} | Date: $(date)" "https://api.telegram.org/bot${BOT_TOKEN}/sendDocument" > /dev/null
+    curl -s -F chat_id="${CHAT_ID}" -F document=@"${BACKUP_FILE}" -F caption="📦 BACKUP VPS VPN | Total Akun: ${TOTAL_ACC} | IP: ${IP_ADD} | Date: $(date)" "https://api.telegram.org/bot${BOT_TOKEN}/sendDocument" > /dev/null
     
     echo -e "\n\e[32m[SUCCESS]\e[0m Backup berhasil dikirim ke Telegram!"
     pause
