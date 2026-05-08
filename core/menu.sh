@@ -11,6 +11,7 @@ source /usr/local/bin/srpcom/utils.sh
 source /usr/local/bin/srpcom/telegram.sh
 source /usr/local/bin/srpcom/xray.sh
 source /usr/local/bin/srpcom/l2tp.sh
+source /usr/local/bin/srpcom/ssh.sh
 
 menu_api_key() {
     clear
@@ -120,22 +121,22 @@ main_menu() {
         print_header # Berasal dari utils.sh
         
         echo "1. MENU XRAY (Vmess, Vless, Trojan)"
-        echo "2. MENU SSH & OVPN (Segera Hadir)"
+        echo "2. MENU SSH & OVPN"
         echo "3. MENU L2TP"
         echo "4. SETTINGS (Backup/Bot/API)"
-        echo "5. RESTART SERVICES (Xray, Caddy, API, L2TP)"
+        echo "5. RESTART SERVICES (All)"
         echo "6. CEK STATUS SERVICES"
         echo "0. Exit CLI"
         echo ""
         read -p "Pilih opsi [0-6]: " opt
         case $opt in
             1) menu_xray ;;
-            2) echo "Menu SSH akan segera ditambahkan!"; pause ;;
+            2) menu_ssh ;;
             3) menu_l2tp ;;
             4) menu_settings ;;
             5) 
                 echo -e "\n=> Restarting Services..."
-                systemctl restart xray caddy cron xray-api ipsec xl2tpd 2>/dev/null
+                systemctl restart xray caddy cron xray-api ipsec xl2tpd dropbear ssh-ws 2>/dev/null
                 echo -e "=> Done!"
                 sleep 1.5 ;;
             6)
@@ -153,6 +154,10 @@ main_menu() {
                 if systemctl is-active --quiet ipsec; then echo -e "\e[32m[ RUNNING ]\e[0m"; else echo -e "\e[31m[ ERROR ]\e[0m"; fi
                 echo -n "L2TP (xl2tpd) : "
                 if systemctl is-active --quiet xl2tpd; then echo -e "\e[32m[ RUNNING ]\e[0m"; else echo -e "\e[31m[ ERROR ]\e[0m"; fi
+                echo -n "DROPBEAR (SSH): "
+                if systemctl is-active --quiet dropbear; then echo -e "\e[32m[ RUNNING ]\e[0m"; else echo -e "\e[31m[ ERROR ]\e[0m"; fi
+                echo -n "SSH-WS PROXY  : "
+                if systemctl is-active --quiet ssh-ws; then echo -e "\e[32m[ RUNNING ]\e[0m"; else echo -e "\e[31m[ ERROR ]\e[0m"; fi
                 echo "======================================"
                 pause ;;
             0) clear; exit 0 ;;
