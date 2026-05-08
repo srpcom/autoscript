@@ -1,64 +1,67 @@
 #!/bin/bash
 # ==========================================
 # l2tp.sh
-# MODULE: L2TP/IPsec LOGIC
-# Berisi logika pembuatan, penghapusan, dan manajemen akun L2TP
+# MODULE: L2TP & IPsec LOGIC
+# Mengelola akun L2TP VPN
 # ==========================================
 
 source /usr/local/etc/srpcom/env.conf
 
-# File kredensial L2TP/IPsec
-CHAP_SECRETS="/etc/ppp/chap-secrets"
-L2TP_EXP="/usr/local/etc/srpcom/l2tp_expiry.txt"
-IPSEC_PSK="srpcom_vpn" # Default Pre-Shared Key
-
 add_l2tp() {
     clear
     echo "======================================"
-    echo "       CREATE L2TP/IPsec ACCOUNT      "
+    echo "         CREATE L2TP ACCOUNT          "
     echo "======================================"
     read -p "Username (x = Batal) : " user
     if [[ "$user" == "x" || "$user" == "X" ]]; then return; fi
     
     # Cek apakah user sudah ada
-    if grep -qw "^\"$user\"" $CHAP_SECRETS; then
-        echo -e "\n=> Error: Username sudah ada!"
+    if grep -q "^\"$user\" l2tpd" /etc/ppp/chap-secrets 2>/dev/null; then
+        echo -e "\n\e[31m[ERROR]\e[0m Username '$user' sudah digunakan!"
         sleep 2; return
     fi
     
-    read -p "Password             : " pass
-    read -p "Expired (Days)       : " masaaktif
+    read -p "Password       : " password
+    read -p "Expired (Days) : " masaaktif
     
     exp_date=$(date -d "$masaaktif days" +"%Y-%m-%d")
     exp_time=$(date -d "$masaaktif days" +"%H:%M:%S")
     
-    # Menulis kredensial ke chap-secrets
-    echo "\"$user\" l2tpd \"$pass\" *" >> $CHAP_SECRETS
-    echo "$user $pass $exp_date $exp_time" >> $L2TP_EXP
+    # Menambahkan ke konfigurasi sistem (chap-secrets)
+    echo "\"$user\" l2tpd \"$password\" *" >> /etc/ppp/chap-secrets
     
-    # Restart layanan
+    # Menyimpan database kustom
+    echo "$user $password $exp_date $exp_time" >> /usr/local/etc/srpcom/l2tp_expiry.txt
+    
+    # Restart layanan agar membaca config baru
     systemctl restart ipsec xl2tpd
-
-    msg_cli=$(echo -e "━━━━━━━━━━━━━━━━━━━━\n❖ L2TP / IPsec VPN ❖\n━━━━━━━━━━━━━━━━━━━━\nRemarks : ${user}\nIP Address : ${IP_ADD}\nDomain : ${DOMAIN}\nIPsec PSK : ${IPSEC_PSK}\nUsername : ${user}\nPassword : ${pass}\n━━━━━━━━━━━━━━━━━━━━\nEXPIRED ON : ${exp_date} ${exp_time} WIB (${masaaktif} days)")
     
-    msg_tg=$(echo -e "━━━━━━━━━━━━━━━━━━━━\n❖ L2TP / IPsec VPN ❖\n━━━━━━━━━━━━━━━━━━━━\nRemarks : \`${user}\`\nIP Address : ${IP_ADD}\nDomain : ${DOMAIN}\nIPsec PSK : \`${IPSEC_PSK}\`\nUsername : \`${user}\`\nPassword : \`${pass}\`\n━━━━━━━━━━━━━━━━━━━━\nEXPIRED ON : ${exp_date} ${exp_time} WIB (${masaaktif} days)")
+    msg_cli=$(echo -e "━━━━━━━━━━━━━━━━━━━━\n❖ L2TP / IPsec VPN ❖\n━━━━━━━━━━━━━━━━━━━━\nRemarks : ${user}\nIP Address : ${IP_ADD}\nDomain : ${DOMAIN}\nIPsec PSK : srpcom_vpn\nUsername : ${user}\nPassword : ${password}\n━━━━━━━━━━━━━━━━━━━━\nEXPIRED ON : ${exp_date} ${exp_time} WIB (${masaaktif} days)")
+    
+    msg_tg=$(echo -e "━━━━━━━━━━━━━━━━━━━━\n❖ L2TP / IPsec VPN ❖\n━━━━━━━━━━━━━━━━━━━━\nRemarks : \`${user}\`\nIP Address : ${IP_ADD}\nDomain : ${DOMAIN}\nIPsec PSK : \`srpcom_vpn\`\nUsername : \`${user}\`\nPassword : \`${password}\`\n━━━━━━━━━━━━━━━━━━━━\nEXPIRED ON : ${exp_date} ${exp_time} WIB (${masaaktif} days)")
     
     clear; echo "$msg_cli"
     send_telegram "$msg_tg"
     pause
 }
 
-del_l2tp() {
+delete_l2tp() {
     clear
     echo "======================================"
-    echo "          DELETE L2TP ACCOUNT         "
+    echo "         DELETE L2TP ACCOUNT          "
     echo "======================================"
-    if [ ! -s "$L2TP_EXP" ]; then
-        echo "Tidak ada akun L2TP."
+    if [ ! -f "/usr/local/etc/srpcom/l2tp_expiry.txt" ]; then
+        echo "Belum ada akun L2TP yang dibuat."
+        pause; return
+    fi
+    
+    mapfile -t users < <(awk '{print $1}' /usr/local/etc/srpcom/l2tp_expiry.txt)
+    
+    if [ ${#users[@]} -eq 0 ]; then
+        echo "Tidak ada akun untuk dihapus."
         pause; return
     fi
 
-    mapfile -t users < <(awk '{print $1}' $L2TP_EXP)
     for i in "${!users[@]}"; do
         echo "$((i+1)). ${users[$i]}"
     done
@@ -71,15 +74,15 @@ del_l2tp() {
     if [[ "$choice" -gt 0 && "$choice" -le "${#users[@]}" ]]; then
         user="${users[$((choice-1))]}"
         
-        # Hapus dari chap-secrets dan expiry list
-        sed -i "/^\"$user\" l2tpd/d" $CHAP_SECRETS
-        sed -i "/^$user /d" $L2TP_EXP
-        
+        # Hapus user dari OS dan file TXT
+        sed -i "/^\"$user\" l2tpd/d" /etc/ppp/chap-secrets
+        sed -i "/^$user /d" /usr/local/etc/srpcom/l2tp_expiry.txt
         systemctl restart ipsec xl2tpd
-        echo -e "\n=> Akun L2TP '$user' berhasil dihapus!"
+        
+        echo -e "\n\e[32m=> Akun L2TP '$user' berhasil dihapus!\e[0m"
         sleep 2
     else
-        echo -e "\n=> Pilihan tidak valid!"; sleep 1; del_l2tp
+        echo -e "\n=> Pilihan tidak valid!"; sleep 1; delete_l2tp
     fi
 }
 
@@ -88,12 +91,18 @@ renew_l2tp() {
     echo "======================================"
     echo "          RENEW L2TP ACCOUNT          "
     echo "======================================"
-    if [ ! -s "$L2TP_EXP" ]; then
-        echo "Tidak ada akun L2TP."
+    if [ ! -f "/usr/local/etc/srpcom/l2tp_expiry.txt" ]; then
+        echo "Belum ada akun L2TP yang dibuat."
+        pause; return
+    fi
+    
+    mapfile -t users < <(awk '{print $1}' /usr/local/etc/srpcom/l2tp_expiry.txt)
+    
+    if [ ${#users[@]} -eq 0 ]; then
+        echo "Tidak ada akun untuk diperpanjang."
         pause; return
     fi
 
-    mapfile -t users < <(awk '{print $1}' $L2TP_EXP)
     for i in "${!users[@]}"; do
         echo "$((i+1)). ${users[$i]}"
     done
@@ -107,8 +116,8 @@ renew_l2tp() {
         user="${users[$((choice-1))]}"
         read -p "Tambah Masa Aktif (Hari): " masaaktif
         
-        current_data=$(grep "^$user " $L2TP_EXP)
-        pass=$(echo "$current_data" | awk '{print $2}')
+        current_data=$(grep "^$user " /usr/local/etc/srpcom/l2tp_expiry.txt)
+        pw=$(echo "$current_data" | awk '{print $2}')
         current_date=$(echo "$current_data" | awk '{print $3}')
         current_time=$(echo "$current_data" | awk '{print $4}')
         
@@ -118,10 +127,11 @@ renew_l2tp() {
         new_exp_date=$(date -d "$current_date $current_time + $masaaktif days" +"%Y-%m-%d")
         new_exp_time=$(date -d "$current_date $current_time + $masaaktif days" +"%H:%M:%S")
         
-        sed -i "/^$user /d" $L2TP_EXP
-        echo "$user $pass $new_exp_date $new_exp_time" >> $L2TP_EXP
+        # Update TXT database
+        sed -i "/^$user /d" /usr/local/etc/srpcom/l2tp_expiry.txt
+        echo "$user $pw $new_exp_date $new_exp_time" >> /usr/local/etc/srpcom/l2tp_expiry.txt
         
-        echo -e "\n=> Akun '$user' diperpanjang $masaaktif Hari!"
+        echo -e "\n\e[32m=> Akun L2TP '$user' diperpanjang $masaaktif Hari!\e[0m"
         echo "=> Expired Baru: $new_exp_date $new_exp_time WIB"
         sleep 2
     else
@@ -134,14 +144,12 @@ list_l2tp() {
     echo "======================================"
     echo "          LIST L2TP ACCOUNTS          "
     echo "======================================"
-    echo -e "\n\e[32m[ L2TP/IPsec ]\e[0m"
-    echo "--------------------------------------"
-    if [ ! -s "$L2TP_EXP" ]; then 
-        echo "Tidak ada akun."
-    else 
-        awk '{print "- "$1" (Exp: "$3" "$4" WIB)"}' $L2TP_EXP
+    if [ ! -f "/usr/local/etc/srpcom/l2tp_expiry.txt" ]; then
+        echo "Belum ada akun L2TP."
+    else
+        awk '{print "- " $1 " (Exp: " $3 ")"}' /usr/local/etc/srpcom/l2tp_expiry.txt
     fi
-    echo -e "\n======================================"
+    echo "======================================"
     pause
 }
 
@@ -150,36 +158,34 @@ detail_l2tp() {
     echo "======================================"
     echo "         DETAIL L2TP ACCOUNT          "
     echo "======================================"
-    if [ ! -s "$L2TP_EXP" ]; then
-        echo "Tidak ada akun L2TP."
+    if [ ! -f "/usr/local/etc/srpcom/l2tp_expiry.txt" ]; then
+        echo "Belum ada akun L2TP yang dibuat."
+        pause; return
+    fi
+    
+    mapfile -t users < <(awk '{print $1}' /usr/local/etc/srpcom/l2tp_expiry.txt)
+    
+    if [ ${#users[@]} -eq 0 ]; then
+        echo "Tidak ada akun."
         pause; return
     fi
 
-    mapfile -t users < <(awk '{print $1}' $L2TP_EXP)
     for i in "${!users[@]}"; do
         echo "$((i+1)). ${users[$i]}"
     done
     echo "0. Back"
     echo "======================================"
-    read -p "Select Account [0-${#users[@]}]: " choice
+    read -p "Pilih nomor akun [1-${#users[@]}]: " choice
     
     if [[ "$choice" == "0" ]]; then return; fi
 
     if [[ "$choice" -gt 0 && "$choice" -le "${#users[@]}" ]]; then
         user="${users[$((choice-1))]}"
         
-        # Get data
-        current_data=$(grep "^$user " $L2TP_EXP)
-        pass=$(echo "$current_data" | awk '{print $2}')
-        exp_date=$(echo "$current_data" | awk '{print $3}')
-        exp_time=$(echo "$current_data" | awk '{print $4}')
-        
-        if [ -z "$exp_date" ]; then 
-            exp_date="Lifetime / No Exp"
-        else 
-            exp_date="${exp_date} ${exp_time} WIB"
-        fi
-        
+        current_data=$(grep "^$user " /usr/local/etc/srpcom/l2tp_expiry.txt)
+        pw=$(echo "$current_data" | awk '{print $2}')
+        dt_str=$(echo "$current_data" | awk '{print $3 " " $4}')
+
         clear
         echo "━━━━━━━━━━━━━━━━━━━━"
         echo "❖ L2TP / IPsec VPN ❖"
@@ -187,14 +193,13 @@ detail_l2tp() {
         echo "Remarks : ${user}"
         echo "IP Address : ${IP_ADD}"
         echo "Domain : ${DOMAIN}"
-        echo "IPsec PSK : ${IPSEC_PSK}"
+        echo "IPsec PSK : srpcom_vpn"
         echo "Username : ${user}"
-        echo "Password : ${pass}"
+        echo "Password : ${pw}"
         echo "━━━━━━━━━━━━━━━━━━━━"
-        echo "EXPIRED ON : ${exp_date}"
+        echo "EXPIRED ON : ${dt_str} WIB"
         echo ""
         pause
-        detail_l2tp
     else
         echo -e "\n=> Pilihan tidak valid!"; sleep 1; detail_l2tp
     fi
@@ -204,7 +209,7 @@ menu_l2tp() {
     while true; do
         clear
         echo "╔════════════════════════════════════╗"
-        echo "║              MENU L2TP             ║"
+        echo "║             MENU L2TP              ║"
         echo "╚════════════════════════════════════╝"
         echo "1. Create L2TP Account"
         echo "2. Delete L2TP Account"
@@ -216,8 +221,8 @@ menu_l2tp() {
         read -p "Please select an option [0-5]: " opt
         case $opt in
             1) add_l2tp ;; 
-            2) del_l2tp ;; 
-            3) renew_l2tp ;; 
+            2) delete_l2tp ;; 
+            3) renew_l2tp ;;
             4) list_l2tp ;;
             5) detail_l2tp ;;
             0) break ;;
