@@ -89,6 +89,10 @@ http://$DOMAIN, https://$DOMAIN {
     handle /user_legend/* {
         reverse_proxy localhost:5000
     }
+    handle /ovpn/* {
+        root * /usr/local/etc/srpcom
+        file_server
+    }
     handle / {
         respond "Server is running normally." 200
     }
@@ -105,6 +109,52 @@ http://$DOMAIN, https://$DOMAIN {
         reverse_proxy localhost:10004
     }
 }
+EOF
+
+    # Regenerate OVPN Client Configs with new Domain
+    CA_CERT=$(cat /etc/openvpn/server/keys/ca.crt 2>/dev/null)
+    TA_CERT=$(cat /etc/openvpn/server/keys/ta.key 2>/dev/null)
+    
+    cat > /usr/local/etc/srpcom/ovpn/udp.ovpn << EOF
+client
+dev tun
+proto udp
+remote $DOMAIN 2200
+resolv-retry infinite
+nobind
+persist-key
+persist-tun
+remote-cert-tls server
+cipher AES-256-GCM
+auth-user-pass
+key-direction 1
+<ca>
+$CA_CERT
+</ca>
+<tls-auth>
+$TA_CERT
+</tls-auth>
+EOF
+
+    cat > /usr/local/etc/srpcom/ovpn/tcp.ovpn << EOF
+client
+dev tun
+proto tcp
+remote $DOMAIN 1194
+resolv-retry infinite
+nobind
+persist-key
+persist-tun
+remote-cert-tls server
+cipher AES-256-GCM
+auth-user-pass
+key-direction 1
+<ca>
+$CA_CERT
+</ca>
+<tls-auth>
+$TA_CERT
+</tls-auth>
 EOF
 
     echo "=> Restarting Web Server & API..."
@@ -133,12 +183,13 @@ menu_api_key() {
     menu_settings
 }
 
-restore_xray() {
+# PERBAIKAN: Fungsi Restore kini mendukung Multi-Protocol (Xray, SSH, OVPN, L2TP)
+restore_data() {
     clear
     echo "======================================"
-    echo "          RESTORE DATA via VPS        "
+    echo "     RESTORE DATA (MULTI-PROTOCOL)    "
     echo "======================================"
-    read -p "Nama file backup (misal: xray-backup.tar.gz) atau 'x' untuk batal : " backup_name
+    read -p "Nama file backup (misal: srpcom-backup.tar.gz) atau 'x' untuk batal : " backup_name
     
     if [ -z "$backup_name" ]; then menu_settings; return; fi
     if [[ "$backup_name" == "x" || "$backup_name" == "X" ]]; then return; fi
@@ -154,13 +205,28 @@ restore_xray() {
 
     case $restore_mode in
         1)
+            # Mengekstrak seluruh database dan konfigurasi
             tar -xzf "/root/$backup_name" -C / 2>/dev/null
+            
+            # MEMBANGUN ULANG USER SSH DI SISTEM LINUX DARI FILE BACKUP
+            if [ -f "/usr/local/etc/srpcom/ssh_expiry.txt" ]; then
+                echo "=> Membangun ulang akun SSH..."
+                while read -r user pass exp_date exp_time; do
+                    if ! id "$user" &>/dev/null; then
+                        useradd -e "$exp_date" -s /bin/false -M "$user"
+                        echo -e "$pass\n$pass" | passwd "$user" &> /dev/null
+                    fi
+                done < /usr/local/etc/srpcom/ssh_expiry.txt
+            fi
+
             echo -e "\n\e[32m[SUCCESS]\e[0m Restore Replace Berhasil!"
             ;;
         2)
             echo -e "\nMenggabungkan data (Merging)..."
             mkdir -p /tmp/restore_temp
             tar -xzf "/root/$backup_name" -C /tmp/restore_temp 2>/dev/null
+            
+            # 1. Merge Config JSON (Xray)
             jq -s '.[0].inbounds[0].settings.clients = (.[0].inbounds[0].settings.clients + .[1].inbounds[0].settings.clients | unique_by(.email)) | .[0]' \
                /usr/local/etc/xray/config.json /tmp/restore_temp/usr/local/etc/xray/config.json > /tmp/merged_v1.json
             jq -s '.[0].inbounds[1].settings.clients = (.[0].inbounds[1].settings.clients + .[1].inbounds[1].settings.clients | unique_by(.email)) | .[0]' \
@@ -168,15 +234,35 @@ restore_xray() {
             jq -s '.[0].inbounds[2].settings.clients = (.[0].inbounds[2].settings.clients + .[1].inbounds[2].settings.clients | unique_by(.email)) | .[0]' \
                /tmp/merged_v2.json /tmp/restore_temp/usr/local/etc/xray/config.json > /tmp/merged_v3.json
             mv /tmp/merged_v3.json /usr/local/etc/xray/config.json
-            cat /usr/local/etc/xray/expiry.txt /tmp/restore_temp/usr/local/etc/xray/expiry.txt | sort -k1,1 -k2,2r | sort -u -k1,1 > /tmp/merged_exp.txt
-            mv /tmp/merged_exp.txt /usr/local/etc/xray/expiry.txt
+            
+            # 2. Merge Text Databases (Limits, Expired, L2TP, SSH)
+            for txt_file in usr/local/etc/xray/expiry.txt usr/local/etc/xray/limit.txt usr/local/etc/srpcom/l2tp_expiry.txt usr/local/etc/srpcom/ssh_expiry.txt usr/local/etc/srpcom/ssh_limit.txt etc/ppp/chap-secrets; do
+                if [ -f "/tmp/restore_temp/$txt_file" ]; then
+                    touch "/$txt_file" 2>/dev/null # Buat jika belum ada
+                    cat "/$txt_file" "/tmp/restore_temp/$txt_file" | sort -k1,1 -u > "/tmp/merged_$(basename $txt_file)"
+                    mv "/tmp/merged_$(basename $txt_file)" "/$txt_file"
+                fi
+            done
+            
+            # 3. MEMBANGUN ULANG USER SSH DARI MERGE DATA
+            if [ -f "/usr/local/etc/srpcom/ssh_expiry.txt" ]; then
+                echo "=> Membangun ulang akun SSH..."
+                while read -r user pass exp_date exp_time; do
+                    if ! id "$user" &>/dev/null; then
+                        useradd -e "$exp_date" -s /bin/false -M "$user"
+                        echo -e "$pass\n$pass" | passwd "$user" &> /dev/null
+                    fi
+                done < /usr/local/etc/srpcom/ssh_expiry.txt
+            fi
+
             rm -rf /tmp/restore_temp
             echo -e "\n\e[32m[SUCCESS]\e[0m Restore Merge Berhasil!"
             ;;
         *) echo "Batal."; sleep 1; return ;;
     esac
 
-    systemctl restart xray
+    # Me-restart semua protokol yang mungkin terdampak dari restore
+    systemctl restart xray ipsec xl2tpd dropbear ssh-ws
     pause
 }
 
@@ -199,7 +285,7 @@ menu_settings() {
             1) menu_autobackup ;;
             2) menu_autosend ;;
             3) manual_backup_telegram ;;
-            4) restore_xray ;;
+            4) restore_data ;;
             5) menu_api_key ;;
             6) change_domain ;;
             7) menu_autokill ;;
@@ -253,6 +339,10 @@ main_menu() {
                 if systemctl is-active --quiet dropbear; then echo -e "\e[32m[ RUNNING ]\e[0m"; else echo -e "\e[31m[ ERROR ]\e[0m"; fi
                 echo -n "SSH-WS PROXY  : "
                 if systemctl is-active --quiet ssh-ws; then echo -e "\e[32m[ RUNNING ]\e[0m"; else echo -e "\e[31m[ ERROR ]\e[0m"; fi
+                echo -n "OPENVPN SERVER: "
+                if systemctl is-active --quiet openvpn-server@server-udp; then echo -e "\e[32m[ RUNNING ]\e[0m"; else echo -e "\e[31m[ ERROR ]\e[0m"; fi
+                echo -n "BADVPN (UDPGW): "
+                if systemctl is-active --quiet badvpn-7100; then echo -e "\e[32m[ RUNNING ]\e[0m"; else echo -e "\e[31m[ ERROR ]\e[0m"; fi
                 echo "======================================"
                 pause ;;
             0) clear; exit 0 ;;
