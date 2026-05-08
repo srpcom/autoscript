@@ -98,6 +98,31 @@ def generate_account_detail(protocol, user, uid, exp_date_str, is_trial=False, l
         link_tls = f"trojan://{uid}@{DOMAIN}:443?path=/trojanws&security=tls&host={DOMAIN}&type=ws&sni={DOMAIN}#{user}"
         link_none = ""
 
+    # msg_cli: Format polos tanpa backtick untuk WEB/API Output
+    msg_cli = (
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"❖ XRAY/{protocol.upper()} WS{trial_txt} ❖\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"Remarks : {user}\n"
+        f"IP Address : {IP_ADD}\n"
+        f"Domain : {DOMAIN}\n"
+        f"Port TLS : 443\n"
+        f"Port NONE-TLS : 80\n"
+        f"{'Password' if protocol == 'trojan' else 'ID'} : {uid}\n"
+        f"Network : Websocket\n"
+        f"Websocket Path : /{protocol}ws\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"Limit IP : {lim_ip_str}\n"
+        f"Limit Kuota : {lim_q_str}\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"LINK WS TLS : {link_tls}\n"
+        f"{'━━━━━━━━━━━━━━━━━━━━' if protocol != 'trojan' else ''}\n"
+        f"{'LINK WS NONE-TLS : ' + link_none if protocol != 'trojan' else ''}\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"Expired On : {exp_date_str} WIB"
+    )
+
+    # msg_tg: Format markdown dengan backtick untuk BOT TELEGRAM
     msg_tg = (
         f"━━━━━━━━━━━━━━━━━━━━\n"
         f"❖ XRAY/{protocol.upper()} WS{trial_txt} ❖\n"
@@ -120,7 +145,8 @@ def generate_account_detail(protocol, user, uid, exp_date_str, is_trial=False, l
         f"━━━━━━━━━━━━━━━━━━━━\n"
         f"Expired On : {exp_date_str} WIB"
     )
-    return msg_tg
+    
+    return msg_cli, msg_tg
 
 @app.route('/user_legend/add-<protocol>ws', methods=['POST'])
 def add_user(protocol):
@@ -145,9 +171,10 @@ def add_user(protocol):
     with open(EXP_FILE, 'a') as f: f.write(f"{user} {dt_str}\n")
     with open(LIMIT_FILE, 'a') as f: f.write(f"{user} {limit_ip} {limit_quota}\n")
     restart_xray()
-    msg_tg = generate_account_detail(protocol, user, uid, dt_str, False, limit_ip, limit_quota)
+    
+    msg_cli, msg_tg = generate_account_detail(protocol, user, uid, dt_str, False, limit_ip, limit_quota)
     send_telegram(msg_tg)
-    return jsonify({"stdout": msg_tg})
+    return jsonify({"stdout": msg_cli, "stdout_tg": msg_tg})
 
 @app.route('/user_legend/trial-<protocol>ws', methods=['POST'])
 def trial_user(protocol):
@@ -171,9 +198,10 @@ def trial_user(protocol):
     with open(EXP_FILE, 'a') as f: f.write(f"{user} {dt_str}\n")
     with open(LIMIT_FILE, 'a') as f: f.write(f"{user} {limit_ip} 1\n")
     restart_xray()
-    msg_tg = generate_account_detail(protocol, user, uid, dt_str, True, limit_ip, 1)
+    
+    msg_cli, msg_tg = generate_account_detail(protocol, user, uid, dt_str, True, limit_ip, 1)
     send_telegram(msg_tg)
-    return jsonify({"stdout": msg_tg})
+    return jsonify({"stdout": msg_cli, "stdout_tg": msg_tg})
 
 @app.route('/user_legend/detail-<protocol>ws', methods=['GET', 'POST'])
 def detail_user(protocol):
@@ -199,8 +227,9 @@ def detail_user(protocol):
                     if line.startswith(user + ' '):
                         p = line.strip().split()
                         if len(p) >= 3: limit_ip, limit_q = int(p[1]), int(p[2]); break
-        msg_tg = generate_account_detail(protocol, user, uid, exp_date_str, False, limit_ip, limit_q)
-        return jsonify({"stdout": msg_tg})
+                        
+        msg_cli, msg_tg = generate_account_detail(protocol, user, uid, exp_date_str, False, limit_ip, limit_q)
+        return jsonify({"stdout": msg_cli, "stdout_tg": msg_tg})
     return jsonify({"stdout": f"Error: User {user} tidak ditemukan!"})
 
 @app.route('/user_legend/del-<protocol>ws', methods=['DELETE', 'POST'])
@@ -271,6 +300,19 @@ def add_ssh():
     with open(SSH_LIMIT, 'a') as f: f.write(f"{user} {limit_ip}\n")
     
     lim_str = f"{limit_ip} IP" if limit_ip > 0 else "Unlimited"
+    
+    msg_cli = (
+        f"━━━━━━━━━━━━━━━━━━━━\n❖ SSH & OVPN ACCOUNT ❖\n━━━━━━━━━━━━━━━━━━━━\n"
+        f"Remarks : {user}\nIP Address : {IP_ADD}\nDomain : {DOMAIN}\n"
+        f"Username : {user}\nPassword : {password}\n━━━━━━━━━━━━━━━━━━━━\n"
+        f"Port OpenSSH : 22\nPort Dropbear : 109, 143\n"
+        f"Port SSH-WS TLS : 443 (Path: /sshws)\nPort SSH-WS NTLS : 80 (Path: /sshws)\n"
+        f"Port UDP Custom : 7100, 7200, 7300\nPort OVPN UDP : 2200\nPort OVPN TCP : 1194\n"
+        f"━━━━━━━━━━━━━━━━━━━━\nLimit IP : {lim_str}\n━━━━━━━━━━━━━━━━━━━━\n"
+        f"LINK OVPN UDP : http://{DOMAIN}/ovpn/udp.ovpn\n"
+        f"LINK OVPN TCP : http://{DOMAIN}/ovpn/tcp.ovpn\n━━━━━━━━━━━━━━━━━━━━\n"
+        f"EXPIRED ON : {exp_date} {exp_time} WIB"
+    )
     msg_tg = (
         f"━━━━━━━━━━━━━━━━━━━━\n❖ SSH & OVPN ACCOUNT ❖\n━━━━━━━━━━━━━━━━━━━━\n"
         f"Remarks : `{user}`\nIP Address : {IP_ADD}\nDomain : {DOMAIN}\n"
@@ -284,7 +326,7 @@ def add_ssh():
         f"EXPIRED ON : {exp_date} {exp_time} WIB"
     )
     send_telegram(msg_tg)
-    return jsonify({"stdout": msg_tg})
+    return jsonify({"stdout": msg_cli, "stdout_tg": msg_tg})
 
 @app.route('/user_legend/del-ssh', methods=['DELETE', 'POST'])
 def del_ssh():
@@ -325,7 +367,10 @@ def detail_ssh():
     if not check_auth(): return jsonify({"stdout": "Unauthorized"}), 401
     user = (request.json or {}).get('user')
     
-    found, msg_tg = False, f"❌ Akun SSH '{user}' tidak ditemukan."
+    found = False
+    msg_cli = f"❌ Akun SSH '{user}' tidak ditemukan."
+    msg_tg = msg_cli
+    
     if os.path.exists(SSH_EXP):
         with open(SSH_EXP, "r") as f:
             for line in f:
@@ -338,6 +383,16 @@ def detail_ssh():
                             for ll in fl:
                                 if ll.startswith(user + " "): limit_ip = int(ll.strip().split()[1])
                     lim_str = f"{limit_ip} IP" if limit_ip > 0 else "Unlimited"
+                    
+                    msg_cli = (
+                        f"━━━━━━━━━━━━━━━━━━━━\n❖ SSH & OVPN ACCOUNT ❖\n━━━━━━━━━━━━━━━━━━━━\n"
+                        f"Remarks : {user}\nIP Address : {IP_ADD}\nDomain : {DOMAIN}\n"
+                        f"Username : {user}\nPassword : {pw}\n━━━━━━━━━━━━━━━━━━━━\n"
+                        f"Limit IP : {lim_str}\n━━━━━━━━━━━━━━━━━━━━\n"
+                        f"LINK OVPN UDP : http://{DOMAIN}/ovpn/udp.ovpn\n"
+                        f"LINK OVPN TCP : http://{DOMAIN}/ovpn/tcp.ovpn\n━━━━━━━━━━━━━━━━━━━━\n"
+                        f"EXPIRED ON : {dt_str} WIB"
+                    )
                     msg_tg = (
                         f"━━━━━━━━━━━━━━━━━━━━\n❖ SSH & OVPN ACCOUNT ❖\n━━━━━━━━━━━━━━━━━━━━\n"
                         f"Remarks : `{user}`\nIP Address : {IP_ADD}\nDomain : {DOMAIN}\n"
@@ -349,7 +404,7 @@ def detail_ssh():
                     )
                     found = True
                     break
-    return jsonify({"stdout": msg_tg})
+    return jsonify({"stdout": msg_cli, "stdout_tg": msg_tg})
 
 @app.route('/user_legend/trial-ssh', methods=['POST'])
 def trial_ssh():
@@ -368,6 +423,13 @@ def trial_ssh():
     with open(SSH_EXP, 'a') as f: f.write(f"{user} {password} {exp_date} {exp_time}\n")
     with open(SSH_LIMIT, 'a') as f: f.write(f"{user} {limit_ip}\n")
     
+    msg_cli = (
+        f"━━━━━━━━━━━━━━━━━━━━\n❖ TRIAL SSH & OVPN ❖\n━━━━━━━━━━━━━━━━━━━━\n"
+        f"Username : {user}\nPassword : {password}\n"
+        f"Domain : {DOMAIN}\nIP : {IP_ADD}\n━━━━━━━━━━━━━━━━━━━━\n"
+        f"Limit IP : {limit_ip} IP\n━━━━━━━━━━━━━━━━━━━━\n"
+        f"EXPIRED ON : {exp_date} {exp_time} WIB"
+    )
     msg_tg = (
         f"━━━━━━━━━━━━━━━━━━━━\n❖ TRIAL SSH & OVPN ❖\n━━━━━━━━━━━━━━━━━━━━\n"
         f"Username : `{user}`\nPassword : `{password}`\n"
@@ -376,7 +438,7 @@ def trial_ssh():
         f"EXPIRED ON : {exp_date} {exp_time} WIB"
     )
     send_telegram(msg_tg)
-    return jsonify({"stdout": msg_tg})
+    return jsonify({"stdout": msg_cli, "stdout_tg": msg_tg})
 
 # ==========================================
 # L2TP ENDPOINTS
@@ -401,6 +463,12 @@ def add_l2tp():
     with open(L2TP_EXP, 'a') as f: f.write(f"{user} {password} {exp_date} {exp_time}\n")
     restart_l2tp()
     
+    msg_cli = (
+        f"━━━━━━━━━━━━━━━━━━━━\n❖ L2TP / IPsec VPN ❖\n━━━━━━━━━━━━━━━━━━━━\n"
+        f"Remarks : {user}\nIP Address : {IP_ADD}\nDomain : {DOMAIN}\n"
+        f"IPsec PSK : srpcom_vpn\nUsername : {user}\nPassword : {password}\n"
+        f"━━━━━━━━━━━━━━━━━━━━\nEXPIRED ON : {exp_date} {exp_time} WIB"
+    )
     msg_tg = (
         f"━━━━━━━━━━━━━━━━━━━━\n❖ L2TP / IPsec VPN ❖\n━━━━━━━━━━━━━━━━━━━━\n"
         f"Remarks : `{user}`\nIP Address : {IP_ADD}\nDomain : {DOMAIN}\n"
@@ -408,7 +476,7 @@ def add_l2tp():
         f"━━━━━━━━━━━━━━━━━━━━\nEXPIRED ON : {exp_date} {exp_time} WIB"
     )
     send_telegram(msg_tg)
-    return jsonify({"stdout": msg_tg})
+    return jsonify({"stdout": msg_cli, "stdout_tg": msg_tg})
 
 @app.route('/user_legend/del-l2tp', methods=['DELETE', 'POST'])
 def del_l2tp():
@@ -456,13 +524,24 @@ def renew_l2tp():
 def detail_l2tp():
     if not check_auth(): return jsonify({"stdout": "Unauthorized"}), 401
     user = (request.json or {}).get('user')
-    found, msg_tg = False, f"❌ Akun L2TP '{user}' tidak ditemukan."
+    
+    found = False
+    msg_cli = f"❌ Akun L2TP '{user}' tidak ditemukan."
+    msg_tg = msg_cli
+    
     if os.path.exists(L2TP_EXP):
         with open(L2TP_EXP, "r") as f:
             for line in f:
                 if line.startswith(user + " "):
                     parts = line.strip().split()
                     pw, dt_str = parts[1], f"{parts[2]} {parts[3]}"
+                    
+                    msg_cli = (
+                        f"━━━━━━━━━━━━━━━━━━━━\n❖ L2TP / IPsec VPN ❖\n━━━━━━━━━━━━━━━━━━━━\n"
+                        f"Remarks : {user}\nIP Address : {IP_ADD}\nDomain : {DOMAIN}\n"
+                        f"IPsec PSK : srpcom_vpn\nUsername : {user}\nPassword : {pw}\n"
+                        f"━━━━━━━━━━━━━━━━━━━━\nEXPIRED ON : {dt_str} WIB"
+                    )
                     msg_tg = (
                         f"━━━━━━━━━━━━━━━━━━━━\n❖ L2TP / IPsec VPN ❖\n━━━━━━━━━━━━━━━━━━━━\n"
                         f"Remarks : `{user}`\nIP Address : {IP_ADD}\nDomain : {DOMAIN}\n"
@@ -471,7 +550,7 @@ def detail_l2tp():
                     )
                     found = True
                     break
-    return jsonify({"stdout": msg_tg})
+    return jsonify({"stdout": msg_cli, "stdout_tg": msg_tg})
 
 @app.route('/user_legend/trial-l2tp', methods=['POST'])
 def trial_l2tp():
