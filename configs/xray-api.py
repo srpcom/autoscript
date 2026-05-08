@@ -59,7 +59,6 @@ def send_telegram(text):
 
         if autosend == "ON" and bot_token and chat_id:
             url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
-            # Kirim ke telegram selalu dengan Markdown
             payload = {"chat_id": chat_id, "text": text, "parse_mode": "Markdown"}
             req = urllib.request.Request(url, data=json.dumps(payload).encode('utf-8'), headers={'Content-Type': 'application/json'})
             urllib.request.urlopen(req, timeout=5)
@@ -70,7 +69,6 @@ def generate_account_detail(protocol, user, uid, exp_date_str, is_trial=False, l
     lim_ip_str = f"{limit_ip} IP" if limit_ip > 0 else "Unlimited"
     lim_q_str = f"{limit_quota} GB" if limit_quota > 0 else "Unlimited"
     
-    # Generate Links
     if protocol == 'vmess':
         tls_dict = {"v":"2","ps":user,"add":DOMAIN,"port":"443","id":uid,"aid":"0","net":"ws","type":"none","host":DOMAIN,"path":"/vmessws","tls":"tls","sni":DOMAIN}
         none_tls_dict = {"v":"2","ps":user,"add":DOMAIN,"port":"80","id":uid,"aid":"0","net":"ws","type":"none","host":DOMAIN,"path":"/vmessws","tls":"","sni":""}
@@ -83,7 +81,7 @@ def generate_account_detail(protocol, user, uid, exp_date_str, is_trial=False, l
         link_tls = f"trojan://{uid}@{DOMAIN}:443?path=/trojanws&security=tls&host={DOMAIN}&type=ws&sni={DOMAIN}#{user}"
         link_none = ""
 
-    # msg_web: Tanpa Backtick (Untuk Website)
+    # msg_web: Bersih (Untuk Website)
     msg_web = (
         f"━━━━━━━━━━━━━━━━━━━━\n"
         f"❖ XRAY/{protocol.upper()} WS{trial_txt} ❖\n"
@@ -107,7 +105,7 @@ def generate_account_detail(protocol, user, uid, exp_date_str, is_trial=False, l
         f"Expired On : {exp_date_str} WIB"
     )
 
-    # msg_tg: Dengan Backtick (Untuk Telegram)
+    # msg_tg: Dengan Backtick (Khusus Telegram/Bot Admin agar Click-to-Copy Aktif)
     msg_tg = (
         f"━━━━━━━━━━━━━━━━━━━━\n"
         f"❖ XRAY/{protocol.upper()} WS{trial_txt} ❖\n"
@@ -157,8 +155,8 @@ def add_user(protocol):
     with open(LIMIT_FILE, 'a') as f: f.write(f"{user} {limit_ip} {limit_quota}\n")
     restart_xray()
     msg_web, msg_tg = generate_account_detail(protocol, user, uid, dt_str, False, limit_ip, limit_quota)
-    send_telegram(msg_tg)
-    return jsonify({"stdout": msg_web})
+    send_telegram(msg_tg) # Notif Telegram pake backtick
+    return jsonify({"stdout": msg_web}) # Balasan Website pake polos
 
 @app.route('/user_legend/trial-<protocol>ws', methods=['POST'])
 def trial_user(protocol):
@@ -211,15 +209,8 @@ def detail_user(protocol):
                         p = line.strip().split()
                         if len(p) >= 3: limit_ip, limit_q = int(p[1]), int(p[2]); break
         msg_web, msg_tg = generate_account_detail(protocol, user, uid, exp_date_str, False, limit_ip, limit_q)
-        # Detail dikirim ke Bot Admin dalam format TG (backtick)
-        return jsonify({"stdout": msg_tg})
+        return jsonify({"stdout": msg_tg}) # Bot Admin butuh format TG (backtick)
     return jsonify({"stdout": "Error: User not found"})
-
-@app.route('/user_legend/cek-xray', methods=['GET'])
-def cek_xray():
-    if not check_auth(): return jsonify({"stdout": "Unauthorized"}), 401
-    out = subprocess.run(['systemctl', 'is-active', 'xray'], capture_output=True, text=True).stdout.strip()
-    return jsonify({"stdout": f"Xray status: {out}, Domain: {DOMAIN}"})
 
 if __name__ == '__main__':
     app.run(host='127.0.0.1', port=5000)
