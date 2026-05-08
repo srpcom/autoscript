@@ -2,7 +2,6 @@
 # ==========================================
 # xray-api.py
 # MODULE: PYTHON API BACKEND
-# Menangani API request antara website billing dan server Xray, L2TP, SSH
 # ==========================================
 
 from flask import Flask, request, jsonify
@@ -20,11 +19,11 @@ BOT_CONF = '/usr/local/etc/xray/bot_setting.conf'
 
 def get_env(key):
     try:
-        if not os.path.exists(ENV_FILE): return "UNKNOWN"
         with open(ENV_FILE, 'r') as f:
             for line in f:
-                if line.startswith(f"{key}="): return line.split('=', 1)[1].strip().strip('"').strip("'")
-    except: pass
+                if line.startswith(f"{key}="):
+                    return line.split('=', 1)[1].strip().strip('"').strip("'")
+    except: return "UNKNOWN"
     return "UNKNOWN"
 
 DOMAIN = get_env("DOMAIN")
@@ -60,7 +59,7 @@ def send_telegram(text):
 
         if autosend == "ON" and bot_token and chat_id:
             url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
-            # Mengaktifkan Markdown agar backtick di Telegram berfungsi
+            # Kirim ke telegram selalu dengan Markdown
             payload = {"chat_id": chat_id, "text": text, "parse_mode": "Markdown"}
             req = urllib.request.Request(url, data=json.dumps(payload).encode('utf-8'), headers={'Content-Type': 'application/json'})
             urllib.request.urlopen(req, timeout=5)
@@ -71,7 +70,7 @@ def generate_account_detail(protocol, user, uid, exp_date_str, is_trial=False, l
     lim_ip_str = f"{limit_ip} IP" if limit_ip > 0 else "Unlimited"
     lim_q_str = f"{limit_quota} GB" if limit_quota > 0 else "Unlimited"
     
-    # Menyiapkan Link
+    # Generate Links
     if protocol == 'vmess':
         tls_dict = {"v":"2","ps":user,"add":DOMAIN,"port":"443","id":uid,"aid":"0","net":"ws","type":"none","host":DOMAIN,"path":"/vmessws","tls":"tls","sni":DOMAIN}
         none_tls_dict = {"v":"2","ps":user,"add":DOMAIN,"port":"80","id":uid,"aid":"0","net":"ws","type":"none","host":DOMAIN,"path":"/vmessws","tls":"","sni":""}
@@ -82,8 +81,9 @@ def generate_account_detail(protocol, user, uid, exp_date_str, is_trial=False, l
         link_none = f"vless://{uid}@{DOMAIN}:80?path=/vlessws&security=none&encryption=none&host={DOMAIN}&type=ws#{user}"
     elif protocol == 'trojan':
         link_tls = f"trojan://{uid}@{DOMAIN}:443?path=/trojanws&security=tls&host={DOMAIN}&type=ws&sni={DOMAIN}#{user}"
+        link_none = ""
 
-    # OUTPUT UNTUK WEBSITE (Tanpa Backtick)
+    # msg_web: Tanpa Backtick (Untuk Website)
     msg_web = (
         f"━━━━━━━━━━━━━━━━━━━━\n"
         f"❖ XRAY/{protocol.upper()} WS{trial_txt} ❖\n"
@@ -92,7 +92,7 @@ def generate_account_detail(protocol, user, uid, exp_date_str, is_trial=False, l
         f"IP Address : {IP_ADD}\n"
         f"Domain : {DOMAIN}\n"
         f"Port TLS : 443\n"
-        f"{'Port NONE-TLS : 80' if protocol != 'trojan' else ''}\n"
+        f"Port NONE-TLS : 80\n"
         f"{'Password' if protocol == 'trojan' else 'ID'} : {uid}\n"
         f"Network : Websocket\n"
         f"Websocket Path : /{protocol}ws\n"
@@ -107,7 +107,7 @@ def generate_account_detail(protocol, user, uid, exp_date_str, is_trial=False, l
         f"Expired On : {exp_date_str} WIB"
     )
 
-    # OUTPUT UNTUK TELEGRAM (Dengan Backtick agar mudah di copy)
+    # msg_tg: Dengan Backtick (Untuk Telegram)
     msg_tg = (
         f"━━━━━━━━━━━━━━━━━━━━\n"
         f"❖ XRAY/{protocol.upper()} WS{trial_txt} ❖\n"
@@ -116,7 +116,7 @@ def generate_account_detail(protocol, user, uid, exp_date_str, is_trial=False, l
         f"IP Address : {IP_ADD}\n"
         f"Domain : {DOMAIN}\n"
         f"Port TLS : 443\n"
-        f"{'Port NONE-TLS : 80' if protocol != 'trojan' else ''}\n"
+        f"Port NONE-TLS : 80\n"
         f"{'Password' if protocol == 'trojan' else 'ID'} : `{uid}`\n"
         f"Network : Websocket\n"
         f"Websocket Path : /{protocol}ws\n"
@@ -186,13 +186,6 @@ def trial_user(protocol):
     send_telegram(msg_tg)
     return jsonify({"stdout": msg_web})
 
-@app.route('/user_legend/cek-xray', methods=['GET'])
-def cek_xray():
-    if not check_auth(): return jsonify({"stdout": "Unauthorized"}), 401
-    out = subprocess.run(['systemctl', 'is-active', 'xray'], capture_output=True, text=True).stdout.strip()
-    return jsonify({"stdout": f"Xray status: {out}, Domain: {DOMAIN}"})
-
-# Endpoint detail diperbarui untuk membalas dengan backtick di bot-admin
 @app.route('/user_legend/detail-<protocol>ws', methods=['GET', 'POST'])
 def detail_user(protocol):
     if not check_auth(): return jsonify({"stdout": "Unauthorized"}), 401
@@ -206,25 +199,27 @@ def detail_user(protocol):
                     uid = c.get('id') if protocol != 'trojan' else c.get('password')
                     break
     if uid:
-        exp_date_str = "Lifetime"
-        limit_ip, limit_q = 0, 0
+        exp_date_str, limit_ip, limit_q = "Lifetime", 0, 0
         if os.path.exists(EXP_FILE):
             with open(EXP_FILE, 'r') as f:
                 for line in f:
-                    if line.startswith(user + ' '):
-                        exp_date_str = line.strip().split(' ', 1)[1]
-                        break
+                    if line.startswith(user + ' '): exp_date_str = line.strip().split(' ', 1)[1]; break
         if os.path.exists(LIMIT_FILE):
             with open(LIMIT_FILE, 'r') as f:
                 for line in f:
                     if line.startswith(user + ' '):
                         p = line.strip().split()
-                        if len(p) >= 3: limit_ip, limit_q = int(p[1]), int(p[2])
-                        break
+                        if len(p) >= 3: limit_ip, limit_q = int(p[1]), int(p[2]); break
         msg_web, msg_tg = generate_account_detail(protocol, user, uid, exp_date_str, False, limit_ip, limit_q)
-        # return msg_tg agar di Bot Admin tampil backtick, msg_web hanya untuk Billing
+        # Detail dikirim ke Bot Admin dalam format TG (backtick)
         return jsonify({"stdout": msg_tg})
     return jsonify({"stdout": "Error: User not found"})
+
+@app.route('/user_legend/cek-xray', methods=['GET'])
+def cek_xray():
+    if not check_auth(): return jsonify({"stdout": "Unauthorized"}), 401
+    out = subprocess.run(['systemctl', 'is-active', 'xray'], capture_output=True, text=True).stdout.strip()
+    return jsonify({"stdout": f"Xray status: {out}, Domain: {DOMAIN}"})
 
 if __name__ == '__main__':
     app.run(host='127.0.0.1', port=5000)
