@@ -94,7 +94,9 @@ def api_req(endpoint, method="POST", payload=None):
         # Pengecekan HTTP Status agar error 404/500 tidak tereksekusi sbg text biasa
         res.raise_for_status()
         
-        return res.json().get('stdout', '✅ Command executed successfully but no output.')
+        # BARIS YANG DIUBAH (Mengutamakan format telegram stdout_tg)
+        res_json = res.json()
+        return res_json.get('stdout_tg', res_json.get('stdout', '✅ Command executed successfully but no output.'))
 
     except requests.exceptions.HTTPError as errh:
         try:
