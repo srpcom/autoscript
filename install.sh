@@ -277,7 +277,9 @@ openssl req -new -x509 -days 3650 -key ca.key -out ca.crt -subj "/CN=SRPCOM_CA"
 openssl ecparam -genkey -name prime256v1 -out server.key
 openssl req -new -key server.key -out server.csr -subj "/CN=SRPCOM_Server"
 openssl x509 -req -days 3650 -in server.csr -CA ca.crt -CAkey ca.key -CAcreateserial -out server.crt
-openvpn --genkey secret ta.key
+
+# PERBAIKAN: Menambahkan --secret agar ta.key berhasil dibuat tanpa error
+openvpn --genkey --secret ta.key
 
 PAM_PLUGIN=$(find /usr -name "openvpn-plugin-auth-pam.so" | head -n 1)
 
@@ -517,5 +519,5 @@ echo "Protokol: VMESS, VLESS, TROJAN, L2TP, SSH, OVPN, UDPGW"
 echo "Optimasi: TCP BBR & Swap RAM 2GB Aktif!"
 echo "Ketik 'menu' untuk masuk ke dashboard manajemen."
 echo "Untuk mengaktifkan Bot Telegram Admin, masuk ke menu:"
-echo "-> [5] Settings -> [8] Setting Telegram Admin Bot"
+echo "-> [5] Settings -> [9] Setting Telegram Admin Bot"
 echo "======================================================"
