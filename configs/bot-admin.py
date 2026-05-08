@@ -310,7 +310,7 @@ def process_action_input(message, action, prot, api_ep):
             payload = {'user': parts[0], 'exp': int(parts[1]) if len(parts) > 1 else 30}
         elif action == "del":
             payload = {'user': parts[0]}
-            method = "DELETE"
+            method = "POST" # <--- SUDAH DIPERBAIKI DARI DELETE MENJADI POST
         elif action == "detail":
             payload = {'user': parts[0]}
         
