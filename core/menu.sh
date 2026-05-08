@@ -13,6 +13,99 @@ source /usr/local/bin/srpcom/l2tp.sh
 source /usr/local/bin/srpcom/ssh.sh
 source /usr/local/bin/srpcom/monitor.sh
 
+GITHUB_RAW="https://raw.githubusercontent.com/syamsul18782/xray2026/main"
+
+menu_update() {
+    while true; do
+        clear
+        echo "╔════════════════════════════════════════════════════════╗"
+        echo "║               UPDATE SCRIPT (LIVE UPDATE)              ║"
+        echo "╚════════════════════════════════════════════════════════╝"
+        echo " [1]  Update Modul Utama (menu.sh)"
+        echo " [2]  Update Modul Utilitas (utils.sh)"
+        echo " [3]  Update Modul Xray (xray.sh)"
+        echo " [4]  Update Modul SSH & OVPN (ssh.sh)"
+        echo " [5]  Update Modul L2TP (l2tp.sh)"
+        echo " [6]  Update Modul Monitoring (monitor.sh)"
+        echo " [7]  Update Fitur Auto (autokill.sh & auto_expired.sh)"
+        echo " [8]  Update API Backend & Bot Telegram (configs/*.py)"
+        echo " [9]  Update SEMUA Modul (ALL IN ONE)"
+        echo "---------------------------------------------------------"
+        echo " [0/x] Kembali ke Menu Utama"
+        echo "========================================================="
+        read -p " Pilih opsi [0-9 or x]: " opt
+        
+        case $opt in
+            1) 
+                echo -e "\n=> Mengunduh menu.sh..."
+                wget -q -O /usr/local/bin/srpcom/menu.sh "$GITHUB_RAW/core/menu.sh"
+                chmod +x /usr/local/bin/srpcom/menu.sh
+                echo -e "\e[32m[SUCCESS]\e[0m Modul Utama diperbarui!"; sleep 1.5; exec menu ;;
+            2) 
+                echo -e "\n=> Mengunduh utils.sh..."
+                wget -q -O /usr/local/bin/srpcom/utils.sh "$GITHUB_RAW/core/utils.sh"
+                chmod +x /usr/local/bin/srpcom/utils.sh
+                echo -e "\e[32m[SUCCESS]\e[0m Modul Utilitas diperbarui!"; sleep 1.5 ;;
+            3) 
+                echo -e "\n=> Mengunduh xray.sh..."
+                wget -q -O /usr/local/bin/srpcom/xray.sh "$GITHUB_RAW/core/xray.sh"
+                chmod +x /usr/local/bin/srpcom/xray.sh
+                echo -e "\e[32m[SUCCESS]\e[0m Modul Xray diperbarui!"; sleep 1.5 ;;
+            4) 
+                echo -e "\n=> Mengunduh ssh.sh..."
+                wget -q -O /usr/local/bin/srpcom/ssh.sh "$GITHUB_RAW/core/ssh.sh"
+                chmod +x /usr/local/bin/srpcom/ssh.sh
+                echo -e "\e[32m[SUCCESS]\e[0m Modul SSH diperbarui!"; sleep 1.5 ;;
+            5) 
+                echo -e "\n=> Mengunduh l2tp.sh..."
+                wget -q -O /usr/local/bin/srpcom/l2tp.sh "$GITHUB_RAW/core/l2tp.sh"
+                chmod +x /usr/local/bin/srpcom/l2tp.sh
+                echo -e "\e[32m[SUCCESS]\e[0m Modul L2TP diperbarui!"; sleep 1.5 ;;
+            6) 
+                echo -e "\n=> Mengunduh monitor.sh..."
+                wget -q -O /usr/local/bin/srpcom/monitor.sh "$GITHUB_RAW/core/monitor.sh"
+                chmod +x /usr/local/bin/srpcom/monitor.sh
+                echo -e "\e[32m[SUCCESS]\e[0m Modul Monitoring diperbarui!"; sleep 1.5 ;;
+            7) 
+                echo -e "\n=> Mengunduh autokill.sh & auto_expired.sh..."
+                wget -q -O /usr/local/bin/srpcom/autokill.sh "$GITHUB_RAW/core/autokill.sh"
+                wget -q -O /usr/local/bin/srpcom/auto_expired.sh "$GITHUB_RAW/core/auto_expired.sh"
+                chmod +x /usr/local/bin/srpcom/autokill.sh /usr/local/bin/srpcom/auto_expired.sh
+                echo -e "\e[32m[SUCCESS]\e[0m Fitur Auto diperbarui!"; sleep 1.5 ;;
+            8) 
+                echo -e "\n=> Mengunduh API Backend & Bot Telegram..."
+                wget -q -O /usr/local/bin/xray-api.py "$GITHUB_RAW/configs/xray-api.py"
+                wget -q -O /usr/local/bin/bot-admin.py "$GITHUB_RAW/configs/bot-admin.py"
+                chmod +x /usr/local/bin/xray-api.py /usr/local/bin/bot-admin.py
+                systemctl daemon-reload
+                systemctl restart xray-api srpcom-bot
+                echo -e "\e[32m[SUCCESS]\e[0m API & Bot diperbarui dan di-restart!"; sleep 1.5 ;;
+            9) 
+                echo -e "\n=> Mengunduh SEMUA modul sistem..."
+                wget -q -O /usr/local/bin/srpcom/utils.sh "$GITHUB_RAW/core/utils.sh"
+                wget -q -O /usr/local/bin/srpcom/telegram.sh "$GITHUB_RAW/core/telegram.sh"
+                wget -q -O /usr/local/bin/srpcom/xray.sh "$GITHUB_RAW/core/xray.sh"
+                wget -q -O /usr/local/bin/srpcom/l2tp.sh "$GITHUB_RAW/core/l2tp.sh"
+                wget -q -O /usr/local/bin/srpcom/ssh.sh "$GITHUB_RAW/core/ssh.sh"
+                wget -q -O /usr/local/bin/srpcom/monitor.sh "$GITHUB_RAW/core/monitor.sh"
+                wget -q -O /usr/local/bin/srpcom/autokill.sh "$GITHUB_RAW/core/autokill.sh"
+                wget -q -O /usr/local/bin/srpcom/auto_expired.sh "$GITHUB_RAW/core/auto_expired.sh"
+                wget -q -O /usr/local/bin/xray-api.py "$GITHUB_RAW/configs/xray-api.py"
+                wget -q -O /usr/local/bin/bot-admin.py "$GITHUB_RAW/configs/bot-admin.py"
+                chmod +x /usr/local/bin/srpcom/*.sh /usr/local/bin/xray-api.py /usr/local/bin/bot-admin.py
+                systemctl daemon-reload
+                systemctl restart xray-api srpcom-bot
+                
+                # Update menu paling akhir agar tidak memutus proses, lalu exec ulang
+                wget -q -O /usr/local/bin/srpcom/menu.sh "$GITHUB_RAW/core/menu.sh"
+                chmod +x /usr/local/bin/srpcom/menu.sh
+                echo -e "\e[32m[SUCCESS]\e[0m Seluruh sistem berhasil diperbarui dari GitHub!"; sleep 2; exec menu ;;
+            0|x|X) exec menu ;;
+            *) echo -e "\n=> Pilihan tidak valid!"; sleep 1 ;;
+        esac
+    done
+}
+
 menu_bot_admin() {
     while true; do
         clear
@@ -30,9 +123,9 @@ menu_bot_admin() {
         echo "1. Mulai / Restart Bot Admin"
         echo "2. Ubah Token & ID Bot"
         echo "3. Hentikan Bot (Disable)"
-        echo "0. Kembali ke Settings"
+        echo "0/x. Kembali ke Settings"
         echo "======================================"
-        read -p "Pilih opsi [0-3]: " opt
+        read -p "Pilih opsi [0-3 or x]: " opt
         case $opt in
             1)
                 if [[ -n "$bot_token" && -n "$admin_id" ]]; then
@@ -61,6 +154,7 @@ EOF
                 echo -e "\n=> Bot Admin berhasil dihentikan!"; sleep 2
                 ;;
             0) break ;;
+            x|X) exec menu ;;
             *) echo -e "\n=> Pilihan tidak valid!"; sleep 1 ;;
         esac
     done
@@ -85,9 +179,9 @@ menu_autokill() {
         echo "======================================"
         echo "1. Turn ON Auto Kill Daemon"
         echo "2. Turn OFF Auto Kill Daemon"
-        echo "0. Back to Settings"
+        echo "0/x. Back to Settings"
         echo "======================================"
-        read -p "Select Option [0-2]: " opt
+        read -p "Select Option [0-2 or x]: " opt
         case $opt in
             1) 
                 echo "*/3 * * * * root /usr/local/bin/srpcom/autokill.sh run_kill >/dev/null 2>&1" > /etc/cron.d/srpcom_autokill
@@ -98,6 +192,7 @@ menu_autokill() {
                 systemctl restart cron
                 echo -e "\n=> Auto Kill Daemon DIMATIKAN!"; sleep 2 ;;
             0) break ;;
+            x|X) exec menu ;;
             *) echo -e "\n=> Pilihan tidak valid!"; sleep 1 ;;
         esac
     done
@@ -120,9 +215,9 @@ menu_auto_expired() {
         echo "======================================"
         echo "1. Turn ON Auto Expired Daemon"
         echo "2. Turn OFF Auto Expired Daemon"
-        echo "0. Back to Settings"
+        echo "0/x. Back to Settings"
         echo "======================================"
-        read -p "Select Option [0-2]: " opt
+        read -p "Select Option [0-2 or x]: " opt
         case $opt in
             1) 
                 echo "0 * * * * root /usr/local/bin/srpcom/auto_expired.sh >/dev/null 2>&1" > /etc/cron.d/auto_expired
@@ -133,6 +228,7 @@ menu_auto_expired() {
                 systemctl restart cron
                 echo -e "\n=> Auto Expired Daemon DIMATIKAN!"; sleep 2 ;;
             0) break ;;
+            x|X) exec menu ;;
             *) echo -e "\n=> Pilihan tidak valid!"; sleep 1 ;;
         esac
     done
@@ -267,7 +363,6 @@ menu_api_key() {
         echo -e "\n\e[32m[SUCCESS]\e[0m API Key berhasil diubah dan sistem direstart!"
         sleep 2
     fi
-    menu_settings
 }
 
 restore_data() {
@@ -277,7 +372,7 @@ restore_data() {
     echo "======================================"
     read -p "Nama file backup (misal: srpcom-backup.tar.gz) atau 'x' untuk batal : " backup_name
     
-    if [ -z "$backup_name" ]; then menu_settings; return; fi
+    if [ -z "$backup_name" ]; then return; fi
     if [[ "$backup_name" == "x" || "$backup_name" == "X" ]]; then return; fi
     if [ ! -f "/root/$backup_name" ]; then
         echo -e "\n\e[31m[ERROR]\e[0m File /root/$backup_name tidak ditemukan!"
@@ -347,8 +442,9 @@ restore_data() {
 menu_settings() {
     while true; do
         clear
-        echo "▶ BACKUP & RESTORE / SETTINGS"
-        echo ""
+        echo "╔════════════════════════════════════════════════════════╗"
+        echo "║               BACKUP & RESTORE / SETTINGS              ║"
+        echo "╚════════════════════════════════════════════════════════╝"
         echo " [1] AUTOBACKUP VIA BOT TELEGRAM"
         echo " [2] AUTOSEND CREATED VPN VIA BOT"
         echo " [3] BACKUP VIA BOT TELEGRAM (MANUAL)"
@@ -358,8 +454,9 @@ menu_settings() {
         echo " [7] SETTING AUTO-KILL MULTI LOGIN"
         echo " [8] SETTING AUTO-DELETE EXPIRED"
         echo " [9] SETTING TELEGRAM ADMIN BOT"
+        echo "---------------------------------------------------------"
         echo " [0/x] Back to Main Menu"
-        echo ""
+        echo "========================================================="
         read -p " Select option [0-9 or x]: " opt
         case $opt in
             1) menu_autobackup ;;
@@ -371,7 +468,7 @@ menu_settings() {
             7) menu_autokill ;;
             8) menu_auto_expired ;;
             9) menu_bot_admin ;;
-            0|x|X) break ;;
+            0|x|X) exec menu ;;
             *) echo "Pilihan tidak valid!"; sleep 1 ;;
         esac
     done
@@ -388,9 +485,10 @@ main_menu() {
         echo "5. SETTINGS (Backup/Autokill/Bot)"
         echo "6. RESTART SERVICES (All)"
         echo "7. CEK STATUS SERVICES"
-        echo "0. Exit CLI"
+        echo "8. UPDATE SCRIPT DARI GITHUB"
+        echo "0/x. Exit CLI"
         echo ""
-        read -p "Pilih opsi [0-7]: " opt
+        read -p "Pilih opsi [0-8 or x]: " opt
         case $opt in
             1) menu_xray ;;
             2) menu_ssh ;;
@@ -429,7 +527,8 @@ main_menu() {
                 if systemctl is-active --quiet badvpn-7100; then echo -e "\e[32m[ RUNNING ]\e[0m"; else echo -e "\e[31m[ ERROR ]\e[0m"; fi
                 echo "======================================"
                 pause ;;
-            0) clear; exit 0 ;;
+            8) menu_update ;;
+            0|x|X) clear; exit 0 ;;
             *) echo "Tidak valid!"; sleep 1 ;;
         esac
     done
