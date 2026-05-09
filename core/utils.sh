@@ -44,7 +44,7 @@ print_header() {
 
     clear
     echo -e "${CYAN}╔════════════════════════════════════╗${NC}"
-    echo -e "${CYAN}║     SRPCOM AUTO SCRIPT MODULAR     ║${NC}"
+    echo -e "${CYAN}║     SRPCOM AUTO SCRIPT v.1         ║${NC}"
     echo -e "${CYAN}╚════════════════════════════════════╝${NC}"
     echo " OS SYSTEM     : ${OS_SYS} ${BIT}"
     echo " KERNEL TYPE   : ${KRNL}"
