@@ -16,7 +16,7 @@ clear
 echo "=========================================="
 echo "  MEMULAI INSTALASI VPN MULTIPORT V5      "
 echo "  XRAY, CADDY, L2TP, SSH, OVPN, BADVPN    "
-echo "  (MODE UNIVERSAL WILDCARD ENABLED)       "
+echo "  (MODE ON-DEMAND TLS ENABLED)            "
 echo "=========================================="
 
 VPS_IP=$(curl -sS --max-time 5 ipv4.icanhazip.com || curl -sS --max-time 5 ifconfig.me)
@@ -471,14 +471,22 @@ systemctl start vpn-nat
 sed -i '/net.ipv4.ip_forward/s/^#//g' /etc/sysctl.conf
 sysctl -p
 
-echo -e "\n[10/11] Menginstal & Mengonfigurasi Caddy (Universal Wildcard)..."
+echo -e "\n[10/11] Menginstal & Mengonfigurasi Caddy (On-Demand TLS)..."
 apt install -y debian-keyring debian-archive-keyring apt-transport-https
 curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | gpg --dearmor --yes -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
 curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | tee /etc/apt/sources.list.d/caddy-stable.list
 apt update && apt install caddy -y
 
+# PERBAIKAN: Konfigurasi Caddy dengan ON-DEMAND TLS
 cat > /etc/caddy/Caddyfile << EOF
-$DOMAIN, *.$DOMAIN, :443 {
+{
+    on_demand_tls {
+        interval 2m
+        burst 5
+    }
+}
+
+\$DOMAIN, :443 {
     handle /user_legend/* {
         reverse_proxy localhost:5000
     }
@@ -501,7 +509,9 @@ $DOMAIN, *.$DOMAIN, :443 {
     handle /sshws* {
         reverse_proxy localhost:10004
     }
-    tls internal
+    tls {
+        on_demand
+    }
 }
 EOF
 
@@ -518,7 +528,7 @@ echo "======================================================"
 echo "    INSTALASI SELESAI & BERHASIL! (V5 FINAL)          "
 echo "======================================================"
 echo "Protokol: VMESS, VLESS, TROJAN, L2TP, SSH, OVPN, UDPGW"
-echo "Optimasi: Caddy Wildcard, TCP BBR & Swap RAM 2GB      "
+echo "Optimasi: ON-DEMAND TLS, TCP BBR & Swap RAM 2GB       "
 echo "Ketik 'menu' untuk masuk ke dashboard manajemen.      "
 echo "Untuk mengaktifkan Bot Telegram Admin, masuk ke menu: "
 echo "-> [5] Settings -> [9] Setting Telegram Admin Bot     "
