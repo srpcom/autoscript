@@ -16,7 +16,7 @@ clear
 echo "=========================================="
 echo "  MEMULAI INSTALASI VPN MULTIPORT V5      "
 echo "  XRAY, CADDY, L2TP, SSH, OVPN, BADVPN    "
-echo "  (MODE ON-DEMAND TLS ENABLED)            "
+echo "  (MODE ON-DEMAND TLS FIX CADDY v2.8+)    "
 echo "=========================================="
 
 VPS_IP=$(curl -sS --max-time 5 ipv4.icanhazip.com || curl -sS --max-time 5 ifconfig.me)
@@ -37,11 +37,9 @@ done
 echo -e "\n[1/11] Memperbarui sistem & dependensi..."
 export DEBIAN_FRONTEND=noninteractive
 apt update && apt upgrade -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold"
-# Menambahkan net-tools untuk kebutuhan monitoring dan autokill SSH
 apt install curl wget unzip uuid-runtime jq tzdata ufw cron gnupg2 gnupg python3 python3-flask python3-pip strongswan xl2tpd iptables dropbear openvpn cmake make gcc git net-tools -y
 timedatectl set-timezone Asia/Jakarta
 
-# Menginstal Modul Python Telegram Bot
 pip3 install pyTelegramBotAPI requests --break-system-packages 2>/dev/null || pip3 install pyTelegramBotAPI requests
 
 mkdir -p /usr/local/etc/srpcom
@@ -53,7 +51,6 @@ DOMAIN="$DOMAIN"
 IP_ADD="$VPS_IP"
 EOF
 
-# File Konfigurasi Kosong untuk Bot Admin (Disetting via menu VPS nanti)
 cat > /usr/local/etc/xray/bot_admin.conf << 'EOF'
 BOT_TOKEN=""
 ADMIN_ID=""
@@ -278,8 +275,6 @@ openssl req -new -x509 -days 3650 -key ca.key -out ca.crt -subj "/CN=SRPCOM_CA"
 openssl ecparam -genkey -name prime256v1 -out server.key
 openssl req -new -key server.key -out server.csr -subj "/CN=SRPCOM_Server"
 openssl x509 -req -days 3650 -in server.csr -CA ca.crt -CAkey ca.key -CAcreateserial -out server.crt
-
-# PERBAIKAN: Menambahkan --secret agar ta.key berhasil dibuat tanpa error
 openvpn --genkey --secret ta.key
 
 PAM_PLUGIN=$(find /usr -name "openvpn-plugin-auth-pam.so" | head -n 1)
@@ -402,6 +397,9 @@ chmod +x /usr/local/bin/xray-api.py
 chmod +x /usr/local/bin/bot-admin.py
 ln -sf /usr/local/bin/srpcom/menu.sh /usr/bin/menu
 
+# Modifikasi Endpoint API (Menambahkan Ask URL untuk Caddy)
+sed -i "/if __name__ == '__main__':/i # Endpoint 'ask' untuk validasi Caddy On-Demand TLS\n@app.route('/ask', methods=['GET'])\ndef ask_domain():\n    return \"OK\", 200\n" /usr/local/bin/xray-api.py
+
 echo -e "\n[8/11] Mengonfigurasi Layanan API & Bot Admin..."
 cat > /etc/systemd/system/xray-api.service << EOF
 [Unit]
@@ -477,12 +475,11 @@ curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | gpg --dearmo
 curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | tee /etc/apt/sources.list.d/caddy-stable.list
 apt update && apt install caddy -y
 
-# PERBAIKAN: Konfigurasi Caddy dengan ON-DEMAND TLS
+# PERBAIKAN FINAL: Caddyfile tanpa opsi "interval" atau "burst"
 cat > /etc/caddy/Caddyfile << EOF
 {
     on_demand_tls {
-        interval 2m
-        burst 5
+        ask http://127.0.0.1:5000/ask
     }
 }
 
@@ -518,7 +515,6 @@ EOF
 echo -e "\n[11/11] Setup Cronjob Selesai..."
 if ! grep -q "menu" /root/.profile; then echo "menu" >> /root/.profile; fi
 
-# Menambahkan cronjob untuk Auto Expired (Berjalan setiap jam ke-0)
 echo "0 * * * * root /usr/local/bin/srpcom/auto_expired.sh >/dev/null 2>&1" > /etc/cron.d/auto_expired
 
 systemctl restart xray caddy cron xray-api ipsec xl2tpd dropbear ssh-ws
