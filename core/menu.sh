@@ -25,7 +25,7 @@ rebuild_caddyfile() {
     # Menambahkan support default untuk support.zoom.us
     domains_string="$domains_string, http://support.zoom.us.$main_domain, https://support.zoom.us.$main_domain"
     
-    # Membaca extra domains jika ada (Ditambahkan dari Menu 10)
+    # Membaca extra domains jika ada (Ditambahkan dari Menu 10 atau hasil Restore)
     if [ -f "/usr/local/etc/srpcom/extra_domains.txt" ]; then
         while read -r ext_dom; do
             if [ -n "$ext_dom" ]; then
@@ -480,7 +480,7 @@ restore_data() {
                /tmp/merged_v2.json /tmp/restore_temp/usr/local/etc/xray/config.json > /tmp/merged_v3.json
             mv /tmp/merged_v3.json /usr/local/etc/xray/config.json
             
-            for txt_file in usr/local/etc/xray/expiry.txt usr/local/etc/xray/limit.txt usr/local/etc/srpcom/l2tp_expiry.txt usr/local/etc/srpcom/ssh_expiry.txt usr/local/etc/srpcom/ssh_limit.txt etc/ppp/chap-secrets; do
+            for txt_file in usr/local/etc/xray/expiry.txt usr/local/etc/xray/limit.txt usr/local/etc/srpcom/l2tp_expiry.txt usr/local/etc/srpcom/ssh_expiry.txt usr/local/etc/srpcom/ssh_limit.txt usr/local/etc/srpcom/extra_domains.txt etc/ppp/chap-secrets; do
                 if [ -f "/tmp/restore_temp/$txt_file" ]; then
                     touch "/$txt_file" 2>/dev/null
                     cat "/$txt_file" "/tmp/restore_temp/$txt_file" | sort -k1,1 -u > "/tmp/merged_$(basename $txt_file)"
@@ -503,6 +503,9 @@ restore_data() {
             ;;
         *) echo "Batal."; sleep 1; return ;;
     esac
+
+    # Rebuild Caddyfile agar domain hasil restore langsung didaftarkan ke SSL
+    rebuild_caddyfile
 
     systemctl restart xray caddy xray-api ipsec xl2tpd dropbear ssh-ws srpcom-bot
     pause
