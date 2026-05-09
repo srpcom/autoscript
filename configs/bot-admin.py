@@ -153,6 +153,7 @@ def handle_backup_bot(chat_id):
         "/usr/local/etc/xray/config.json", "/usr/local/etc/xray/expiry.txt", 
         "/usr/local/etc/xray/limit.txt", "/usr/local/etc/srpcom/env.conf", 
         "/usr/local/etc/srpcom/l2tp_expiry.txt", "/usr/local/etc/srpcom/ssh_expiry.txt", 
+        "/usr/local/etc/srpcom/ssh_limit.txt", "/usr/local/etc/srpcom/extra_domains.txt",
         "/etc/ppp/chap-secrets"
     ]
     valid = [f for f in files if os.path.exists(f)]
@@ -424,7 +425,7 @@ def process_action_input(message, action, prot, api_ep):
             payload = {'user': parts[0], 'exp': int(parts[1]) if len(parts) > 1 else 30}
         elif action == "del":
             payload = {'user': parts[0]}
-            method = "POST" # <--- Diperbaiki agar menggunakan format yang didukung backend
+            method = "POST"
         elif action == "detail":
             payload = {'user': parts[0]}
         
