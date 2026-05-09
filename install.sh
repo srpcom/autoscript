@@ -14,7 +14,7 @@ fi
 
 clear
 echo "=========================================="
-echo "  MEMULAI INSTALASI VPN MULTIPORT V5      "
+echo "  MEMULAI INSTALASI VPN MULTIPORT V6      "
 echo "  XRAY, CADDY, L2TP, SSH, OVPN, BADVPN    "
 echo "  (MODE ON-DEMAND TLS FIX CADDY v2.8+)    "
 echo "=========================================="
