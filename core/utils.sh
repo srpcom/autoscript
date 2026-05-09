@@ -54,6 +54,6 @@ print_header() {
     echo " IP ADDRESS    : ${IP_ADD}"
     echo " ISP           : ${ISP_NAME}"
     echo -e "${CYAN}╔════════════════════════════════════╗${NC}"
-    printf "${CYAN}║ XRAY : %-3s | SSH : %-3s | L2TP : %-3s║\n${NC}" "${XRAY_C:-0}" "${SSH_C:-0}" "${L2TP_C:-0}"
+    printf "${CYAN}║ XRAY : %-3s | SSH : %-3s| L2TP : %-3s║\n${NC}" "${XRAY_C:-0}" "${SSH_C:-0}" "${L2TP_C:-0}"
     echo -e "${CYAN}╚════════════════════════════════════╝${NC}"
 }
