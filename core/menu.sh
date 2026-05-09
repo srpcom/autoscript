@@ -15,6 +15,54 @@ source /usr/local/bin/srpcom/monitor.sh
 
 GITHUB_RAW="https://raw.githubusercontent.com/syamsul18782/xray2026/main"
 
+# ==========================================
+# FUNGSI PEMBANGUNAN ULANG CADDYFILE
+# ==========================================
+rebuild_caddyfile() {
+    local main_domain="$DOMAIN"
+    local domains_string="http://$main_domain, https://$main_domain"
+    
+    # Menambahkan support default untuk support.zoom.us
+    domains_string="$domains_string, http://support.zoom.us.$main_domain, https://support.zoom.us.$main_domain"
+    
+    # Membaca extra domains jika ada (Ditambahkan dari Menu 10)
+    if [ -f "/usr/local/etc/srpcom/extra_domains.txt" ]; then
+        while read -r ext_dom; do
+            if [ -n "$ext_dom" ]; then
+                domains_string="$domains_string, http://$ext_dom, https://$ext_dom"
+            fi
+        done < /usr/local/etc/srpcom/extra_domains.txt
+    fi
+
+    cat > /etc/caddy/Caddyfile << EOF
+$domains_string {
+    handle /user_legend/* {
+        reverse_proxy localhost:5000
+    }
+    handle /ovpn/* {
+        root * /usr/local/etc/srpcom
+        file_server
+    }
+    handle / {
+        respond "Server is running normally." 200
+    }
+    handle /vmessws* {
+        reverse_proxy localhost:10001
+    }
+    handle /vlessws* {
+        reverse_proxy localhost:10002
+    }
+    handle /trojanws* {
+        reverse_proxy localhost:10003
+    }
+    handle /sshws* {
+        reverse_proxy localhost:10004
+    }
+}
+EOF
+    systemctl restart caddy
+}
+
 menu_update() {
     while true; do
         clear
@@ -267,32 +315,8 @@ change_domain() {
     sed -i "s/^DOMAIN=.*/DOMAIN=\"$new_domain\"/g" /usr/local/etc/srpcom/env.conf
     source /usr/local/etc/srpcom/env.conf
 
-    cat > /etc/caddy/Caddyfile << EOF
-http://$DOMAIN, https://$DOMAIN {
-    handle /user_legend/* {
-        reverse_proxy localhost:5000
-    }
-    handle /ovpn/* {
-        root * /usr/local/etc/srpcom
-        file_server
-    }
-    handle / {
-        respond "Server is running normally." 200
-    }
-    handle /vmessws* {
-        reverse_proxy localhost:10001
-    }
-    handle /vlessws* {
-        reverse_proxy localhost:10002
-    }
-    handle /trojanws* {
-        reverse_proxy localhost:10003
-    }
-    handle /sshws* {
-        reverse_proxy localhost:10004
-    }
-}
-EOF
+    # Membangun ulang Caddyfile berdasarkan domain baru dan domain tambahan
+    rebuild_caddyfile
 
     # Regenerate OVPN Client Configs with new Domain
     CA_CERT=$(cat /etc/openvpn/server/keys/ca.crt 2>/dev/null)
@@ -340,13 +364,58 @@ $TA_CERT
 </tls-auth>
 EOF
 
-    echo "=> Restarting Web Server & API..."
-    systemctl restart caddy
+    echo "=> Restarting API..."
     systemctl restart xray-api
     
     echo -e "\n\e[32m[SUCCESS]\e[0m Domain berhasil diganti menjadi $DOMAIN!"
     sleep 2
 }
+
+add_extra_domain() {
+    clear
+    echo "======================================"
+    echo "     TAMBAH NAMA DOMAIN SPESIFIK      "
+    echo "======================================"
+    echo "Domain Utama : $DOMAIN"
+    echo "Default SSL  : support.zoom.us.$DOMAIN"
+    echo "======================================"
+    echo "Gunakan fitur ini untuk menambahkan"
+    echo "subdomain lain (contoh: bug.srpcom.cloud)"
+    echo "agar Caddy menerbitkan sertifikat"
+    echo "SSL yang valid untuknya secara eksplisit."
+    echo "======================================"
+    read -p "Masukkan Domain Baru (tekan 'x' untuk batal): " new_ext
+    
+    if [[ "$new_ext" == "x" || "$new_ext" == "X" || -z "$new_ext" ]]; then return; fi
+    
+    echo -e "\nMemeriksa resolusi DNS untuk $new_ext..."
+    domain_ip=$(getent ahostsv4 "$new_ext" | awk '{ print $1 }' | head -n 1)
+    
+    if [[ "$domain_ip" != "$IP_ADD" ]]; then
+        echo -e "\n\e[31m[ERROR]\e[0m Domain $new_ext belum mengarah ke IP $IP_ADD!"
+        echo "IP DNS saat ini: ${domain_ip:-Kosong}"
+        echo "Pastikan A Record DNS sudah mengarah ke VPS (DNS Only)."
+        sleep 4
+        return
+    fi
+    
+    # Cek duplikasi
+    if grep -q "^$new_ext$" /usr/local/etc/srpcom/extra_domains.txt 2>/dev/null; then
+        echo -e "\n\e[33m[INFO]\e[0m Domain $new_ext sudah ada dalam daftar."
+        sleep 2
+        return
+    fi
+    
+    # Simpan ke daftar
+    echo "$new_ext" >> /usr/local/etc/srpcom/extra_domains.txt
+    
+    echo -e "\n=> Mengonfigurasi ulang Caddy Server..."
+    rebuild_caddyfile
+    
+    echo -e "\n\e[32m[SUCCESS]\e[0m Domain $new_ext berhasil ditambahkan dan diamankan!"
+    sleep 2
+}
+
 
 menu_api_key() {
     clear
@@ -454,10 +523,11 @@ menu_settings() {
         echo " [7] SETTING AUTO-KILL MULTI LOGIN"
         echo " [8] SETTING AUTO-DELETE EXPIRED"
         echo " [9] SETTING TELEGRAM ADMIN BOT"
+        echo " [10] TAMBAH DOMAIN/SUBDOMAIN SPESIFIK (CADDY)"
         echo "---------------------------------------------------------"
         echo " [0/x] Back to Main Menu"
         echo "========================================================="
-        read -p " Select option [0-9 or x]: " opt
+        read -p " Select option [0-10 or x]: " opt
         case $opt in
             1) menu_autobackup ;;
             2) menu_autosend ;;
@@ -468,6 +538,7 @@ menu_settings() {
             7) menu_autokill ;;
             8) menu_auto_expired ;;
             9) menu_bot_admin ;;
+            10) add_extra_domain ;;
             0|x|X) exec menu ;;
             *) echo "Pilihan tidak valid!"; sleep 1 ;;
         esac
