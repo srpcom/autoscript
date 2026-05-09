@@ -78,10 +78,11 @@ menu_update() {
         echo " [7]  Update Fitur Auto (autokill.sh & auto_expired.sh)"
         echo " [8]  Update API Backend & Bot Telegram (configs/*.py)"
         echo " [9]  Update SEMUA Modul (ALL IN ONE)"
+        echo " [10] Update Daftar Extra Domain (Bug SNI) dari GitHub"
         echo "---------------------------------------------------------"
         echo " [0/x] Kembali ke Menu Utama"
         echo "========================================================="
-        read -p " Pilih opsi [0-9 or x]: " opt
+        read -p " Pilih opsi [0-10 or x]: " opt
         
         case $opt in
             1) 
@@ -144,10 +145,38 @@ menu_update() {
                 systemctl daemon-reload
                 systemctl restart xray-api srpcom-bot
                 
+                # Merge Extra Domains
+                wget -q -O /tmp/new_domains.txt "$GITHUB_RAW/core/extra_domains.txt"
+                if [ -s /tmp/new_domains.txt ]; then
+                    touch /usr/local/etc/srpcom/extra_domains.txt
+                    cat /usr/local/etc/srpcom/extra_domains.txt /tmp/new_domains.txt | sort -u | grep -v '^$' > /tmp/merged_domains.txt
+                    mv /tmp/merged_domains.txt /usr/local/etc/srpcom/extra_domains.txt
+                    rm -f /tmp/new_domains.txt
+                    rebuild_caddyfile
+                fi
+                
                 # Update menu paling akhir agar tidak memutus proses, lalu exec ulang
                 wget -q -O /usr/local/bin/srpcom/menu.sh "$GITHUB_RAW/core/menu.sh"
                 chmod +x /usr/local/bin/srpcom/menu.sh
                 echo -e "\e[32m[SUCCESS]\e[0m Seluruh sistem berhasil diperbarui dari GitHub!"; sleep 2; exec menu ;;
+            10)
+                echo -e "\n=> Mengunduh daftar Extra Domain (Bug SNI) dari GitHub..."
+                wget -q -O /tmp/new_domains.txt "$GITHUB_RAW/core/extra_domains.txt"
+                if [ -s /tmp/new_domains.txt ]; then
+                    touch /usr/local/etc/srpcom/extra_domains.txt
+                    cat /usr/local/etc/srpcom/extra_domains.txt /tmp/new_domains.txt | sort -u | grep -v '^$' > /tmp/merged_domains.txt
+                    mv /tmp/merged_domains.txt /usr/local/etc/srpcom/extra_domains.txt
+                    rm -f /tmp/new_domains.txt
+                    echo -e "\e[32m[SUCCESS]\e[0m Daftar domain berhasil diperbarui dan digabungkan!"
+                    echo -e "=> Mengonfigurasi ulang Caddy Server..."
+                    rebuild_caddyfile
+                    sleep 2
+                else
+                    echo -e "\e[31m[ERROR]\e[0m Gagal mengunduh atau file extra_domains.txt di GitHub kosong!"
+                    rm -f /tmp/new_domains.txt
+                    sleep 2
+                fi
+                ;;
             0|x|X) exec menu ;;
             *) echo -e "\n=> Pilihan tidak valid!"; sleep 1 ;;
         esac
