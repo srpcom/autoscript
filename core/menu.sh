@@ -160,7 +160,13 @@ menu_update() {
                 chmod +x /usr/local/bin/srpcom/menu.sh
                 echo -e "\e[32m[SUCCESS]\e[0m Seluruh sistem berhasil diperbarui dari GitHub!"; sleep 2; exec menu ;;
             10)
-                echo -e "\n=> Mengunduh daftar Extra Domain (Bug SNI) dari GitHub..."
+                echo -e "\n=> Memperbarui Daftar Extra Domain (Bug SNI) dari GitHub"
+                read -p "Apakah Anda yakin ingin mengimpor dan menggabungkan data dari GitHub? (y/n): " confirm
+                if [[ "$confirm" != "y" && "$confirm" != "Y" ]]; then
+                    echo "=> Dibatalkan."; sleep 1; continue
+                fi
+
+                echo -e "\n=> Mengunduh daftar Extra Domain dari GitHub..."
                 wget -q -O /tmp/new_domains.txt "$GITHUB_RAW/core/extra_domains.txt"
                 if [ -s /tmp/new_domains.txt ]; then
                     touch /usr/local/etc/srpcom/extra_domains.txt
@@ -400,28 +406,34 @@ EOF
     sleep 2
 }
 
+# ==========================================
+# MANAJEMEN EXTRA DOMAIN (BUG / SNI)
+# ==========================================
 add_extra_domain() {
     clear
     echo "======================================"
-    echo "     TAMBAH NAMA DOMAIN SPESIFIK      "
+    echo "      TAMBAH SUBDOMAIN (BUG) BARU     "
     echo "======================================"
     echo "Domain Utama : $DOMAIN"
-    echo "Default SSL  : support.zoom.us.$DOMAIN"
     echo "======================================"
-    echo "Gunakan fitur ini untuk menambahkan"
-    echo "subdomain lain (contoh: bug.srpcom.cloud)"
-    echo "agar Caddy menerbitkan sertifikat"
-    echo "SSL yang valid untuknya secara eksplisit."
+    echo "Cukup masukkan subdomain depannya saja."
+    echo "Contoh: jika Anda memasukkan 'bug.wa',"
+    echo "maka akan menjadi: bug.wa.$DOMAIN"
     echo "======================================"
-    read -p "Masukkan Domain Baru (tekan 'x' untuk batal): " new_ext
+    read -p "Masukkan Subdomain (tekan 'x' untuk batal): " input_bug
     
-    if [[ "$new_ext" == "x" || "$new_ext" == "X" || -z "$new_ext" ]]; then return; fi
+    if [[ "$input_bug" == "x" || "$input_bug" == "X" || -z "$input_bug" ]]; then return; fi
     
-    echo -e "\nMemeriksa resolusi DNS untuk $new_ext..."
-    domain_ip=$(getent ahostsv4 "$new_ext" | awk '{ print $1 }' | head -n 1)
+    # Pencegahan jika user tidak sengaja memasukkan domain utama di belakang
+    input_bug=${input_bug%.$DOMAIN}
+    
+    full_domain="${input_bug}.${DOMAIN}"
+    
+    echo -e "\nMemeriksa resolusi DNS untuk $full_domain..."
+    domain_ip=$(getent ahostsv4 "$full_domain" | awk '{ print $1 }' | head -n 1)
     
     if [[ "$domain_ip" != "$IP_ADD" ]]; then
-        echo -e "\n\e[31m[ERROR]\e[0m Domain $new_ext belum mengarah ke IP $IP_ADD!"
+        echo -e "\n\e[31m[ERROR]\e[0m Domain $full_domain belum mengarah ke IP $IP_ADD!"
         echo "IP DNS saat ini: ${domain_ip:-Kosong}"
         echo "Pastikan A Record DNS sudah mengarah ke VPS (DNS Only)."
         sleep 4
@@ -429,22 +441,102 @@ add_extra_domain() {
     fi
     
     # Cek duplikasi
-    if grep -q "^$new_ext$" /usr/local/etc/srpcom/extra_domains.txt 2>/dev/null; then
-        echo -e "\n\e[33m[INFO]\e[0m Domain $new_ext sudah ada dalam daftar."
+    if grep -q "^$full_domain$" /usr/local/etc/srpcom/extra_domains.txt 2>/dev/null; then
+        echo -e "\n\e[33m[INFO]\e[0m Domain $full_domain sudah ada dalam daftar."
         sleep 2
         return
     fi
     
     # Simpan ke daftar
-    echo "$new_ext" >> /usr/local/etc/srpcom/extra_domains.txt
+    echo "$full_domain" >> /usr/local/etc/srpcom/extra_domains.txt
     
     echo -e "\n=> Mengonfigurasi ulang Caddy Server..."
     rebuild_caddyfile
     
-    echo -e "\n\e[32m[SUCCESS]\e[0m Domain $new_ext berhasil ditambahkan dan diamankan!"
+    echo -e "\n\e[32m[SUCCESS]\e[0m Bug $full_domain berhasil ditambahkan dan diamankan!"
     sleep 2
 }
 
+del_extra_domain() {
+    clear
+    echo "======================================"
+    echo "         HAPUS EXTRA DOMAIN / SNI     "
+    echo "======================================"
+    if [ ! -s "/usr/local/etc/srpcom/extra_domains.txt" ]; then
+        echo "Belum ada domain tambahan yang terdaftar."
+        pause; return
+    fi
+    
+    mapfile -t domains < /usr/local/etc/srpcom/extra_domains.txt
+    
+    if [ ${#domains[@]} -eq 0 ]; then
+        echo "Belum ada domain tambahan yang terdaftar."
+        pause; return
+    fi
+
+    for i in "${!domains[@]}"; do
+        echo "$((i+1)). ${domains[$i]}"
+    done
+    echo "0. Kembali"
+    echo "======================================"
+    read -p "Pilih nomor domain yang dihapus [1-${#domains[@]} or 0]: " choice
+    
+    if [[ "$choice" == "0" ]]; then return; fi
+
+    if [[ "$choice" -gt 0 && "$choice" -le "${#domains[@]}" ]]; then
+        selected_domain="${domains[$((choice-1))]}"
+        
+        # Hapus domain dari file TXT
+        sed -i "/^${selected_domain}$/d" /usr/local/etc/srpcom/extra_domains.txt
+        
+        echo -e "\n=> Mengonfigurasi ulang Caddy Server..."
+        rebuild_caddyfile
+        
+        echo -e "\n\e[32m[SUCCESS]\e[0m Domain $selected_domain berhasil dihapus dari sistem!"
+        sleep 2
+    else
+        echo -e "\n=> Pilihan tidak valid!"; sleep 1; del_extra_domain
+    fi
+}
+
+list_extra_domain() {
+    clear
+    echo "======================================"
+    echo "        DAFTAR EXTRA DOMAIN / SNI     "
+    echo "======================================"
+    if [ ! -s "/usr/local/etc/srpcom/extra_domains.txt" ]; then
+        echo "Belum ada domain tambahan yang terdaftar."
+    else
+        awk '{print "- " $1}' /usr/local/etc/srpcom/extra_domains.txt
+    fi
+    echo "======================================"
+    pause
+}
+
+menu_extra_domain() {
+    while true; do
+        clear
+        echo "======================================"
+        echo "     MANAJEMEN EXTRA DOMAIN / SNI     "
+        echo "======================================"
+        echo "Domain Utama : $DOMAIN"
+        echo "Default SSL  : support.zoom.us.$DOMAIN"
+        echo "======================================"
+        echo "1. Tambah Subdomain (Bug) Baru"
+        echo "2. Hapus Subdomain (Bug)"
+        echo "3. Lihat Daftar Subdomain"
+        echo "0/x. Kembali ke Settings"
+        echo "======================================"
+        read -p "Pilih opsi [0-3 or x]: " opt
+        case $opt in
+            1) add_extra_domain ;;
+            2) del_extra_domain ;;
+            3) list_extra_domain ;;
+            0|x|X) break ;;
+            *) echo -e "\n=> Pilihan tidak valid!"; sleep 1 ;;
+        esac
+    done
+}
 
 menu_api_key() {
     clear
@@ -555,7 +647,7 @@ menu_settings() {
         echo " [7] SETTING AUTO-KILL MULTI LOGIN"
         echo " [8] SETTING AUTO-DELETE EXPIRED"
         echo " [9] SETTING TELEGRAM ADMIN BOT"
-        echo " [10] TAMBAH DOMAIN/SUBDOMAIN SPESIFIK (CADDY)"
+        echo " [10] MANAJEMEN DOMAIN BUG / SNI"
         echo "---------------------------------------------------------"
         echo " [0/x] Back to Main Menu"
         echo "========================================================="
@@ -570,7 +662,7 @@ menu_settings() {
             7) menu_autokill ;;
             8) menu_auto_expired ;;
             9) menu_bot_admin ;;
-            10) add_extra_domain ;;
+            10) menu_extra_domain ;;
             0|x|X) exec menu ;;
             *) echo "Pilihan tidak valid!"; sleep 1 ;;
         esac
