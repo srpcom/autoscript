@@ -21,7 +21,7 @@ echo "=========================================="
 VPS_IP=$(curl -sS --max-time 5 ipv4.icanhazip.com || curl -sS --max-time 5 ifconfig.me)
 
 while true; do
-    read -p "Masukkan Domain VPS Anda (contoh: sg1.srpcom.cloud): " DOMAIN
+    read -p "Masukkan Domain VPS Anda (contoh: aw.srpcom.cloud): " DOMAIN
     if [ -z "$DOMAIN" ]; then echo -e "\e[31m[ERROR]\e[0m Domain tidak boleh kosong!\n"; continue; fi
     DOMAIN_IP=$(getent ahostsv4 "$DOMAIN" | awk '{ print $1 }' | head -n 1)
     if [ "$DOMAIN_IP" == "$VPS_IP" ]; then
@@ -51,6 +51,9 @@ cat > /usr/local/etc/srpcom/env.conf << EOF
 DOMAIN="$DOMAIN"
 IP_ADD="$VPS_IP"
 EOF
+
+# File untuk menyimpan daftar extra domain caddy
+touch /usr/local/etc/srpcom/extra_domains.txt
 
 # File Konfigurasi Kosong untuk Bot Admin (Disetting via menu VPS nanti)
 cat > /usr/local/etc/xray/bot_admin.conf << 'EOF'
@@ -476,8 +479,11 @@ curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | gpg --dearmo
 curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | tee /etc/apt/sources.list.d/caddy-stable.list
 apt update && apt install caddy -y
 
+# Menerapkan support eksplisit untuk support.zoom.us.DOMAIN
+DOMAINS_STR="http://$DOMAIN, https://$DOMAIN, http://support.zoom.us.$DOMAIN, https://support.zoom.us.$DOMAIN"
+
 cat > /etc/caddy/Caddyfile << EOF
-http://$DOMAIN, https://$DOMAIN {
+$DOMAINS_STR {
     handle /user_legend/* {
         reverse_proxy localhost:5000
     }
@@ -517,6 +523,7 @@ echo "    INSTALASI SELESAI & BERHASIL! (V5 FINAL)          "
 echo "======================================================"
 echo "Protokol: VMESS, VLESS, TROJAN, L2TP, SSH, OVPN, UDPGW"
 echo "Optimasi: TCP BBR & Swap RAM 2GB Aktif!"
+echo "Default SNI/Bug: support.zoom.us.$DOMAIN"
 echo "Ketik 'menu' untuk masuk ke dashboard manajemen."
 echo "Untuk mengaktifkan Bot Telegram Admin, masuk ke menu:"
 echo "-> [5] Settings -> [9] Setting Telegram Admin Bot"
