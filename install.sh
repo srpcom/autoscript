@@ -16,6 +16,7 @@ clear
 echo "=========================================="
 echo "  MEMULAI INSTALASI VPN MULTIPORT V5      "
 echo "  XRAY, CADDY, L2TP, SSH, OVPN, BADVPN    "
+echo "  (MODE UNIVERSAL WILDCARD ENABLED)       "
 echo "=========================================="
 
 VPS_IP=$(curl -sS --max-time 5 ipv4.icanhazip.com || curl -sS --max-time 5 ifconfig.me)
@@ -391,8 +392,8 @@ wget -q -O /usr/local/bin/srpcom/l2tp.sh "$GITHUB_RAW/core/l2tp.sh"
 wget -q -O /usr/local/bin/srpcom/ssh.sh "$GITHUB_RAW/core/ssh.sh"
 wget -q -O /usr/local/bin/srpcom/monitor.sh "$GITHUB_RAW/core/monitor.sh"
 wget -q -O /usr/local/bin/srpcom/autokill.sh "$GITHUB_RAW/core/autokill.sh"
-wget -q -O /usr/local/bin/srpcom/menu.sh "$GITHUB_RAW/core/menu.sh"
 wget -q -O /usr/local/bin/srpcom/auto_expired.sh "$GITHUB_RAW/core/auto_expired.sh"
+wget -q -O /usr/local/bin/srpcom/menu.sh "$GITHUB_RAW/core/menu.sh"
 wget -q -O /usr/local/bin/xray-api.py "$GITHUB_RAW/configs/xray-api.py"
 wget -q -O /usr/local/bin/bot-admin.py "$GITHUB_RAW/configs/bot-admin.py"
 
@@ -470,14 +471,14 @@ systemctl start vpn-nat
 sed -i '/net.ipv4.ip_forward/s/^#//g' /etc/sysctl.conf
 sysctl -p
 
-echo -e "\n[10/11] Menginstal & Mengonfigurasi Caddy..."
+echo -e "\n[10/11] Menginstal & Mengonfigurasi Caddy (Universal Wildcard)..."
 apt install -y debian-keyring debian-archive-keyring apt-transport-https
 curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | gpg --dearmor --yes -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
 curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | tee /etc/apt/sources.list.d/caddy-stable.list
 apt update && apt install caddy -y
 
 cat > /etc/caddy/Caddyfile << EOF
-http://$DOMAIN, https://$DOMAIN {
+$DOMAIN, *.$DOMAIN, :443 {
     handle /user_legend/* {
         reverse_proxy localhost:5000
     }
@@ -500,6 +501,7 @@ http://$DOMAIN, https://$DOMAIN {
     handle /sshws* {
         reverse_proxy localhost:10004
     }
+    tls internal
 }
 EOF
 
@@ -516,8 +518,8 @@ echo "======================================================"
 echo "    INSTALASI SELESAI & BERHASIL! (V5 FINAL)          "
 echo "======================================================"
 echo "Protokol: VMESS, VLESS, TROJAN, L2TP, SSH, OVPN, UDPGW"
-echo "Optimasi: TCP BBR & Swap RAM 2GB Aktif!"
-echo "Ketik 'menu' untuk masuk ke dashboard manajemen."
-echo "Untuk mengaktifkan Bot Telegram Admin, masuk ke menu:"
-echo "-> [5] Settings -> [9] Setting Telegram Admin Bot"
+echo "Optimasi: Caddy Wildcard, TCP BBR & Swap RAM 2GB      "
+echo "Ketik 'menu' untuk masuk ke dashboard manajemen.      "
+echo "Untuk mengaktifkan Bot Telegram Admin, masuk ke menu: "
+echo "-> [5] Settings -> [9] Setting Telegram Admin Bot     "
 echo "======================================================"
