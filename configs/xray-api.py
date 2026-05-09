@@ -87,8 +87,8 @@ def generate_account_detail(protocol, user, uid, exp_date_str, is_trial=False, l
     lim_q_str = f"{limit_quota} GB" if limit_quota > 0 else "Unlimited"
     
     if protocol == 'vmess':
-        tls_dict = {"v":"2","ps":user,"add":DOMAIN,"port":"443","id":uid,"aid":"0","net":"ws","type":"none","host":DOMAIN,"path":"/vmessws","tls":"tls","sni":DOMAIN}
-        none_tls_dict = {"v":"2","ps":user,"add":DOMAIN,"port":"80","id":uid,"aid":"0","net":"ws","type":"none","host":DOMAIN,"path":"/vmessws","tls":"","sni":""}
+        tls_dict = {"v":"2","ps":user,"add":DOMAIN,"port":"443","id":uid,"aid":"0","scy":"auto","net":"ws","type":"none","host":DOMAIN,"path":"/vmessws","tls":"tls","sni":DOMAIN}
+        none_tls_dict = {"v":"2","ps":user,"add":DOMAIN,"port":"80","id":uid,"aid":"0","scy":"auto","net":"ws","type":"none","host":DOMAIN,"path":"/vmessws","tls":"","sni":""}
         link_tls = "vmess://" + base64.b64encode(json.dumps(tls_dict, separators=(',', ':')).encode('utf-8')).decode('utf-8')
         link_none = "vmess://" + base64.b64encode(json.dumps(none_tls_dict, separators=(',', ':')).encode('utf-8')).decode('utf-8')
     elif protocol == 'vless':
@@ -588,6 +588,12 @@ def cek_xray():
     if not check_auth(): return jsonify({"stdout": "Unauthorized"}), 401
     out = subprocess.run(['systemctl', 'is-active', 'xray'], capture_output=True, text=True).stdout.strip()
     return jsonify({"stdout": f"Xray status: {out}, Domain: {DOMAIN}"})
+
+# Endpoint 'ask' untuk validasi Caddy On-Demand TLS
+@app.route('/ask', methods=['GET'])
+def ask_domain():
+    # Mengizinkan Caddy untuk menerbitkan SSL untuk domain yang masuk
+    return "OK", 200
 
 if __name__ == '__main__':
     app.run(host='127.0.0.1', port=5000)
