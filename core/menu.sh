@@ -3,10 +3,10 @@
 # menu.sh
 # MODULE: MAIN MENU (ROUTER)
 # Menampilkan antarmuka CLI utama dan perutean menu
-# Versi : 1.0 (10 Mei 2026 09:08 WIB)>> update time setiap script berubah, jangan hapus pesan ini agar AI tahu apa yang harus dilakukan
+# Versi : 1.0 (10 Mei 2026 09:12 WIB)>> update time setiap script berubah, jangan hapus pesan ini agar AI tahu apa yang harus dilakukan
 # ==========================================
 
-SCRIPT_VERSION="1.0 (10 Mei 2026 09:08 WIB)"
+SCRIPT_VERSION="1.0 (10 Mei 2026 09:12 WIB)"
 
 source /usr/local/etc/srpcom/env.conf
 source /usr/local/bin/srpcom/utils.sh
@@ -83,11 +83,10 @@ menu_update() {
         echo " [7]  Update Fitur Auto (autokill.sh & auto_expired.sh)"
         echo " [8]  Update API Backend & Bot Telegram (configs/*.py)"
         echo " [9]  Update SEMUA Modul (ALL IN ONE)"
-        echo " [10] Update Daftar Extra Domain (Bug SNI) dari GitHub"
         echo "---------------------------------------------------------"
         echo " [0/x] Kembali ke Menu Utama"
         echo "========================================================="
-        read -p " Pilih opsi [0-10 or x]: " opt
+        read -p " Pilih opsi [0-9 or x]: " opt
         
         case $opt in
             1) 
@@ -168,9 +167,6 @@ menu_update() {
                 echo -e "\e[32m[SUCCESS]\e[0m Seluruh sistem berhasil diperbarui dari GitHub!"
                 echo -e "=> Versi Terinstal : $SCRIPT_VERSION"
                 sleep 2; exec menu ;;
-            10)
-                import_github_domain
-                ;;
             0|x|X) exec menu ;;
             *) echo -e "\n=> Pilihan tidak valid!"; sleep 1 ;;
         esac
