@@ -221,34 +221,13 @@ add_trial() {
     pause
 }
 
-create_xray() {
-    clear
-    echo "╔════════════════════════════════════════════════════════╗"
-    echo "║                      CREATE XRAY                       ║"
-    echo "╚════════════════════════════════════════════════════════╝"
-    echo "1.  VMESS WS"
-    echo "2.  VLESS WS"
-    echo "3.  TROJAN WS"
-    echo "4.  TRIAL ACCOUNT (60 Minutes)"
-    echo "0.  Back"
-    echo "========================================================="
-    read -p "Please select an option [0-4]: " opt
-    case $opt in
-        1) add_vmess_ws ;;
-        2) add_vless_ws ;;
-        3) add_trojan_ws ;;
-        4) add_trial ;;
-        0) return ;;
-        *) echo "Pilihan tidak valid!"; sleep 1; create_xray ;;
-    esac
-}
-
 delete_xray() {
     clear
     echo "========================================================="
     echo "                   DELETE XRAY ACCOUNT                   "
     echo "========================================================="
-    mapfile -t users < <(jq -r '.inbounds[].settings.clients[].email' /usr/local/etc/xray/config.json | sort -u)
+    # PERBAIKAN: Menambahkan `?` pada clients[] agar port API (dokodemo-door) yang nilainya null tidak error
+    mapfile -t users < <(jq -r '.inbounds[].settings.clients[]?.email' /usr/local/etc/xray/config.json | sort -u)
     
     if [ ${#users[@]} -eq 0 ] || [ -z "${users[0]}" ] || [ "${users[0]}" == "null" ]; then
         echo "Tidak ada akun untuk dihapus."
@@ -279,7 +258,8 @@ renew_xray() {
     echo "========================================================="
     echo "                   RENEW XRAY ACCOUNT                    "
     echo "========================================================="
-    mapfile -t users < <(jq -r '.inbounds[].settings.clients[].email' /usr/local/etc/xray/config.json | sort -u)
+    # PERBAIKAN: Menambahkan `?` pada clients[] agar port API (dokodemo-door) yang nilainya null tidak error
+    mapfile -t users < <(jq -r '.inbounds[].settings.clients[]?.email' /usr/local/etc/xray/config.json | sort -u)
     
     if [ ${#users[@]} -eq 0 ] || [ -z "${users[0]}" ] || [ "${users[0]}" == "null" ]; then
         echo "Tidak ada akun untuk diperpanjang."
@@ -323,15 +303,15 @@ list_xray() {
     echo "                   LIST XRAY ACCOUNTS                    "
     echo "========================================================="
     echo -e "\n\e[32m[ VMESS WS ]\e[0m"
-    mapfile -t users < <(jq -r '.inbounds[] | select(.protocol=="vmess") | .settings.clients[].email' /usr/local/etc/xray/config.json 2>/dev/null)
+    mapfile -t users < <(jq -r '.inbounds[] | select(.protocol=="vmess") | .settings.clients[]?.email' /usr/local/etc/xray/config.json 2>/dev/null)
     if [ ${#users[@]} -eq 0 ] || [ -z "${users[0]}" ] || [ "${users[0]}" == "null" ]; then echo "Tidak ada akun."; else print_user_table "hide_back"; fi
     
     echo -e "\n\e[32m[ VLESS WS ]\e[0m"
-    mapfile -t users < <(jq -r '.inbounds[] | select(.protocol=="vless") | .settings.clients[].email' /usr/local/etc/xray/config.json 2>/dev/null)
+    mapfile -t users < <(jq -r '.inbounds[] | select(.protocol=="vless") | .settings.clients[]?.email' /usr/local/etc/xray/config.json 2>/dev/null)
     if [ ${#users[@]} -eq 0 ] || [ -z "${users[0]}" ] || [ "${users[0]}" == "null" ]; then echo "Tidak ada akun."; else print_user_table "hide_back"; fi
     
     echo -e "\n\e[32m[ TROJAN WS ]\e[0m"
-    mapfile -t users < <(jq -r '.inbounds[] | select(.protocol=="trojan") | .settings.clients[].email' /usr/local/etc/xray/config.json 2>/dev/null)
+    mapfile -t users < <(jq -r '.inbounds[] | select(.protocol=="trojan") | .settings.clients[]?.email' /usr/local/etc/xray/config.json 2>/dev/null)
     if [ ${#users[@]} -eq 0 ] || [ -z "${users[0]}" ] || [ "${users[0]}" == "null" ]; then echo "Tidak ada akun."; else print_user_table "hide_back"; fi
     
     echo -e "\n========================================================="
@@ -400,7 +380,7 @@ detail_list() {
     echo "========================================================="
     echo "                 SELECT ${prot^^} ACCOUNT                 "
     echo "========================================================="
-    mapfile -t users < <(jq -r '.inbounds[] | select(.protocol=="'$prot'") | .settings.clients[].email' /usr/local/etc/xray/config.json 2>/dev/null)
+    mapfile -t users < <(jq -r '.inbounds[] | select(.protocol=="'$prot'") | .settings.clients[]?.email' /usr/local/etc/xray/config.json 2>/dev/null)
     if [ ${#users[@]} -eq 0 ] || [ -z "${users[0]}" ] || [ "${users[0]}" == "null" ]; then
         echo "Tidak ada akun di protokol ini."
         echo "========================================================="
@@ -427,9 +407,9 @@ detail_xray() {
     echo "========================================================="
     echo "                   DETAIL XRAY ACCOUNT                   "
     echo "========================================================="
-    c_vm=$(jq '[.inbounds[] | select(.protocol=="vmess") | .settings.clients[]] | length' /usr/local/etc/xray/config.json 2>/dev/null || echo 0)
-    c_vl=$(jq '[.inbounds[] | select(.protocol=="vless") | .settings.clients[]] | length' /usr/local/etc/xray/config.json 2>/dev/null || echo 0)
-    c_tr=$(jq '[.inbounds[] | select(.protocol=="trojan") | .settings.clients[]] | length' /usr/local/etc/xray/config.json 2>/dev/null || echo 0)
+    c_vm=$(jq '[.inbounds[] | select(.protocol=="vmess") | .settings.clients[]?] | length' /usr/local/etc/xray/config.json 2>/dev/null || echo 0)
+    c_vl=$(jq '[.inbounds[] | select(.protocol=="vless") | .settings.clients[]?] | length' /usr/local/etc/xray/config.json 2>/dev/null || echo 0)
+    c_tr=$(jq '[.inbounds[] | select(.protocol=="trojan") | .settings.clients[]?] | length' /usr/local/etc/xray/config.json 2>/dev/null || echo 0)
 
     echo "1. VMESS ($c_vm)"
     echo "2. VLESS ($c_vl)"
@@ -452,7 +432,7 @@ change_protocol_uuid() {
     echo "========================================================="
     echo "               CHANGE UUID/PASS ${prot^^} WS             "
     echo "========================================================="
-    mapfile -t users < <(jq -r '.inbounds[] | select(.protocol=="'$prot'") | .settings.clients[].email' /usr/local/etc/xray/config.json 2>/dev/null)
+    mapfile -t users < <(jq -r '.inbounds[] | select(.protocol=="'$prot'") | .settings.clients[]?.email' /usr/local/etc/xray/config.json 2>/dev/null)
     if [ ${#users[@]} -eq 0 ] || [ -z "${users[0]}" ] || [ "${users[0]}" == "null" ]; then
         echo "Tidak ada akun di protokol ini."
         echo "========================================================="
