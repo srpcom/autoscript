@@ -276,6 +276,12 @@ renew_xray() {
         user="${users[$((choice-1))]}"
         read -p "Tambah Masa Aktif (Hari): " masaaktif
         
+        # Validasi: Pastikan input tidak kosong dan hanya berupa angka
+        if ! [[ "$masaaktif" =~ ^[0-9]+$ ]]; then
+            echo -e "\n\e[31m[ERROR]\e[0m Input tidak valid! Harap masukkan angka saja (contoh: 30)."
+            sleep 2; renew_xray; return
+        fi
+        
         current_data=$(grep "^$user " /usr/local/etc/xray/expiry.txt)
         current_date=$(echo "$current_data" | awk '{print $2}')
         current_time=$(echo "$current_data" | awk '{print $3}')
@@ -283,8 +289,8 @@ renew_xray() {
         if [ -z "$current_date" ]; then current_date=$(date +"%Y-%m-%d"); fi
         if [ -z "$current_time" ]; then current_time=$(date +"%H:%M:%S"); fi
         
-        new_exp_date=$(date -d "$current_date $current_time + $masaaktif days" +"%Y-%m-%d")
-        new_exp_time=$(date -d "$current_date $current_time + $masaaktif days" +"%H:%M:%S")
+        new_exp_date=$(date -d "$current_date + $masaaktif days" +"%Y-%m-%d")
+        new_exp_time="$current_time"
         
         sed -i "/^$user /d" /usr/local/etc/xray/expiry.txt
         echo "$user $new_exp_date $new_exp_time" >> /usr/local/etc/xray/expiry.txt
