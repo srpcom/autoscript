@@ -497,30 +497,58 @@ import_github_domain() {
     echo "======================================"
     echo "     IMPORT EXTRA DOMAIN (GITHUB)     "
     echo "======================================"
-    echo "Fitur ini akan mengunduh daftar Bug/SNI"
-    echo "dari GitHub dan menggabungkannya dengan"
-    echo "daftar yang sudah ada di VPS Anda."
+    echo "=> Sedang mengambil data dari GitHub..."
+    
+    wget -q -O /tmp/new_domains.txt "$GITHUB_RAW/core/extra_domains.txt"
+    if [ ! -s /tmp/new_domains.txt ]; then
+        echo -e "\e[31m[ERROR]\e[0m Gagal mengambil data atau daftar di GitHub kosong!"
+        rm -f /tmp/new_domains.txt
+        sleep 2; return
+    fi
+    
+    touch /usr/local/etc/srpcom/extra_domains.txt
+
+    echo -e "\n\e[36m[ DAFTAR DOMAIN DI GITHUB ]\e[0m"
+    awk '{print "- " $1}' /tmp/new_domains.txt
+    
+    echo -e "\n\e[36m[ DAFTAR DOMAIN DI SISTEM SAAT INI ]\e[0m"
+    if [ ! -s "/usr/local/etc/srpcom/extra_domains.txt" ]; then
+        echo "- (Kosong)"
+    else
+        awk '{print "- " $1}' /usr/local/etc/srpcom/extra_domains.txt
+    fi
+    
     echo "======================================"
-    read -p "Apakah Anda yakin ingin mengimpor data? (y/n): " confirm
+    read -p "Apakah Anda yakin ingin mengimpor data di atas? (y/n): " confirm
     if [[ "$confirm" != "y" && "$confirm" != "Y" ]]; then
-        echo "=> Dibatalkan."; sleep 1; return
+        echo "=> Dibatalkan."; rm -f /tmp/new_domains.txt; sleep 1; return
     fi
 
-    echo -e "\n=> Mengunduh daftar Extra Domain dari GitHub..."
-    wget -q -O /tmp/new_domains.txt "$GITHUB_RAW/core/extra_domains.txt"
-    if [ -s /tmp/new_domains.txt ]; then
-        touch /usr/local/etc/srpcom/extra_domains.txt
-        cat /usr/local/etc/srpcom/extra_domains.txt /tmp/new_domains.txt | sort -u | grep -v '^$' > /tmp/merged_domains.txt
-        mv /tmp/merged_domains.txt /usr/local/etc/srpcom/extra_domains.txt
-        rm -f /tmp/new_domains.txt
-        echo -e "\e[32m[SUCCESS]\e[0m Daftar domain berhasil diperbarui dan digabungkan!"
-        echo -e "=> Mengonfigurasi ulang Caddy Server..."
+    echo -e "\n=> Memproses import..."
+    local has_new=false
+    while read -r domain; do
+        if [ -z "$domain" ]; then continue; fi
+        
+        # Cek apakah domain sudah ada di sistem
+        if grep -q "^${domain}$" /usr/local/etc/srpcom/extra_domains.txt 2>/dev/null; then
+            echo -e " - $domain \e[33m(Sudah ada, dilewati)\e[0m"
+        else
+            echo -e " + $domain \e[32m(Ditambahkan)\e[0m"
+            echo "$domain" >> /usr/local/etc/srpcom/extra_domains.txt
+            has_new=true
+        fi
+    done < /tmp/new_domains.txt
+    
+    rm -f /tmp/new_domains.txt
+
+    if [ "$has_new" = true ]; then
+        echo -e "\n\e[32m[SUCCESS]\e[0m Data baru berhasil digabungkan!"
+        echo "=> Mengonfigurasi ulang Caddy Server..."
         rebuild_caddyfile
         sleep 2
     else
-        echo -e "\e[31m[ERROR]\e[0m Gagal mengunduh atau file extra_domains.txt di GitHub kosong!"
-        rm -f /tmp/new_domains.txt
-        sleep 2
+        echo -e "\n\e[33m[INFO]\e[0m Tidak ada perubahan (semua domain dari GitHub sudah ada di sistem)."
+        sleep 3
     fi
 }
 
