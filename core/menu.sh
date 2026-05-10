@@ -3,7 +3,10 @@
 # menu.sh
 # MODULE: MAIN MENU (ROUTER)
 # Menampilkan antarmuka CLI utama dan perutean menu
+# Versi : 1.0 (10 Mei 2026 07:08 WIB)
 # ==========================================
+
+SCRIPT_VERSION="1.0 (10 Mei 2026 07:08 WIB)"
 
 source /usr/local/etc/srpcom/env.conf
 source /usr/local/bin/srpcom/utils.sh
@@ -69,6 +72,8 @@ menu_update() {
         echo "╔════════════════════════════════════════════════════════╗"
         echo "║               UPDATE SCRIPT (LIVE UPDATE)              ║"
         echo "╚════════════════════════════════════════════════════════╝"
+        echo " Versi Sistem Saat Ini : $SCRIPT_VERSION"
+        echo "---------------------------------------------------------"
         echo " [1]  Update Modul Utama (menu.sh)"
         echo " [2]  Update Modul Utilitas (utils.sh)"
         echo " [3]  Update Modul Xray (xray.sh)"
@@ -89,7 +94,9 @@ menu_update() {
                 echo -e "\n=> Mengunduh menu.sh..."
                 wget -q -O /usr/local/bin/srpcom/menu.sh "$GITHUB_RAW/core/menu.sh"
                 chmod +x /usr/local/bin/srpcom/menu.sh
-                echo -e "\e[32m[SUCCESS]\e[0m Modul Utama diperbarui!"; sleep 1.5; exec menu ;;
+                echo -e "\e[32m[SUCCESS]\e[0m Modul Utama diperbarui!"
+                echo -e "=> Versi Terinstal : $SCRIPT_VERSION"
+                sleep 1.5; exec menu ;;
             2) 
                 echo -e "\n=> Mengunduh utils.sh..."
                 wget -q -O /usr/local/bin/srpcom/utils.sh "$GITHUB_RAW/core/utils.sh"
@@ -158,7 +165,9 @@ menu_update() {
                 # Update menu paling akhir agar tidak memutus proses, lalu exec ulang
                 wget -q -O /usr/local/bin/srpcom/menu.sh "$GITHUB_RAW/core/menu.sh"
                 chmod +x /usr/local/bin/srpcom/menu.sh
-                echo -e "\e[32m[SUCCESS]\e[0m Seluruh sistem berhasil diperbarui dari GitHub!"; sleep 2; exec menu ;;
+                echo -e "\e[32m[SUCCESS]\e[0m Seluruh sistem berhasil diperbarui dari GitHub!"
+                echo -e "=> Versi Terinstal : $SCRIPT_VERSION"
+                sleep 2; exec menu ;;
             10)
                 import_github_domain
                 ;;
