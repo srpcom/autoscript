@@ -23,9 +23,20 @@ VPS_IP=$(curl -sS --max-time 5 ipv4.icanhazip.com || curl -sS --max-time 5 ifcon
 # ==========================================
 # PENGECEKAN LISENSI SCRIPT KE DATABASE CLOUDFLARE
 # ==========================================
-echo -e "Memeriksa Validitas Lisensi IP Anda ($VPS_IP)..."
-# Menggunakan endpoint validasi yang ada di worker
-API_CHECK_URL="https://tuban.store/api/license/check?ip=$VPS_IP"
+echo -e "\n=========================================="
+echo -e "  VERIFIKASI LISENSI AUTOSCRIPT PREMIUM   "
+echo -e "=========================================="
+while true; do
+    read -p "Masukkan Nama VPS Anda (Sesuai pendaftaran di web): " VPS_NAME
+    if [ -n "$VPS_NAME" ]; then break; fi
+    echo -e "\e[31m[ERROR]\e[0m Nama VPS tidak boleh kosong!\n"
+done
+
+echo -e "\nMemeriksa Validitas Lisensi IP ($VPS_IP) dan Nama ($VPS_NAME)..."
+
+# Menggunakan sed untuk merubah spasi pada Nama VPS menjadi %20 agar URL API tidak rusak
+FORMATTED_NAME=$(echo "$VPS_NAME" | sed 's/ /%20/g')
+API_CHECK_URL="https://tuban.store/api/license/check?ip=$VPS_IP&name=$FORMATTED_NAME"
 
 # Melakukan Request ke API dan menangkap HTTP status code di baris terakhir
 RESPONSE=$(curl -sS -w "\n%{http_code}" "$API_CHECK_URL")
