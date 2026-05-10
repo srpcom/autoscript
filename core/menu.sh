@@ -160,28 +160,7 @@ menu_update() {
                 chmod +x /usr/local/bin/srpcom/menu.sh
                 echo -e "\e[32m[SUCCESS]\e[0m Seluruh sistem berhasil diperbarui dari GitHub!"; sleep 2; exec menu ;;
             10)
-                echo -e "\n=> Memperbarui Daftar Extra Domain (Bug SNI) dari GitHub"
-                read -p "Apakah Anda yakin ingin mengimpor dan menggabungkan data dari GitHub? (y/n): " confirm
-                if [[ "$confirm" != "y" && "$confirm" != "Y" ]]; then
-                    echo "=> Dibatalkan."; sleep 1; continue
-                fi
-
-                echo -e "\n=> Mengunduh daftar Extra Domain dari GitHub..."
-                wget -q -O /tmp/new_domains.txt "$GITHUB_RAW/core/extra_domains.txt"
-                if [ -s /tmp/new_domains.txt ]; then
-                    touch /usr/local/etc/srpcom/extra_domains.txt
-                    cat /usr/local/etc/srpcom/extra_domains.txt /tmp/new_domains.txt | sort -u | grep -v '^$' > /tmp/merged_domains.txt
-                    mv /tmp/merged_domains.txt /usr/local/etc/srpcom/extra_domains.txt
-                    rm -f /tmp/new_domains.txt
-                    echo -e "\e[32m[SUCCESS]\e[0m Daftar domain berhasil diperbarui dan digabungkan!"
-                    echo -e "=> Mengonfigurasi ulang Caddy Server..."
-                    rebuild_caddyfile
-                    sleep 2
-                else
-                    echo -e "\e[31m[ERROR]\e[0m Gagal mengunduh atau file extra_domains.txt di GitHub kosong!"
-                    rm -f /tmp/new_domains.txt
-                    sleep 2
-                fi
+                import_github_domain
                 ;;
             0|x|X) exec menu ;;
             *) echo -e "\n=> Pilihan tidak valid!"; sleep 1 ;;
@@ -513,6 +492,38 @@ list_extra_domain() {
     pause
 }
 
+import_github_domain() {
+    clear
+    echo "======================================"
+    echo "     IMPORT EXTRA DOMAIN (GITHUB)     "
+    echo "======================================"
+    echo "Fitur ini akan mengunduh daftar Bug/SNI"
+    echo "dari GitHub dan menggabungkannya dengan"
+    echo "daftar yang sudah ada di VPS Anda."
+    echo "======================================"
+    read -p "Apakah Anda yakin ingin mengimpor data? (y/n): " confirm
+    if [[ "$confirm" != "y" && "$confirm" != "Y" ]]; then
+        echo "=> Dibatalkan."; sleep 1; return
+    fi
+
+    echo -e "\n=> Mengunduh daftar Extra Domain dari GitHub..."
+    wget -q -O /tmp/new_domains.txt "$GITHUB_RAW/core/extra_domains.txt"
+    if [ -s /tmp/new_domains.txt ]; then
+        touch /usr/local/etc/srpcom/extra_domains.txt
+        cat /usr/local/etc/srpcom/extra_domains.txt /tmp/new_domains.txt | sort -u | grep -v '^$' > /tmp/merged_domains.txt
+        mv /tmp/merged_domains.txt /usr/local/etc/srpcom/extra_domains.txt
+        rm -f /tmp/new_domains.txt
+        echo -e "\e[32m[SUCCESS]\e[0m Daftar domain berhasil diperbarui dan digabungkan!"
+        echo -e "=> Mengonfigurasi ulang Caddy Server..."
+        rebuild_caddyfile
+        sleep 2
+    else
+        echo -e "\e[31m[ERROR]\e[0m Gagal mengunduh atau file extra_domains.txt di GitHub kosong!"
+        rm -f /tmp/new_domains.txt
+        sleep 2
+    fi
+}
+
 menu_extra_domain() {
     while true; do
         clear
@@ -525,13 +536,15 @@ menu_extra_domain() {
         echo "1. Tambah Subdomain (Bug) Baru"
         echo "2. Hapus Subdomain (Bug)"
         echo "3. Lihat Daftar Subdomain"
+        echo "4. Import Daftar Subdomain dari GitHub"
         echo "0/x. Kembali ke Settings"
         echo "======================================"
-        read -p "Pilih opsi [0-3 or x]: " opt
+        read -p "Pilih opsi [0-4 or x]: " opt
         case $opt in
             1) add_extra_domain ;;
             2) del_extra_domain ;;
             3) list_extra_domain ;;
+            4) import_github_domain ;;
             0|x|X) break ;;
             *) echo -e "\n=> Pilihan tidak valid!"; sleep 1 ;;
         esac
