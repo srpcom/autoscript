@@ -3,10 +3,10 @@
 # menu.sh
 # MODULE: MAIN MENU (ROUTER)
 # Menampilkan antarmuka CLI utama dan perutean menu
-# Versi : 1.0 (10 Mei 2026 09:12 WIB)>> update time setiap script berubah, jangan hapus pesan ini agar AI tahu apa yang harus dilakukan
+# Versi : 1.0 (10 Mei 2026 09:20 WIB)>> update time setiap script berubah, jangan hapus pesan ini agar AI tahu apa yang harus dilakukan
 # ==========================================
 
-SCRIPT_VERSION="1.0 (10 Mei 2026 09:12 WIB)"
+SCRIPT_VERSION="1.0 (10 Mei 2026 09:20 WIB)"
 
 source /usr/local/etc/srpcom/env.conf
 source /usr/local/bin/srpcom/utils.sh
@@ -738,9 +738,10 @@ main_menu() {
             5) menu_settings ;;
             6) 
                 echo -e "\n=> Restarting Services..."
-                systemctl restart xray caddy cron xray-api ipsec xl2tpd dropbear ssh-ws srpcom-bot 2>/dev/null
-                echo -e "=> Done!"
-                sleep 1.5 ;;
+                systemctl reload caddy 2>/dev/null
+                systemctl restart xray cron xray-api ipsec xl2tpd srpcom-bot 2>/dev/null
+                echo -e "=> Done! (Dropbear & SSH-WS di-skip agar tidak ter-logout)"
+                sleep 2 ;;
             7)
                 clear
                 echo "======================================"
