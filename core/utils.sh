@@ -1,4 +1,42 @@
-# ... existing code ...
+#!/bin/bash
+# ==========================================
+# utils.sh
+# MODULE: UTILITIES
+# Berisi fungsi pembantu, pewarnaan, dan informasi OS
+# ==========================================
+
+# Memuat Environment Global (Domain & IP)
+source /usr/local/etc/srpcom/env.conf
+
+# Warna Standar
+GREEN='\e[32m'
+RED='\e[31m'
+YELLOW='\e[33m'
+CYAN='\e[36m'
+NC='\e[0m' # No Color
+
+pause() {
+    echo ""
+    read -n 1 -s -r -p "Tekan tombol apapun untuk kembali..."
+}
+
+print_header() {
+    OS_SYS=$(grep PRETTY_NAME /etc/os-release | cut -d'"' -f2)
+    BIT=$(uname -m)
+    if [[ "$BIT" == "x86_64" ]]; then BIT="(64 Bit)"; else BIT="(32 Bit)"; fi
+    KRNL=$(uname -r)
+    CPUMDL=$(awk -F: '/model name/ {print $2; exit}' /proc/cpuinfo | sed 's/^[ \t]*//')
+    CPUFREQ=$(awk -F: '/cpu MHz/ {print $2; exit}' /proc/cpuinfo | sed 's/^[ \t]*//')
+    if [[ -z "$CPUFREQ" ]]; then CPUFREQ="Unknown"; fi
+    CORE=$(nproc)
+    T_RAM=$(free -m | awk '/Mem:/ {printf "%.1f GB", $2/1024}')
+    U_RAM=$(free -m | awk '/Mem:/ {printf "%.1f MB", $3}')
+    T_DISK=$(df -h / | awk 'NR==2 {print $2}')
+    U_DISK=$(df -h / | awk 'NR==2 {print $3}')
+    ISP_NAME=$(curl -sS --max-time 3 ipinfo.io/org | cut -d' ' -f2-)
+    REG=$(curl -sS --max-time 3 ipinfo.io/city)
+    TZ=$(cat /etc/timezone)
+
     # Menghitung Total Akun Berdasarkan Protokol
     XRAY_C=$(jq '[.inbounds[] | select(.protocol=="vmess" or .protocol=="vless" or .protocol=="trojan") | .settings.clients | length] | add' /usr/local/etc/xray/config.json 2>/dev/null || echo 0)
     SSH_C=$(wc -l < /usr/local/etc/srpcom/ssh_expiry.txt 2>/dev/null || echo 0)
