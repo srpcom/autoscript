@@ -14,6 +14,22 @@ fi
 
 clear
 echo "=========================================="
+echo "       VERIFIKASI PASSWORD INSTALASI      "
+echo "=========================================="
+# Menggunakan flag -s agar password yang diketik tidak terlihat di layar
+read -sp "Masukkan Password Instalasi: " input_pass
+echo ""
+
+if [ "$input_pass" != "suruan6464" ]; then
+    echo -e "\n\e[31m[ERROR]\e[0m Password salah! Akses ditolak dan instalasi dibatalkan."
+    exit 1
+fi
+
+echo -e "\e[32m[SUCCESS]\e[0m Password benar! Menyiapkan instalasi...\n"
+sleep 2
+
+clear
+echo "=========================================="
 echo "  MEMULAI INSTALASI VPN MULTIPORT V5      "
 echo "  XRAY, CADDY, L2TP, SSH, OVPN, BADVPN    "
 echo "=========================================="
