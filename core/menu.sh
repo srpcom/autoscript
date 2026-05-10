@@ -3,10 +3,10 @@
 # menu.sh
 # MODULE: MAIN MENU (ROUTER)
 # Menampilkan antarmuka CLI utama dan perutean menu
-# Versi : 1.0 (10 Mei 2026 09:26 WIB)>> update time setiap script berubah, jangan hapus pesan ini agar AI tahu apa yang harus dilakukan
+# Versi : 1.0 (10 Mei 2026 09:50 WIB)>> update time setiap script berubah, jangan hapus pesan ini agar AI tahu apa yang harus dilakukan
 # ==========================================
 
-SCRIPT_VERSION="1.0 (10 Mei 2026 09:26 WIB)"
+SCRIPT_VERSION="1.0 (10 Mei 2026 09:50 WIB)"
 
 source /usr/local/etc/srpcom/env.conf
 source /usr/local/bin/srpcom/utils.sh
@@ -56,7 +56,7 @@ $main_str {
 }
 EOF
 
-    # Menambahkan blok khusus untuk extra domains agar main domain tidak terpengaruh saat reload
+    # Menambahkan blok khusus untuk extra domains agar main domain tidak terpengaruh
     if [ -s "/usr/local/etc/srpcom/extra_domains.txt" ]; then
         local extra_str=""
         while read -r ext_dom; do
@@ -74,12 +74,14 @@ EOF
 
 $extra_str {
     import proxy_rules
+    tls internal
 }
 EOF
         fi
     fi
 
-    systemctl reload caddy 2>/dev/null || systemctl restart caddy 2>/dev/null
+    # Reload Caddy secara halus di background agar script terminal sempat memberikan output SUCCESS
+    nohup systemctl reload caddy >/dev/null 2>&1 &
 }
 
 menu_update() {
