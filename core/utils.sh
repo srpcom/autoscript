@@ -33,9 +33,9 @@ print_header() {
     U_RAM=$(free -m | awk '/Mem:/ {printf "%.1f MB", $3}')
     T_DISK=$(df -h / | awk 'NR==2 {print $2}')
     U_DISK=$(df -h / | awk 'NR==2 {print $3}')
-    ISP_NAME=$(curl -sS --max-time 3 ipinfo.io/org 2>/dev/null | cut -d' ' -f2-)
-    REG=$(curl -sS --max-time 3 ipinfo.io/city 2>/dev/null)
-    TZ=$(cat /etc/timezone 2>/dev/null)
+    ISP_NAME=$(curl -sS --max-time 3 ipinfo.io/org | cut -d' ' -f2-)
+    REG=$(curl -sS --max-time 3 ipinfo.io/city)
+    TZ=$(cat /etc/timezone)
 
     # Membaca data Masa Aktif Lisensi dari VPS
     LIC_EXP=$(cat /usr/local/etc/srpcom/license_exp.txt 2>/dev/null)
