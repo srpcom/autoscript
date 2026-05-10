@@ -3,10 +3,10 @@
 # menu.sh
 # MODULE: MAIN MENU (ROUTER)
 # Menampilkan antarmuka CLI utama dan perutean menu
-# Versi : 1.0 (10 Mei 2026 07:12 WIB)
+# Versi : 1.0 (10 Mei 2026 07:17 WIB)
 # ==========================================
 
-SCRIPT_VERSION="1.0 (10 Mei 2026 07:12 WIB)"
+SCRIPT_VERSION="1.0 (10 Mei 2026 07:17 WIB)"
 
 source /usr/local/etc/srpcom/env.conf
 source /usr/local/bin/srpcom/utils.sh
