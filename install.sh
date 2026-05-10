@@ -14,27 +14,43 @@ fi
 
 clear
 echo "=========================================="
-echo "       VERIFIKASI PASSWORD INSTALASI      "
-echo "=========================================="
-# Menggunakan flag -s agar password yang diketik tidak terlihat di layar
-read -sp "Masukkan Password Instalasi: " input_pass
-echo ""
-
-if [ "$input_pass" != "suruan6464" ]; then
-    echo -e "\n\e[31m[ERROR]\e[0m Password salah! Akses ditolak dan instalasi dibatalkan."
-    exit 1
-fi
-
-echo -e "\e[32m[SUCCESS]\e[0m Password benar! Menyiapkan instalasi...\n"
-sleep 2
-
-clear
-echo "=========================================="
 echo "  MEMULAI INSTALASI VPN MULTIPORT V5      "
 echo "  XRAY, CADDY, L2TP, SSH, OVPN, BADVPN    "
 echo "=========================================="
 
 VPS_IP=$(curl -sS --max-time 5 ipv4.icanhazip.com || curl -sS --max-time 5 ifconfig.me)
+
+# ==========================================
+# PENGECEKAN LISENSI SCRIPT KE DATABASE CLOUDFLARE
+# ==========================================
+echo -e "Memeriksa Validitas Lisensi IP Anda ($VPS_IP)..."
+# Menggunakan endpoint validasi yang ada di worker
+API_CHECK_URL="https://tuban.store/api/license/check?ip=$VPS_IP"
+
+# Melakukan Request ke API dan menangkap HTTP status code di baris terakhir
+RESPONSE=$(curl -sS -w "\n%{http_code}" "$API_CHECK_URL")
+HTTP_STATUS=$(echo "$RESPONSE" | tail -n1)
+JSON_BODY=$(echo "$RESPONSE" | sed '$d')
+
+# Memeriksa HTTP Status (Hanya lolos jika API mengembalikan kode 200 OK)
+if [ "$HTTP_STATUS" != "200" ]; then
+    echo -e "\e[31m[ERROR] LISENSI DITOLAK ATAU TIDAK VALID!\e[0m"
+    
+    # Mencoba mengekstrak pesan error dari JSON response menggunakan bash utilities (grep/cut)
+    ERR_MSG=$(echo "$JSON_BODY" | grep -o '"message":"[^"]*' | cut -d'"' -f4)
+    if [ -n "$ERR_MSG" ]; then
+        echo -e "\e[33mAlasan:\e[0m $ERR_MSG"
+    else
+        echo -e "\e[33mAlasan:\e[0m IP $VPS_IP belum terdaftar di sistem atau masa aktif habis."
+    fi
+    
+    echo -e "Silakan beli/perpanjang lisensi Anda di: \e[36mhttps://tuban.store/lisensi\e[0m"
+    exit 1
+fi
+
+echo -e "\e[32m[SUCCESS]\e[0m Lisensi Valid! Melanjutkan instalasi...\n"
+# ==========================================
+
 
 while true; do
     read -p "Masukkan Domain VPS Anda (contoh: aw.srpcom.cloud): " DOMAIN
