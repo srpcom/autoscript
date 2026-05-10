@@ -226,7 +226,7 @@ delete_xray() {
     echo "========================================================="
     echo "                   DELETE XRAY ACCOUNT                   "
     echo "========================================================="
-    mapfile -t users < <(jq -r '.inbounds[].settings.clients[]?.email' /usr/local/etc/xray/config.json | sort -u)
+    mapfile -t users < <(jq -r '.inbounds[] | select(.protocol == "vmess" or .protocol == "vless" or .protocol == "trojan") | .settings.clients[].email' /usr/local/etc/xray/config.json | sort -u)
     
     if [ ${#users[@]} -eq 0 ] || [ -z "${users[0]}" ] || [ "${users[0]}" == "null" ]; then
         echo "Tidak ada akun untuk dihapus."
@@ -257,7 +257,7 @@ renew_xray() {
     echo "========================================================="
     echo "                   RENEW XRAY ACCOUNT                    "
     echo "========================================================="
-    mapfile -t users < <(jq -r '.inbounds[].settings.clients[]?.email' /usr/local/etc/xray/config.json | sort -u)
+    mapfile -t users < <(jq -r '.inbounds[] | select(.protocol == "vmess" or .protocol == "vless" or .protocol == "trojan") | .settings.clients[].email' /usr/local/etc/xray/config.json | sort -u)
     
     if [ ${#users[@]} -eq 0 ] || [ -z "${users[0]}" ] || [ "${users[0]}" == "null" ]; then
         echo "Tidak ada akun untuk diperpanjang."
