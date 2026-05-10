@@ -3,10 +3,10 @@
 # menu.sh
 # MODULE: MAIN MENU (ROUTER)
 # Menampilkan antarmuka CLI utama dan perutean menu
-# Versi : 1.1 (10 Mei 2026 17:25 WIB)>> update time setiap script berubah, jangan hapus pesan ini agar AI tahu apa yang harus dilakukan
+# Versi : 1.2 (10 Mei 2026 18:30 WIB)>> update time setiap script berubah, jangan hapus pesan ini agar AI tahu apa yang harus dilakukan
 # ==========================================
 
-SCRIPT_VERSION="1.1 (10 Mei 2026 17:25 WIB)"
+SCRIPT_VERSION="1.2 (10 Mei 2026 18:30 WIB)"
 
 source /usr/local/etc/srpcom/env.conf
 source /usr/local/bin/srpcom/utils.sh
@@ -580,7 +580,6 @@ menu_extra_domain() {
         echo "     MANAJEMEN EXTRA DOMAIN / SNI     "
         echo "======================================"
         echo "Domain Utama : $DOMAIN"
-        echo "Default SSL  : support.zoom.us.$DOMAIN"
         echo "======================================"
         echo "1. Tambah Subdomain (Bug) Baru"
         echo "2. Hapus Subdomain (Bug)"
