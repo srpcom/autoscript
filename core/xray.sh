@@ -172,7 +172,7 @@ add_trial() {
     elif [[ "$prot_opt" == "2" ]]; then
         prot="vless"
         jq '(.inbounds[] | select(.protocol=="vless") | .settings.clients) += [{"id": "'$uuid'", "email": "'$user'"}]' /usr/local/etc/xray/config.json > /tmp/config.json
-    elif [[ "$prot" == "3" ]]; then
+    elif [[ "$prot_opt" == "3" ]]; then
         prot="trojan"
         jq '(.inbounds[] | select(.protocol=="trojan") | .settings.clients) += [{"password": "'$uuid'", "email": "'$user'"}]' /usr/local/etc/xray/config.json > /tmp/config.json
     else
@@ -226,7 +226,6 @@ delete_xray() {
     echo "========================================================="
     echo "                   DELETE XRAY ACCOUNT                   "
     echo "========================================================="
-    # PERBAIKAN: Menambahkan `?` pada clients[] agar port API (dokodemo-door) yang nilainya null tidak error
     mapfile -t users < <(jq -r '.inbounds[].settings.clients[]?.email' /usr/local/etc/xray/config.json | sort -u)
     
     if [ ${#users[@]} -eq 0 ] || [ -z "${users[0]}" ] || [ "${users[0]}" == "null" ]; then
@@ -258,7 +257,6 @@ renew_xray() {
     echo "========================================================="
     echo "                   RENEW XRAY ACCOUNT                    "
     echo "========================================================="
-    # PERBAIKAN: Menambahkan `?` pada clients[] agar port API (dokodemo-door) yang nilainya null tidak error
     mapfile -t users < <(jq -r '.inbounds[].settings.clients[]?.email' /usr/local/etc/xray/config.json | sort -u)
     
     if [ ${#users[@]} -eq 0 ] || [ -z "${users[0]}" ] || [ "${users[0]}" == "null" ]; then
