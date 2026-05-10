@@ -3,10 +3,10 @@
 # menu.sh
 # MODULE: MAIN MENU (ROUTER)
 # Menampilkan antarmuka CLI utama dan perutean menu
-# Versi : 1.0 (10 Mei 2026 10:08 WIB)>> update time setiap script berubah, jangan hapus pesan ini agar AI tahu apa yang harus dilakukan
+# Versi : 1.0 (10 Mei 2026 10:29 WIB)>> update time setiap script berubah, jangan hapus pesan ini agar AI tahu apa yang harus dilakukan
 # ==========================================
 
-SCRIPT_VERSION="1.0 (10 Mei 2026 10:08 WIB)"
+SCRIPT_VERSION="1.0 (10 Mei 2026 10:29 WIB)"
 
 source /usr/local/etc/srpcom/env.conf
 source /usr/local/bin/srpcom/utils.sh
@@ -176,16 +176,6 @@ menu_update() {
                 chmod +x /usr/local/bin/srpcom/*.sh /usr/local/bin/xray-api.py /usr/local/bin/bot-admin.py
                 systemctl daemon-reload
                 systemctl restart xray-api srpcom-bot
-                
-                # Merge Extra Domains
-                wget -q -O /tmp/new_domains.txt "$GITHUB_RAW/core/extra_domains.txt"
-                if [ -s /tmp/new_domains.txt ]; then
-                    touch /usr/local/etc/srpcom/extra_domains.txt
-                    cat /usr/local/etc/srpcom/extra_domains.txt /tmp/new_domains.txt | sort -u | grep -v '^$' > /tmp/merged_domains.txt
-                    mv /tmp/merged_domains.txt /usr/local/etc/srpcom/extra_domains.txt
-                    rm -f /tmp/new_domains.txt
-                    rebuild_caddyfile
-                fi
                 
                 # Update menu paling akhir agar tidak memutus proses, lalu exec ulang
                 wget -q -O /usr/local/bin/srpcom/menu.sh "$GITHUB_RAW/core/menu.sh"
@@ -641,30 +631,30 @@ restore_data() {
         sleep 2; return
     fi
 
-    echo -e "\nMetode Restore:"
+    echo -e "\nMetode Restore (Hanya memproses Akun VPN, Sistem diabaikan):"
     echo "1. Replace (Hapus user saat ini, ganti total dengan backup)"
     echo "2. Merge   (Tambahkan user dari backup ke data saat ini)"
     read -p "Pilih Metode [1-2]: " restore_mode
 
-    case $restore_mode in
-        1)
-            tar -xzf "/root/$backup_name" -C / 2>/dev/null
-            if [ -f "/usr/local/etc/srpcom/ssh_expiry.txt" ]; then
-                echo "=> Membangun ulang akun SSH..."
-                while read -r user pass exp_date exp_time; do
-                    if ! id "$user" &>/dev/null; then
-                        useradd -e "$exp_date" -s /bin/false -M "$user"
-                        echo -e "$pass\n$pass" | passwd "$user" &> /dev/null
-                    fi
-                done < /usr/local/etc/srpcom/ssh_expiry.txt
-            fi
-            echo -e "\n\e[32m[SUCCESS]\e[0m Restore Replace Berhasil!"
-            ;;
-        2)
-            echo -e "\nMenggabungkan data (Merging)..."
-            mkdir -p /tmp/restore_temp
-            tar -xzf "/root/$backup_name" -C /tmp/restore_temp 2>/dev/null
-            
+    if [[ "$restore_mode" != "1" && "$restore_mode" != "2" ]]; then
+        echo "Batal."; sleep 1; return
+    fi
+
+    echo -e "\nMemproses data..."
+    mkdir -p /tmp/restore_temp
+    tar -xzf "/root/$backup_name" -C /tmp/restore_temp 2>/dev/null
+    
+    # 1. RESTORE XRAY CONFIG.JSON (Hanya Array Clients)
+    if [ -f "/tmp/restore_temp/usr/local/etc/xray/config.json" ]; then
+        if [ "$restore_mode" == "1" ]; then
+            jq -s '.[0].inbounds[0].settings.clients = .[1].inbounds[0].settings.clients | .[0]' \
+               /usr/local/etc/xray/config.json /tmp/restore_temp/usr/local/etc/xray/config.json > /tmp/merged_v1.json
+            jq -s '.[0].inbounds[1].settings.clients = .[1].inbounds[1].settings.clients | .[0]' \
+               /tmp/merged_v1.json /tmp/restore_temp/usr/local/etc/xray/config.json > /tmp/merged_v2.json
+            jq -s '.[0].inbounds[2].settings.clients = .[1].inbounds[2].settings.clients | .[0]' \
+               /tmp/merged_v2.json /tmp/restore_temp/usr/local/etc/xray/config.json > /tmp/merged_v3.json
+            mv /tmp/merged_v3.json /usr/local/etc/xray/config.json
+        else
             jq -s '.[0].inbounds[0].settings.clients = (.[0].inbounds[0].settings.clients + .[1].inbounds[0].settings.clients | unique_by(.email)) | .[0]' \
                /usr/local/etc/xray/config.json /tmp/restore_temp/usr/local/etc/xray/config.json > /tmp/merged_v1.json
             jq -s '.[0].inbounds[1].settings.clients = (.[0].inbounds[1].settings.clients + .[1].inbounds[1].settings.clients | unique_by(.email)) | .[0]' \
@@ -672,35 +662,38 @@ restore_data() {
             jq -s '.[0].inbounds[2].settings.clients = (.[0].inbounds[2].settings.clients + .[1].inbounds[2].settings.clients | unique_by(.email)) | .[0]' \
                /tmp/merged_v2.json /tmp/restore_temp/usr/local/etc/xray/config.json > /tmp/merged_v3.json
             mv /tmp/merged_v3.json /usr/local/etc/xray/config.json
-            
-            for txt_file in usr/local/etc/xray/expiry.txt usr/local/etc/xray/limit.txt usr/local/etc/srpcom/l2tp_expiry.txt usr/local/etc/srpcom/ssh_expiry.txt usr/local/etc/srpcom/ssh_limit.txt usr/local/etc/srpcom/extra_domains.txt etc/ppp/chap-secrets; do
-                if [ -f "/tmp/restore_temp/$txt_file" ]; then
-                    touch "/$txt_file" 2>/dev/null
-                    cat "/$txt_file" "/tmp/restore_temp/$txt_file" | sort -k1,1 -u > "/tmp/merged_$(basename $txt_file)"
-                    mv "/tmp/merged_$(basename $txt_file)" "/$txt_file"
-                fi
-            done
-            
-            if [ -f "/usr/local/etc/srpcom/ssh_expiry.txt" ]; then
-                echo "=> Membangun ulang akun SSH..."
-                while read -r user pass exp_date exp_time; do
-                    if ! id "$user" &>/dev/null; then
-                        useradd -e "$exp_date" -s /bin/false -M "$user"
-                        echo -e "$pass\n$pass" | passwd "$user" &> /dev/null
-                    fi
-                done < /usr/local/etc/srpcom/ssh_expiry.txt
+        fi
+    fi
+    
+    # 2. RESTORE FILE TXT & CHAP-SECRETS (Hanya Database Akun)
+    ACCOUNT_FILES="usr/local/etc/xray/expiry.txt usr/local/etc/xray/limit.txt usr/local/etc/srpcom/l2tp_expiry.txt usr/local/etc/srpcom/ssh_expiry.txt usr/local/etc/srpcom/ssh_limit.txt etc/ppp/chap-secrets"
+    
+    for txt_file in $ACCOUNT_FILES; do
+        if [ -f "/tmp/restore_temp/$txt_file" ]; then
+            touch "/$txt_file" 2>/dev/null
+            if [ "$restore_mode" == "1" ]; then
+                cp -f "/tmp/restore_temp/$txt_file" "/$txt_file"
+            else
+                cat "/$txt_file" "/tmp/restore_temp/$txt_file" | sort -k1,1 -u > "/tmp/merged_$(basename $txt_file)"
+                mv "/tmp/merged_$(basename $txt_file)" "/$txt_file"
             fi
+        fi
+    done
+    
+    # 3. REBUILD OS USER (SSH)
+    if [ -f "/usr/local/etc/srpcom/ssh_expiry.txt" ]; then
+        echo "=> Membangun ulang OS User SSH..."
+        while read -r user pass exp_date exp_time; do
+            if [ -n "$user" ] && ! id "$user" &>/dev/null; then
+                useradd -e "$exp_date" -s /bin/false -M "$user"
+                echo -e "$pass\n$pass" | passwd "$user" &> /dev/null
+            fi
+        done < /usr/local/etc/srpcom/ssh_expiry.txt
+    fi
 
-            rm -rf /tmp/restore_temp
-            echo -e "\n\e[32m[SUCCESS]\e[0m Restore Merge Berhasil!"
-            ;;
-        *) echo "Batal."; sleep 1; return ;;
-    esac
-
-    # Rebuild Caddyfile agar domain hasil restore langsung didaftarkan ke SSL
-    rebuild_caddyfile
-
+    rm -rf /tmp/restore_temp
     systemctl restart xray caddy xray-api ipsec xl2tpd dropbear ssh-ws srpcom-bot
+    echo -e "\n\e[32m[SUCCESS]\e[0m Restore Data Akun VPN Berhasil!"
     pause
 }
 
