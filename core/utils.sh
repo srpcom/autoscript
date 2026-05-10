@@ -5,7 +5,7 @@
 # Berisi fungsi pembantu, pewarnaan, dan informasi OS
 # ==========================================
 
-# Memuat Environment Global (Domain & IP)
+# Memuat Environment Global (Domain, IP & VPS_NAME)
 source /usr/local/etc/srpcom/env.conf
 
 # Warna Standar
@@ -33,13 +33,38 @@ print_header() {
     U_RAM=$(free -m | awk '/Mem:/ {printf "%.1f MB", $3}')
     T_DISK=$(df -h / | awk 'NR==2 {print $2}')
     U_DISK=$(df -h / | awk 'NR==2 {print $3}')
-    ISP_NAME=$(curl -sS --max-time 3 ipinfo.io/org | cut -d' ' -f2-)
-    REG=$(curl -sS --max-time 3 ipinfo.io/city)
-    TZ=$(cat /etc/timezone)
+    ISP_NAME=$(curl -sS --max-time 3 ipinfo.io/org 2>/dev/null | cut -d' ' -f2-)
+    REG=$(curl -sS --max-time 3 ipinfo.io/city 2>/dev/null)
+    TZ=$(cat /etc/timezone 2>/dev/null)
 
-    # Membaca data Masa Aktif Lisensi dari VPS
-    LIC_EXP=$(cat /usr/local/etc/srpcom/license_exp.txt 2>/dev/null)
-    if [ -z "$LIC_EXP" ]; then LIC_EXP="Tidak Diketahui"; fi
+    # ==========================================
+    # MEMBACA MASA AKTIF LISENSI LIVE DARI API (D1)
+    # ==========================================
+    FORMATTED_NAME=$(echo "$VPS_NAME" | sed 's/ /%20/g')
+    API_CHECK_URL="https://tuban.store/api/license/check?ip=$IP_ADD&name=$FORMATTED_NAME"
+    
+    # Hit API dengan timeout 3 detik agar menu tidak lemot jika internet bermasalah
+    API_RES=$(curl -sS --max-time 3 "$API_CHECK_URL" 2>/dev/null)
+    
+    if [ -n "$API_RES" ]; then
+        IS_SUCCESS=$(echo "$API_RES" | grep -o '"success":true')
+        if [ -n "$IS_SUCCESS" ]; then
+            # Ambil tanggal expired dari API JSON Response
+            LIC_EXP=$(echo "$API_RES" | grep -o '"expires_at":"[^"]*' | cut -d'"' -f4)
+            # Simpan sebagai backup lokal jika sewaktu-waktu web mati
+            echo "$LIC_EXP" > /usr/local/etc/srpcom/license_exp.txt
+        else
+            # Ambil pesan error penolakan (Misal: Expired / Tidak Terdaftar)
+            LIC_EXP=$(echo "$API_RES" | grep -o '"message":"[^"]*' | cut -d'"' -f4 | cut -c 1-22)
+            if [ -z "$LIC_EXP" ]; then LIC_EXP="Lisensi Ditolak API!"; fi
+            echo "EXPIRED" > /usr/local/etc/srpcom/license_exp.txt
+        fi
+    else
+        # Fallback ke file txt lokal jika API timeout / Cloudflare sedang gangguan
+        LIC_EXP=$(cat /usr/local/etc/srpcom/license_exp.txt 2>/dev/null)
+        if [ -z "$LIC_EXP" ]; then LIC_EXP="Koneksi API Gagal"; fi
+    fi
+    # ==========================================
 
     # Menghitung Total Akun Berdasarkan Protokol
     XRAY_C=$(jq '[.inbounds[] | select(.protocol=="vmess" or .protocol=="vless" or .protocol=="trojan") | .settings.clients | length] | add' /usr/local/etc/xray/config.json 2>/dev/null || echo 0)
