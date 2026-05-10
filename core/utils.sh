@@ -43,9 +43,10 @@ print_header() {
     L2TP_C=$(wc -l < /usr/local/etc/srpcom/l2tp_expiry.txt 2>/dev/null || echo 0)
 
     clear
-    echo -e "${CYAN}╔══════════════════════════════════════════════════════╗${NC}"
-    printf "${CYAN}║ %-52s ║\n${NC}" "SRPCOM AUTO SCRIPT ${SCRIPT_VERSION:-v.1}"
-    echo -e "${CYAN}╚══════════════════════════════════════════════════════╝${NC}"
+    echo -e "${CYAN}╔══════════════════════════════════════╗${NC}"
+    printf "${CYAN}║ %-36s ║\n${NC}" "         SRPCOM AUTO SCRIPT"
+    printf "${CYAN}║ %-36s ║\n${NC}" "    ${SCRIPT_VERSION:-v.1}"
+    echo -e "${CYAN}╚══════════════════════════════════════╝${NC}"
     echo " OS SYSTEM     : ${OS_SYS} ${BIT}"
     echo " KERNEL TYPE   : ${KRNL}"
     echo " CPU MODEL     : ${CPUMDL} (${CORE} core)"
@@ -53,7 +54,7 @@ print_header() {
     echo " DOMAIN        : ${DOMAIN}"
     echo " IP ADDRESS    : ${IP_ADD}"
     echo " ISP           : ${ISP_NAME}"
-    echo -e "${CYAN}╔══════════════════════════════════════════════════════╗${NC}"
-    printf "${CYAN}║ XRAY : %-10s| SSH : %-10s| L2TP : %-9s║\n${NC}" "${XRAY_C:-0}" "${SSH_C:-0}" "${L2TP_C:-0}"
-    echo -e "${CYAN}╚══════════════════════════════════════════════════════╝${NC}"
+    echo -e "${CYAN}╔══════════════════════════════════════╗${NC}"
+    printf "${CYAN}║ XRAY: %-5s| SSH: %-5s| L2TP: %-6s║\n${NC}" "${XRAY_C:-0}" "${SSH_C:-0}" "${L2TP_C:-0}"
+    echo -e "${CYAN}╚══════════════════════════════════════╝${NC}"
 }
