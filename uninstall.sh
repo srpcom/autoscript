@@ -21,7 +21,7 @@ echo " - L2TP/IPsec (xl2tpd & strongswan)"
 echo " - SSH-WS, Dropbear, & Akun-akun SSH"
 echo " - OpenVPN & BadVPN UDPGW"
 echo " - Bot Telegram Admin & API Backend"
-echo " - Seluruh cronjob dan file sistem srpcom"
+echo " - Seluruh cronjob, firewall, dan file sistem srpcom"
 echo "====================================================="
 read -p "Apakah Anda YAKIN ingin menghapus semuanya? (y/n): " confirm
 if [[ "$confirm" != "y" && "$confirm" != "Y" ]]; then
@@ -41,7 +41,9 @@ systemctl disable xray caddy ipsec xl2tpd dropbear openvpn-server@server-udp ope
 echo -e "\n[2/7] Menghapus Akun SSH/Dropbear yang Dibuat..."
 if [ -f "/usr/local/etc/srpcom/ssh_expiry.txt" ]; then
     grep -v "^$" /usr/local/etc/srpcom/ssh_expiry.txt | while read -r user pass exp_date exp_time; do
-        userdel -f "$user" 2>/dev/null
+        if id "$user" &>/dev/null; then
+            userdel -f "$user" 2>/dev/null
+        fi
     done
 fi
 
@@ -59,7 +61,8 @@ ETH=$(ip route ls | grep default | awk '{print $5}' | head -n 1)
 iptables -t nat -D POSTROUTING -s 192.168.42.0/24 -o $ETH -j MASQUERADE 2>/dev/null
 iptables -t nat -D POSTROUTING -s 10.8.0.0/24 -o $ETH -j MASQUERADE 2>/dev/null
 iptables -t nat -D POSTROUTING -s 10.9.0.0/24 -o $ETH -j MASQUERADE 2>/dev/null
-# Menonaktifkan UFW (opsional, karena sebelumnya diaktifkan oleh script)
+# Reset dan Nonaktifkan UFW ke kondisi pabrik
+ufw --force reset >/dev/null 2>&1
 ufw disable >/dev/null 2>&1
 
 echo -e "\n[6/7] Menghapus Seluruh File & Folder Konfigurasi..."
@@ -87,7 +90,10 @@ rm -f /etc/systemd/system/badvpn-7100.service
 rm -f /etc/systemd/system/badvpn-7200.service
 rm -f /etc/systemd/system/badvpn-7300.service
 rm -f /etc/systemd/system/vpn-nat.service
+
+# Membersihkan Daemon Cache agar tidak ada status 'failed' atau 'not-found'
 systemctl daemon-reload
+systemctl reset-failed
 
 echo -e "\n[7/7] Menghapus Cronjob & Menghapus Shortcut Menu..."
 rm -f /etc/cron.d/xray_autobackup
@@ -97,8 +103,11 @@ sed -i '/menu/d' /root/.profile
 
 clear
 echo "====================================================="
-echo "    UNINSTALL SELESAI & BERHASIL!                    "
+echo -e "\e[32m         UNINSTALL SELESAI & BERHASIL!               \e[0m"
 echo "====================================================="
 echo " Seluruh layanan VPN, Bot, dan file sistem telah     "
-echo " dibersihkan dari VPS Anda.                          "
+echo " dibersihkan secara total dari VPS Anda.             "
+echo "                                                     "
+echo " INFO: Swap RAM 2GB & Optimasi TCP BBR sengaja       "
+echo " dipertahankan karena baik untuk performa VPS Anda.  "
 echo "====================================================="
