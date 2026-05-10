@@ -91,10 +91,8 @@ def api_req(endpoint, method="POST", payload=None):
         else:
             res = requests.post(url, headers=headers, json=payload, timeout=10)
             
-        # Pengecekan HTTP Status agar error 404/500 tidak tereksekusi sbg text biasa
         res.raise_for_status()
         
-        # BARIS YANG DIUBAH (Mengutamakan format telegram stdout_tg)
         res_json = res.json()
         return res_json.get('stdout_tg', res_json.get('stdout', '✅ Command executed successfully but no output.'))
 
@@ -149,11 +147,14 @@ def get_list_accounts(prot):
 def handle_backup_bot(chat_id):
     now_str = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
     backup_file = f"/tmp/srpcom-backup-{now_str}.tar.gz"
+    # Hanya membackup file database akun VPN, BUKAN file settingan sistem
     files = [
-        "/usr/local/etc/xray/config.json", "/usr/local/etc/xray/expiry.txt", 
-        "/usr/local/etc/xray/limit.txt", "/usr/local/etc/srpcom/env.conf", 
-        "/usr/local/etc/srpcom/l2tp_expiry.txt", "/usr/local/etc/srpcom/ssh_expiry.txt", 
-        "/usr/local/etc/srpcom/ssh_limit.txt", "/usr/local/etc/srpcom/extra_domains.txt",
+        "/usr/local/etc/xray/config.json", 
+        "/usr/local/etc/xray/expiry.txt", 
+        "/usr/local/etc/xray/limit.txt", 
+        "/usr/local/etc/srpcom/l2tp_expiry.txt", 
+        "/usr/local/etc/srpcom/ssh_expiry.txt", 
+        "/usr/local/etc/srpcom/ssh_limit.txt", 
         "/etc/ppp/chap-secrets"
     ]
     valid = [f for f in files if os.path.exists(f)]
