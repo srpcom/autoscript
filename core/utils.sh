@@ -33,9 +33,13 @@ print_header() {
     U_RAM=$(free -m | awk '/Mem:/ {printf "%.1f MB", $3}')
     T_DISK=$(df -h / | awk 'NR==2 {print $2}')
     U_DISK=$(df -h / | awk 'NR==2 {print $3}')
-    ISP_NAME=$(curl -sS --max-time 3 ipinfo.io/org | cut -d' ' -f2-)
-    REG=$(curl -sS --max-time 3 ipinfo.io/city)
-    TZ=$(cat /etc/timezone)
+    ISP_NAME=$(curl -sS --max-time 3 ipinfo.io/org 2>/dev/null | cut -d' ' -f2-)
+    REG=$(curl -sS --max-time 3 ipinfo.io/city 2>/dev/null)
+    TZ=$(cat /etc/timezone 2>/dev/null)
+
+    # Membaca data Masa Aktif Lisensi dari VPS
+    LIC_EXP=$(cat /usr/local/etc/srpcom/license_exp.txt 2>/dev/null)
+    if [ -z "$LIC_EXP" ]; then LIC_EXP="Tidak Diketahui"; fi
 
     # Menghitung Total Akun Berdasarkan Protokol
     XRAY_C=$(jq '[.inbounds[] | select(.protocol=="vmess" or .protocol=="vless" or .protocol=="trojan") | .settings.clients | length] | add' /usr/local/etc/xray/config.json 2>/dev/null || echo 0)
@@ -46,6 +50,7 @@ print_header() {
     echo -e "${CYAN}╔══════════════════════════════════════╗${NC}"
     printf "${CYAN}║ %-36s ║\n${NC}" "         SRPCOM AUTO SCRIPT"
     printf "${CYAN}║ %-36s ║\n${NC}" "    ${SCRIPT_VERSION:-v.1}"
+    printf "${CYAN}║ %-36s ║\n${NC}" " Lisensi Aktif : $LIC_EXP"
     echo -e "${CYAN}╚══════════════════════════════════════╝${NC}"
     
     # Menyusun string informasi dan membatasi maksimal 40 karakter agar tidak wrap di HP
