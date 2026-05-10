@@ -63,7 +63,7 @@ $domains_string {
     }
 }
 EOF
-    systemctl restart caddy
+    systemctl reload caddy
 }
 
 menu_update() {
