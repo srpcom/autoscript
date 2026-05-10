@@ -71,7 +71,7 @@ add_vmess_ws() {
     echo "$user $exp_date $exp_time" >> /usr/local/etc/xray/expiry.txt
 
     jq '(.inbounds[] | select(.protocol=="vmess") | .settings.clients) += [{"id": "'$uuid'", "alterId": 0, "email": "'$user'"}]' /usr/local/etc/xray/config.json > /tmp/config.json
-    mv /tmp/config.json /usr/local/etc/xray/config.json
+    if [ -s /tmp/config.json ]; then mv /tmp/config.json /usr/local/etc/xray/config.json; fi
     systemctl restart xray
     
     tls_json="{\"v\":\"2\",\"ps\":\"${user}\",\"add\":\"${DOMAIN}\",\"port\":\"443\",\"id\":\"${uuid}\",\"aid\":\"0\",\"scy\":\"auto\",\"net\":\"ws\",\"type\":\"none\",\"host\":\"${DOMAIN}\",\"path\":\"/vmessws\",\"tls\":\"tls\",\"sni\":\"${DOMAIN}\"}"
@@ -103,7 +103,7 @@ add_vless_ws() {
     echo "$user $exp_date $exp_time" >> /usr/local/etc/xray/expiry.txt
 
     jq '(.inbounds[] | select(.protocol=="vless") | .settings.clients) += [{"id": "'$uuid'", "email": "'$user'"}]' /usr/local/etc/xray/config.json > /tmp/config.json
-    mv /tmp/config.json /usr/local/etc/xray/config.json
+    if [ -s /tmp/config.json ]; then mv /tmp/config.json /usr/local/etc/xray/config.json; fi
     systemctl restart xray
     
     link_tls="vless://${uuid}@${DOMAIN}:443?path=/vlessws&security=tls&encryption=none&host=${DOMAIN}&type=ws&sni=${DOMAIN}#${user}"
@@ -133,7 +133,7 @@ add_trojan_ws() {
     echo "$user $exp_date $exp_time" >> /usr/local/etc/xray/expiry.txt
 
     jq '(.inbounds[] | select(.protocol=="trojan") | .settings.clients) += [{"password": "'$uuid'", "email": "'$user'"}]' /usr/local/etc/xray/config.json > /tmp/config.json
-    mv /tmp/config.json /usr/local/etc/xray/config.json
+    if [ -s /tmp/config.json ]; then mv /tmp/config.json /usr/local/etc/xray/config.json; fi
     systemctl restart xray
     
     link_tls="trojan://${uuid}@${DOMAIN}:443?path=/trojanws&security=tls&host=${DOMAIN}&type=ws&sni=${DOMAIN}#${user}"
@@ -179,7 +179,7 @@ add_trial() {
         echo -e "\n=> Pilihan tidak valid!"; sleep 1; add_trial; return
     fi
     
-    mv /tmp/config.json /usr/local/etc/xray/config.json
+    if [ -s /tmp/config.json ]; then mv /tmp/config.json /usr/local/etc/xray/config.json; fi
     echo "$user $exp_date $exp_time" >> /usr/local/etc/xray/expiry.txt
     systemctl restart xray
     
@@ -242,8 +242,8 @@ delete_xray() {
 
     if [[ "$choice" -gt 0 && "$choice" -le "${#users[@]}" ]]; then
         user="${users[$((choice-1))]}"
-        jq '(.inbounds[].settings.clients) |= map(select(.email != "'$user'"))' /usr/local/etc/xray/config.json > /tmp/config.json
-        mv /tmp/config.json /usr/local/etc/xray/config.json
+        jq '(.inbounds[] | select(.protocol == "vmess" or .protocol == "vless" or .protocol == "trojan") | .settings.clients) |= map(select(.email != "'$user'"))' /usr/local/etc/xray/config.json > /tmp/config.json
+        if [ -s /tmp/config.json ]; then mv /tmp/config.json /usr/local/etc/xray/config.json; fi
         sed -i "/^$user /d" /usr/local/etc/xray/expiry.txt
         systemctl restart xray
         echo -e "\n\e[32m=> Akun '$user' berhasil dihapus!\e[0m"
@@ -456,7 +456,7 @@ change_protocol_uuid() {
         elif [[ "$prot" == "trojan" ]]; then
             jq '(.inbounds[] | select(.protocol=="'$prot'") | .settings.clients[] | select(.email=="'$selected_user'") | .password) = "'$new_uuid'"' /usr/local/etc/xray/config.json > /tmp/config.json
         fi
-        mv /tmp/config.json /usr/local/etc/xray/config.json
+        if [ -s /tmp/config.json ]; then mv /tmp/config.json /usr/local/etc/xray/config.json; fi
         systemctl restart xray
         echo -e "\n=> UUID/Password untuk '$selected_user' berhasil diubah!"
         sleep 2
