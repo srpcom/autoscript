@@ -40,30 +40,56 @@ print_header() {
     # ==========================================
     # MEMBACA MASA AKTIF LISENSI LIVE DARI API (D1)
     # ==========================================
+    # Fallback jika VPS_NAME kosong di env.conf (VPS versi lama)
+    if [ -z "$VPS_NAME" ]; then 
+        VPS_NAME="Unknown"
+    fi
+    
     FORMATTED_NAME=$(echo "$VPS_NAME" | sed 's/ /%20/g')
     API_CHECK_URL="https://tuban.store/api/license/check?ip=$IP_ADD&name=$FORMATTED_NAME"
     
-    # Hit API dengan timeout 3 detik agar menu tidak lemot jika internet bermasalah
+    # Inisialisasi variabel kosong
+    LIC_EXP=""
+    
+    # Hit API dengan timeout 3 detik agar menu tidak hang
     API_RES=$(curl -sS --max-time 3 "$API_CHECK_URL" 2>/dev/null)
     
     if [ -n "$API_RES" ]; then
-        IS_SUCCESS=$(echo "$API_RES" | grep -o '"success":true')
-        if [ -n "$IS_SUCCESS" ]; then
-            # Ambil tanggal expired dari API JSON Response
-            LIC_EXP=$(echo "$API_RES" | grep -o '"expires_at":"[^"]*' | cut -d'"' -f4)
-            # Simpan sebagai backup lokal jika sewaktu-waktu web mati
-            echo "$LIC_EXP" > /usr/local/etc/srpcom/license_exp.txt
-        else
-            # Ambil pesan error penolakan (Misal: Expired / Tidak Terdaftar)
-            LIC_EXP=$(echo "$API_RES" | grep -o '"message":"[^"]*' | cut -d'"' -f4 | cut -c 1-22)
-            if [ -z "$LIC_EXP" ]; then LIC_EXP="Lisensi Ditolak API!"; fi
+        # Ekstrak status boolean JSON dengan aman menggunakan jq
+        IS_SUCCESS=$(echo "$API_RES" | jq -r '.success' 2>/dev/null)
+        
+        if [ "$IS_SUCCESS" == "true" ]; then
+            LIC_EXP=$(echo "$API_RES" | jq -r '.data.expires_at' 2>/dev/null)
+            # Simpan backup lokal jika dapet data
+            if [ -n "$LIC_EXP" ] && [ "$LIC_EXP" != "null" ]; then
+                echo "$LIC_EXP" > /usr/local/etc/srpcom/license_exp.txt
+            fi
+        elif [ "$IS_SUCCESS" == "false" ]; then
+            MSG=$(echo "$API_RES" | jq -r '.message' 2>/dev/null)
+            if [ -n "$MSG" ] && [ "$MSG" != "null" ]; then
+                LIC_EXP="$MSG"
+            else
+                LIC_EXP="Lisensi Ditolak API"
+            fi
             echo "EXPIRED" > /usr/local/etc/srpcom/license_exp.txt
         fi
-    else
-        # Fallback ke file txt lokal jika API timeout / Cloudflare sedang gangguan
-        LIC_EXP=$(cat /usr/local/etc/srpcom/license_exp.txt 2>/dev/null)
-        if [ -z "$LIC_EXP" ]; then LIC_EXP="Koneksi API Gagal"; fi
     fi
+
+    # Fallback ke txt lokal jika API timeout / format rusak (HTML error dari Cloudflare)
+    if [ -z "$LIC_EXP" ] || [ "$LIC_EXP" == "null" ]; then
+        LIC_EXP=$(cat /usr/local/etc/srpcom/license_exp.txt 2>/dev/null)
+    fi
+
+    # Bersihkan dari spasi enter (newline/whitespace) yang memicu error output
+    LIC_EXP=$(echo "$LIC_EXP" | xargs)
+
+    # Fallback terakhir jika string benar-benar kosong
+    if [ -z "$LIC_EXP" ]; then 
+        LIC_EXP="Tidak Diketahui"
+    fi
+
+    # Mencegah kotak (box menu) jebol jika teks terlalu panjang (Maks 19 Karakter)
+    LIC_EXP="${LIC_EXP:0:19}"
     # ==========================================
 
     # Menghitung Total Akun Berdasarkan Protokol
