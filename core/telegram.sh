@@ -40,8 +40,12 @@ run_autobackup() {
     local date_str=$(date +"%Y-%m-%d_%H-%M")
     local backup_file="/tmp/srpcom-backup-${date_str}.tar.gz"
     
-    # Mengompresi seluruh file database penting (Xray, SSH, L2TP)
-    tar -czf "$backup_file" /usr/local/etc/xray /usr/local/etc/srpcom /etc/ppp/chap-secrets 2>/dev/null
+    # Mengompresi HANYA file database akun (Xray, SSH, L2TP) tanpa settingan sistem
+    local valid_files=""
+    for f in /usr/local/etc/xray/config.json /usr/local/etc/xray/expiry.txt /usr/local/etc/xray/limit.txt /usr/local/etc/srpcom/l2tp_expiry.txt /usr/local/etc/srpcom/ssh_expiry.txt /usr/local/etc/srpcom/ssh_limit.txt /etc/ppp/chap-secrets; do
+        if [ -f "$f" ]; then valid_files="$valid_files $f"; fi
+    done
+    tar -czf "$backup_file" $valid_files 2>/dev/null
     
     local caption="📦 *AUTO BACKUP HARIAN*\n━━━━━━━━━━━━━━━━━━━━\nDomain : ${DOMAIN}\nIP VPS : ${IP_ADD}\nTanggal : $(date +"%Y-%m-%d %H:%M:%S")\n━━━━━━━━━━━━━━━━━━━━\n_Pesan otomatis dari server_"
     
@@ -76,7 +80,12 @@ manual_backup_telegram() {
     local date_str=$(date +"%Y-%m-%d_%H-%M")
     local backup_file="/root/srpcom-backup-${date_str}.tar.gz"
     
-    tar -czf "$backup_file" /usr/local/etc/xray /usr/local/etc/srpcom /etc/ppp/chap-secrets 2>/dev/null
+    # Mengompresi HANYA file database akun (Xray, SSH, L2TP) tanpa settingan sistem
+    local valid_files=""
+    for f in /usr/local/etc/xray/config.json /usr/local/etc/xray/expiry.txt /usr/local/etc/xray/limit.txt /usr/local/etc/srpcom/l2tp_expiry.txt /usr/local/etc/srpcom/ssh_expiry.txt /usr/local/etc/srpcom/ssh_limit.txt /etc/ppp/chap-secrets; do
+        if [ -f "$f" ]; then valid_files="$valid_files $f"; fi
+    done
+    tar -czf "$backup_file" $valid_files 2>/dev/null
     
     echo "=> Sedang mengirim file ke Telegram Anda..."
     local caption="📦 *MANUAL BACKUP VPS*\n━━━━━━━━━━━━━━━━━━━━\nDomain : ${DOMAIN}\nIP VPS : ${IP_ADD}\nTanggal : $(date +"%Y-%m-%d %H:%M:%S")\n━━━━━━━━━━━━━━━━━━━━"
