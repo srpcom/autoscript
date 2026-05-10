@@ -3,10 +3,10 @@
 # menu.sh
 # MODULE: MAIN MENU (ROUTER)
 # Menampilkan antarmuka CLI utama dan perutean menu
-# Versi : 1.0 (10 Mei 2026 09:50 WIB)>> update time setiap script berubah, jangan hapus pesan ini agar AI tahu apa yang harus dilakukan
+# Versi : 1.0 (10 Mei 2026 10:08 WIB)>> update time setiap script berubah, jangan hapus pesan ini agar AI tahu apa yang harus dilakukan
 # ==========================================
 
-SCRIPT_VERSION="1.0 (10 Mei 2026 09:50 WIB)"
+SCRIPT_VERSION="1.0 (10 Mei 2026 10:08 WIB)"
 
 source /usr/local/etc/srpcom/env.conf
 source /usr/local/bin/srpcom/utils.sh
@@ -25,7 +25,8 @@ rebuild_caddyfile() {
     local main_domain="$DOMAIN"
     local main_str="http://$main_domain, https://$main_domain, http://support.zoom.us.$main_domain, https://support.zoom.us.$main_domain"
     
-    cat > /etc/caddy/Caddyfile << EOF
+    # Simpan ke file temporary terlebih dahulu
+    cat > /tmp/temp_caddyfile << EOF
 (proxy_rules) {
     handle /user_legend/* {
         reverse_proxy localhost:5000
@@ -70,7 +71,7 @@ EOF
         done < /usr/local/etc/srpcom/extra_domains.txt
         
         if [ -n "$extra_str" ]; then
-            cat >> /etc/caddy/Caddyfile << EOF
+            cat >> /tmp/temp_caddyfile << EOF
 
 $extra_str {
     import proxy_rules
@@ -80,8 +81,15 @@ EOF
         fi
     fi
 
-    # Reload Caddy secara halus di background agar script terminal sempat memberikan output SUCCESS
-    nohup systemctl reload caddy >/dev/null 2>&1 &
+    # Cek apakah konfigurasi benar-benar berubah sebelum me-reload Caddy
+    if ! cmp -s /etc/caddy/Caddyfile /tmp/temp_caddyfile; then
+        mv /tmp/temp_caddyfile /etc/caddy/Caddyfile
+        # Reload Caddy secara halus di background (delay 2 detik) agar output CLI sempat muncul di terminal
+        nohup bash -c "sleep 2; systemctl reload caddy" >/dev/null 2>&1 &
+    else
+        # Jika tidak ada perubahan isi, hapus file temporary dan abaikan reload (mencegah SSH terputus sia-sia)
+        rm -f /tmp/temp_caddyfile
+    fi
 }
 
 menu_update() {
