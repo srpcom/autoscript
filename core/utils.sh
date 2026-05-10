@@ -45,8 +45,12 @@ print_header() {
         VPS_NAME="Unknown"
     fi
     
-    FORMATTED_NAME=$(echo "$VPS_NAME" | sed 's/ /%20/g')
-    API_CHECK_URL="https://tuban.store/api/license/check?ip=$IP_ADD&name=$FORMATTED_NAME"
+    # BERSIIHKAN KARAKTER ENTER/NEWLINE TERSEMBUNYI DARI FILE CONF
+    CLEAN_IP=$(echo -n "$IP_ADD" | tr -d '\r\n')
+    CLEAN_NAME=$(echo -n "$VPS_NAME" | tr -d '\r\n')
+    
+    FORMATTED_NAME=$(echo "$CLEAN_NAME" | sed 's/ /%20/g')
+    API_CHECK_URL="https://tuban.store/api/license/check?ip=$CLEAN_IP&name=$FORMATTED_NAME"
     
     # Inisialisasi variabel kosong
     LIC_EXP=""
