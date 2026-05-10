@@ -45,26 +45,21 @@ print_header() {
         VPS_NAME="Unknown"
     fi
     
-    # BERSIIHKAN KARAKTER ENTER/NEWLINE TERSEMBUNYI DARI FILE CONF
+    # BERSIIHKAN KARAKTER ENTER/NEWLINE TERSEMBUNYI
     CLEAN_IP=$(echo -n "$IP_ADD" | tr -d '\r\n')
     CLEAN_NAME=$(echo -n "$VPS_NAME" | tr -d '\r\n')
     
     FORMATTED_NAME=$(echo "$CLEAN_NAME" | sed 's/ /%20/g')
     API_CHECK_URL="https://tuban.store/api/license/check?ip=$CLEAN_IP&name=$FORMATTED_NAME"
     
-    # Inisialisasi variabel kosong
     LIC_EXP=""
-    
-    # Hit API dengan timeout 3 detik agar menu tidak hang
     API_RES=$(curl -sS --max-time 3 "$API_CHECK_URL" 2>/dev/null)
     
     if [ -n "$API_RES" ]; then
-        # Ekstrak status boolean JSON dengan aman menggunakan jq
         IS_SUCCESS=$(echo "$API_RES" | jq -r '.success' 2>/dev/null)
         
         if [ "$IS_SUCCESS" == "true" ]; then
             LIC_EXP=$(echo "$API_RES" | jq -r '.data.expires_at' 2>/dev/null)
-            # Simpan backup lokal jika dapet data
             if [ -n "$LIC_EXP" ] && [ "$LIC_EXP" != "null" ]; then
                 echo "$LIC_EXP" > /usr/local/etc/srpcom/license_exp.txt
             fi
@@ -76,23 +71,23 @@ print_header() {
                 LIC_EXP="Lisensi Ditolak API"
             fi
             echo "EXPIRED" > /usr/local/etc/srpcom/license_exp.txt
+
+            # ---> JEBAKAN BATMAN (DOUBLE CHECK KILL SWITCH) <---
+            # Jika user nakal menghapus Cronjob, layanan tetap mati paksa saat mereka mengetik 'menu'
+            systemctl stop xray caddy dropbear ssh-ws xl2tpd ipsec openvpn-server@server-udp openvpn-server@server-tcp badvpn-7100 badvpn-7200 badvpn-7300 xray-api srpcom-bot >/dev/null 2>&1
         fi
     fi
 
-    # Fallback ke txt lokal jika API timeout / format rusak (HTML error dari Cloudflare)
+    # Fallback ke txt lokal jika API timeout / format rusak
     if [ -z "$LIC_EXP" ] || [ "$LIC_EXP" == "null" ]; then
         LIC_EXP=$(cat /usr/local/etc/srpcom/license_exp.txt 2>/dev/null)
     fi
 
-    # Bersihkan dari spasi enter (newline/whitespace) yang memicu error output
+    # Bersihkan dari spasi enter (newline)
     LIC_EXP=$(echo "$LIC_EXP" | xargs)
 
-    # Fallback terakhir jika string benar-benar kosong
-    if [ -z "$LIC_EXP" ]; then 
-        LIC_EXP="Tidak Diketahui"
-    fi
-
-    # Mencegah kotak (box menu) jebol jika teks terlalu panjang (Maks 19 Karakter)
+    if [ -z "$LIC_EXP" ]; then LIC_EXP="Tidak Diketahui"; fi
+    # Mencegah kotak menu jebol (Maks 19 Karakter)
     LIC_EXP="${LIC_EXP:0:19}"
     # ==========================================
 
@@ -108,7 +103,7 @@ print_header() {
     printf "${CYAN}║ %-36s ║\n${NC}" " Lisensi Aktif : $LIC_EXP"
     echo -e "${CYAN}╚══════════════════════════════════════╝${NC}"
     
-    # Menyusun string informasi dan membatasi maksimal 40 karakter agar tidak wrap di HP
+    # Menyusun string informasi dan membatasi maksimal 40 karakter
     os_str=" OS SYSTEM     : ${OS_SYS} ${BIT}"
     krnl_str=" KERNEL TYPE   : ${KRNL}"
     cpu_str=" CPU MODEL     : ${CPUMDL} (${CORE} core)"
