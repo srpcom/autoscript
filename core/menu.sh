@@ -3,10 +3,10 @@
 # menu.sh
 # MODULE: MAIN MENU (ROUTER)
 # Menampilkan antarmuka CLI utama dan perutean menu
-# Versi : 1.0 (10 Mei 2026 09:20 WIB)>> update time setiap script berubah, jangan hapus pesan ini agar AI tahu apa yang harus dilakukan
+# Versi : 1.0 (10 Mei 2026 09:26 WIB)>> update time setiap script berubah, jangan hapus pesan ini agar AI tahu apa yang harus dilakukan
 # ==========================================
 
-SCRIPT_VERSION="1.0 (10 Mei 2026 09:20 WIB)"
+SCRIPT_VERSION="1.0 (10 Mei 2026 09:26 WIB)"
 
 source /usr/local/etc/srpcom/env.conf
 source /usr/local/bin/srpcom/utils.sh
@@ -23,22 +23,10 @@ GITHUB_RAW="https://raw.githubusercontent.com/syamsul18782/xray2026/main"
 # ==========================================
 rebuild_caddyfile() {
     local main_domain="$DOMAIN"
-    local domains_string="http://$main_domain, https://$main_domain"
+    local main_str="http://$main_domain, https://$main_domain, http://support.zoom.us.$main_domain, https://support.zoom.us.$main_domain"
     
-    # Menambahkan support default untuk support.zoom.us
-    domains_string="$domains_string, http://support.zoom.us.$main_domain, https://support.zoom.us.$main_domain"
-    
-    # Membaca extra domains jika ada (Ditambahkan dari Menu 10 atau hasil Restore)
-    if [ -f "/usr/local/etc/srpcom/extra_domains.txt" ]; then
-        while read -r ext_dom; do
-            if [ -n "$ext_dom" ]; then
-                domains_string="$domains_string, http://$ext_dom, https://$ext_dom"
-            fi
-        done < /usr/local/etc/srpcom/extra_domains.txt
-    fi
-
     cat > /etc/caddy/Caddyfile << EOF
-$domains_string {
+(proxy_rules) {
     handle /user_legend/* {
         reverse_proxy localhost:5000
     }
@@ -62,8 +50,36 @@ $domains_string {
         reverse_proxy localhost:10004
     }
 }
+
+$main_str {
+    import proxy_rules
+}
 EOF
-    systemctl reload caddy
+
+    # Menambahkan blok khusus untuk extra domains agar main domain tidak terpengaruh saat reload
+    if [ -s "/usr/local/etc/srpcom/extra_domains.txt" ]; then
+        local extra_str=""
+        while read -r ext_dom; do
+            if [ -n "$ext_dom" ]; then
+                if [ -z "$extra_str" ]; then
+                    extra_str="http://$ext_dom, https://$ext_dom"
+                else
+                    extra_str="$extra_str, http://$ext_dom, https://$ext_dom"
+                fi
+            fi
+        done < /usr/local/etc/srpcom/extra_domains.txt
+        
+        if [ -n "$extra_str" ]; then
+            cat >> /etc/caddy/Caddyfile << EOF
+
+$extra_str {
+    import proxy_rules
+}
+EOF
+        fi
+    fi
+
+    systemctl reload caddy 2>/dev/null || systemctl restart caddy 2>/dev/null
 }
 
 menu_update() {
