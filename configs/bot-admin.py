@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 # ==========================================
 # bot-admin.py
-# MODULE: TELEGRAM ADMIN INTERACTIVE BOT (REVISED)
+# MODULE: TELEGRAM MASTER-NODE PANEL
+# Mengendalikan puluhan VPS dari 1 Bot Telegram
 # ==========================================
 
 import os
@@ -9,7 +10,7 @@ import sys
 import json
 import time
 import datetime
-import subprocess
+import base64
 import requests
 import telebot
 import logging
@@ -18,61 +19,39 @@ from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton, ForceReply
 # --- KONFIGURASI PATH ---
 CONF_FILE = '/usr/local/etc/xray/bot_admin.conf'
 API_KEY_FILE = '/usr/local/etc/xray/api_key.conf'
-API_BASE = 'http://127.0.0.1:5000/user_legend'
-XRAY_CONF = '/usr/local/etc/xray/config.json'
-XRAY_EXP = '/usr/local/etc/xray/expiry.txt'
-SSH_EXP = '/usr/local/etc/srpcom/ssh_expiry.txt'
-L2TP_EXP = '/usr/local/etc/srpcom/l2tp_expiry.txt'
+SERVERS_FILE = '/usr/local/etc/xray/servers.json'
 
-# --- LOADING SETTINGS ---
+# --- STATE MANAGEMENT ---
+# Menyimpan sesi aktif (Server yang sedang dikelola oleh Admin/Chat ID tersebut)
+active_server = {}
+
+def get_api_key():
+    try:
+        with open(API_KEY_FILE, 'r') as f: return f.read().strip()
+    except: pass
+    return "DEFAULT_KEY"
+
 def load_bot_config():
     bot_token, admin_id = "", ""
     try:
         if os.path.exists(CONF_FILE):
             with open(CONF_FILE, 'r') as f:
-                lines = f.read().splitlines()
-                for line in lines:
-                    if line.startswith('BOT_TOKEN='):
-                        bot_token = line.split('=')[1].strip().strip('"').strip("'")
-                    elif line.startswith('ADMIN_ID='):
-                        admin_id = line.split('=')[1].strip().strip('"').strip("'")
-    except Exception:
-        pass
+                for line in f.read().splitlines():
+                    if line.startswith('BOT_TOKEN='): bot_token = line.split('=')[1].strip().strip('"').strip("'")
+                    elif line.startswith('ADMIN_ID='): admin_id = line.split('=')[1].strip().strip('"').strip("'")
+    except: pass
     return bot_token, admin_id
 
 BOT_TOKEN, ADMIN_ID = load_bot_config()
 
-# Mencegah SystemD Crash Loop
 if not BOT_TOKEN or not ADMIN_ID:
-    print("WARNING: Token Bot atau Admin ID kosong di file /usr/local/etc/xray/bot_admin.conf.")
-    print("Bot masuk ke mode siaga. Silakan setting melalui menu CLI.")
+    print("WARNING: Bot Token atau Admin ID kosong. Menunggu konfigurasi...")
     while not BOT_TOKEN or not ADMIN_ID:
         time.sleep(30)
         BOT_TOKEN, ADMIN_ID = load_bot_config()
-    print("Token ditemukan! Melanjutkan inisiasi bot...")
+    print("Token ditemukan! Bot dijalankan...")
 
-def get_api_key():
-    try:
-        if os.path.exists(API_KEY_FILE):
-            with open(API_KEY_FILE, 'r') as f:
-                return f.read().strip()
-    except:
-        pass
-    return "DEFAULT_KEY"
-
-def load_json(p):
-    if not os.path.exists(p):
-        return {}
-    try:
-        with open(p, 'r') as f:
-            return json.load(f)
-    except:
-        return {}
-
-# --- INISIALISASI BOT ---
 bot = telebot.TeleBot(BOT_TOKEN)
-
-# Mengaktifkan Log Level DEBUG untuk Telebot
 telebot.logger.setLevel(logging.DEBUG)
 
 PROT_MAP = {'vmess': 'vmessws', 'vless': 'vlessws', 'trojan': 'trojanws', 'ssh': 'ssh', 'l2tp': 'l2tp'}
@@ -80,96 +59,77 @@ PROT_MAP = {'vmess': 'vmessws', 'vless': 'vlessws', 'trojan': 'trojanws', 'ssh':
 def is_admin(message):
     return str(message.chat.id) == ADMIN_ID
 
-def api_req(endpoint, method="POST", payload=None):
-    headers = {"x-api-key": get_api_key(), "Content-Type": "application/json"}
-    url = f"{API_BASE}/{endpoint}"
+def get_default_server():
+    return {"name": "💻 Local Server", "domain": "127.0.0.1:5000", "api_key": get_api_key()}
+
+# --- CORE API ROUTER ---
+def api_req(endpoint, method="POST", payload=None, chat_id=None):
+    srv = active_server.get(str(chat_id), get_default_server())
+    domain = srv['domain']
+    
+    if "127.0.0.1" in domain or "localhost" in domain:
+        url = f"http://{domain}/user_legend/{endpoint}"
+    else:
+        url = f"https://{domain}/user_legend/{endpoint}"
+        
+    headers = {"x-api-key": srv['api_key'], "Content-Type": "application/json"}
+    
     try:
         if method == "GET":
-            res = requests.get(url, headers=headers, json=payload, timeout=10)
+            res = requests.get(url, headers=headers, json=payload, timeout=15)
         elif method == "DELETE":
-            res = requests.delete(url, headers=headers, json=payload, timeout=10)
+            res = requests.delete(url, headers=headers, json=payload, timeout=15)
         else:
-            res = requests.post(url, headers=headers, json=payload, timeout=10)
+            res = requests.post(url, headers=headers, json=payload, timeout=15)
             
         res.raise_for_status()
-        
         res_json = res.json()
-        return res_json.get('stdout_tg', res_json.get('stdout', '✅ Command executed successfully but no output.'))
+        return res_json.get('stdout_tg', res_json.get('stdout', '✅ Eksekusi berhasil.'))
 
     except requests.exceptions.HTTPError as errh:
-        try:
-            return res.json().get('stdout', f"❌ API HTTP Error: {errh}")
-        except:
-            return f"❌ HTTP Error ({res.status_code}): Fungsi ini belum dikonfigurasi di server API."
+        try: return res.json().get('stdout', f"❌ API HTTP Error: {errh}")
+        except: return f"❌ HTTP Error ({res.status_code}): Periksa keabsahan API Key atau Domain Node!"
     except requests.exceptions.ConnectionError as errc:
-        return f"❌ Error Koneksi: API Server (Backend) sedang mati/down.\nDetail: {errc}"
+        return f"❌ Error Koneksi: Node Server ({srv['name']}) sedang mati/down.\nPastikan port 443 terbuka."
     except Exception as e:
         return f"❌ Unexpected Error: {str(e)}"
 
-# --- FUNGSI LOGIKA LIST & BACKUP ---
-def get_list_accounts(prot):
-    result = []
-    if prot in ['vmess', 'vless', 'trojan']:
-        cfg = load_json(XRAY_CONF)
-        target_users = []
-        for ib in cfg.get('inbounds', []):
-            if ib.get('protocol') == prot:
-                for c in ib['settings'].get('clients', []):
-                    email = c.get('email')
-                    if email: target_users.append(email)
-        exp_data = {}
-        if os.path.exists(XRAY_EXP):
-            with open(XRAY_EXP, 'r') as f:
-                for line in f:
-                    p = line.strip().split()
-                    if len(p) >= 2:
-                        exp_data[p[0]] = p[1]
-        for u in target_users:
-            exp = exp_data.get(u, "Lifetime")
-            result.append(f"• `{u}` (Exp: {exp})")
-    elif prot == 'ssh' and os.path.exists(SSH_EXP):
-        with open(SSH_EXP, 'r') as f:
-            for line in f:
-                p = line.strip().split()
-                if len(p) >= 3:
-                    result.append(f"• `{p[0]}` (Exp: {p[2]})")
-    elif prot == 'l2tp' and os.path.exists(L2TP_EXP):
-        with open(L2TP_EXP, 'r') as f:
-            for line in f:
-                p = line.strip().split()
-                if len(p) >= 3:
-                    result.append(f"• `{p[0]}` (Exp: {p[2]})")
-
-    if not result:
-        return f"Belum ada akun aktif untuk protokol {prot.upper()}."
-    return f"📋 *LIST ACCOUNT {prot.upper()}*\n━━━━━━━━━━━━━━━━━━━━\n" + "\n".join(result)
-
 def handle_backup_bot(chat_id):
-    now_str = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-    backup_file = f"/tmp/srpcom-backup-{now_str}.tar.gz"
-    # Hanya membackup file database akun VPN, BUKAN file settingan sistem
-    files = [
-        "/usr/local/etc/xray/config.json", 
-        "/usr/local/etc/xray/expiry.txt", 
-        "/usr/local/etc/xray/limit.txt", 
-        "/usr/local/etc/srpcom/l2tp_expiry.txt", 
-        "/usr/local/etc/srpcom/ssh_expiry.txt", 
-        "/usr/local/etc/srpcom/ssh_limit.txt", 
-        "/etc/ppp/chap-secrets"
-    ]
-    valid = [f for f in files if os.path.exists(f)]
-    if valid:
-        try:
-            subprocess.run(['tar', '-czf', backup_file, '-C', '/'] + [f.lstrip('/') for f in valid], check=True)
-            with open(backup_file, 'rb') as doc:
-                bot.send_document(chat_id, doc, caption=f"📦 *BACKUP VPS VPN*\nTanggal: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", parse_mode="Markdown")
-            os.remove(backup_file)
-        except Exception as e:
-            bot.send_message(chat_id, f"Gagal Backup: {e}")
+    bot.send_message(chat_id, "⏳ Menyusun data backup dari Node...")
+    srv = active_server.get(str(chat_id), get_default_server())
+    domain = srv['domain']
+    
+    if "127.0.0.1" in domain or "localhost" in domain:
+        url = f"http://{domain}/user_legend/sys-backup"
     else:
-        bot.send_message(chat_id, "Tidak ada data untuk dibackup.")
+        url = f"https://{domain}/user_legend/sys-backup"
+        
+    try:
+        res = requests.get(url, headers={"x-api-key": srv['api_key']}, timeout=25)
+        res_json = res.json()
+        if 'data' in res_json:
+            file_bytes = base64.b64decode(res_json['data'])
+            bot.send_document(chat_id, file_bytes, visible_file_name=res_json.get('filename', 'backup.tar.gz'),
+                caption=f"📦 *BACKUP VPS VPN*\nServer: {srv['name']}\nTanggal: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", parse_mode="Markdown")
+        else:
+            bot.send_message(chat_id, res_json.get('stdout', 'Tidak ada file backup.'))
+    except Exception as e:
+        bot.send_message(chat_id, f"❌ Request Backup Gagal: {e}")
 
-# --- KEYBOARDS ---
+# --- KEYBOARDS & UI ---
+def server_selection_keyboard():
+    markup = InlineKeyboardMarkup(row_width=1)
+    markup.add(InlineKeyboardButton("💻 Local Server (This VPS)", callback_data="sel_srv_local"))
+    
+    if os.path.exists(SERVERS_FILE):
+        try:
+            with open(SERVERS_FILE, 'r') as f:
+                data = json.load(f)
+                for idx, node in enumerate(data.get("nodes", [])):
+                    markup.add(InlineKeyboardButton(f"🌐 Node: {node['name']}", callback_data=f"sel_srv_{idx}"))
+        except: pass
+    return markup
+
 def main_menu_keyboard():
     markup = InlineKeyboardMarkup(row_width=3)
     markup.add(
@@ -185,6 +145,7 @@ def main_menu_keyboard():
         InlineKeyboardButton("📊 MONITORING", callback_data="menu_monitor"),
         InlineKeyboardButton("⚙️ STATUS & BACKUP", callback_data="menu_status")
     )
+    markup.add(InlineKeyboardButton("🔄 Ganti Node Server", callback_data="menu_server_selection"))
     return markup
 
 def protocol_menu_keyboard(prot):
@@ -222,100 +183,13 @@ def monitor_menu_keyboard():
     )
     return markup
 
-# --- FUNGSI MONITORING ---
-def get_monitor_xray():
-    try:
-        ip_data = {}
-        if os.path.exists('/var/log/xray/access.log'):
-            try:
-                out = subprocess.run(['tail', '-n', '3000', '/var/log/xray/access.log'], capture_output=True, text=True)
-                for line in out.stdout.splitlines():
-                    if 'accepted' in line and '127.0.0.1' not in line:
-                        parts = line.split()
-                        if len(parts) >= 7:
-                            user = parts[6]
-                            ip = parts[2].replace('tcp:', '').replace('udp:', '').split(':')[0]
-                            if user not in ip_data:
-                                ip_data[user] = set()
-                            ip_data[user].add(ip)
-            except: pass
-
-        stats = {}
-        try:
-            out = subprocess.run(['/usr/local/bin/xray', 'api', 'statsquery', '--server=127.0.0.1:10085'], capture_output=True, text=True)
-            data = json.loads(out.stdout)
-            for item in data.get('stat', []):
-                name_parts = item['name'].split('>>>')
-                if len(name_parts) >= 4 and name_parts[0] == 'user':
-                    user = name_parts[1]
-                    t_type = name_parts[3]
-                    if user not in stats:
-                        stats[user] = {'downlink': 0, 'uplink': 0}
-                    stats[user][t_type] = item.get('value', 0)
-        except: pass
-
-        limits = {}
-        if os.path.exists('/usr/local/etc/xray/limit.txt'):
-            with open('/usr/local/etc/xray/limit.txt', 'r') as f:
-                for line in f:
-                    p = line.strip().split()
-                    if len(p) >= 3:
-                        limits[p[0]] = {'ip': int(p[1]), 'quota': int(p[2])}
-
-        all_users = set(list(stats.keys()) + list(ip_data.keys()))
-        if not all_users:
-            return "Belum ada data pemakaian atau user aktif di Xray."
-
-        res = "📈 *XRAY MONITORING*\n━━━━━━━━━━━━━━━━━━━━\n"
-        for u in sorted(all_users):
-            active_ips = len(ip_data.get(u, set()))
-            lim_ip = limits.get(u, {}).get('ip', 0)
-            lim_ip_str = str(lim_ip) if lim_ip > 0 else 'Unli'
-            
-            dl = stats.get(u, {}).get('downlink', 0) / 1048576
-            ul = stats.get(u, {}).get('uplink', 0) / 1048576
-            tot_gb = (dl + ul) / 1024
-            
-            lim_q = limits.get(u, {}).get('quota', 0)
-            lim_q_str = f"{lim_q} GB" if lim_q > 0 else 'Unli'
-            
-            res += f"👤 *{u}*\n├ IP Aktif : {active_ips} / {lim_ip_str}\n└ Kuota : {tot_gb:.2f} GB / {lim_q_str}\n\n"
-        return res
-    except Exception as e:
-        return f"Gagal mengambil data monitoring Xray: {e}"
-
-def get_monitor_ssh():
-    try:
-        res = "💻 *SSH MONITORING*\n━━━━━━━━━━━━━━━━━━━━\n"
-        out = subprocess.run('netstat -tnpa', shell=True, capture_output=True, text=True)
-        active_users = []
-        for line in out.stdout.splitlines():
-            if 'ESTABLISHED' in line and ('dropbear' in line or 'sshd' in line):
-                parts = line.split()
-                if len(parts) >= 7:
-                    pid_prog = parts[6]
-                    pid = pid_prog.split('/')[0]
-                    ip = parts[4].split(':')[0]
-                    try:
-                        u_out = subprocess.run(['ps', '-o', 'user=', '-p', pid], capture_output=True, text=True)
-                        user = u_out.stdout.strip()
-                        if user and user != 'root':
-                            active_users.append(f"👤 `{user}` | 🌐 {ip}")
-                    except: pass
-        
-        if not active_users:
-            return res + "Belum ada user SSH/Dropbear yang aktif."
-        return res + "\n".join(active_users)
-    except Exception as e:
-        return f"Gagal mengambil data monitoring SSH: {e}"
-
 # --- HANDLERS ---
 @bot.message_handler(commands=['start', 'menu'])
 def send_welcome(message):
     if not is_admin(message):
         bot.reply_to(message, "⛔ Akses Ditolak!")
         return
-    bot.send_message(message.chat.id, "👋 *PANEL ADMIN VPS*", reply_markup=main_menu_keyboard(), parse_mode="Markdown")
+    bot.send_message(message.chat.id, "👋 *PILIH NODE SERVER UNTUK DIKELOLA*\nSilakan daftarkan node tambahan melalui terminal VPS Anda.", reply_markup=server_selection_keyboard(), parse_mode="Markdown")
 
 @bot.callback_query_handler(func=lambda call: True)
 def handle_query(call):
@@ -328,8 +202,27 @@ def handle_query(call):
     msg_id = call.message.message_id
     
     try:
-        if data == "menu_main":
-            bot.edit_message_text("👋 *PANEL ADMIN VPS*", chat_id, msg_id, reply_markup=main_menu_keyboard(), parse_mode="Markdown")
+        if data == "menu_server_selection":
+            bot.edit_message_text("👋 *PILIH NODE SERVER UNTUK DIKELOLA*", chat_id, msg_id, reply_markup=server_selection_keyboard(), parse_mode="Markdown")
+            
+        elif data.startswith("sel_srv_"):
+            srv_id = data.split("sel_srv_")[1]
+            srv_info = get_default_server()
+            if srv_id != "local":
+                try:
+                    with open(SERVERS_FILE, 'r') as f:
+                        nodes = json.load(f).get("nodes", [])
+                        idx = int(srv_id)
+                        if idx < len(nodes):
+                            srv_info = {"name": nodes[idx]["name"], "domain": nodes[idx]["domain"], "api_key": nodes[idx]["api_key"]}
+                except: pass
+            
+            active_server[str(chat_id)] = srv_info
+            bot.edit_message_text(f"👋 *PANEL ADMIN VPS*\nConnected Node: 🟢 *{srv_info['name']}*", chat_id, msg_id, reply_markup=main_menu_keyboard(), parse_mode="Markdown")
+            
+        elif data == "menu_main":
+            srv = active_server.get(str(chat_id), get_default_server())
+            bot.edit_message_text(f"👋 *PANEL ADMIN VPS*\nConnected Node: 🟢 *{srv['name']}*", chat_id, msg_id, reply_markup=main_menu_keyboard(), parse_mode="Markdown")
         
         elif data == "menu_status":
             bot.edit_message_text("⚙️ *MENU STATUS & BACKUP*", chat_id, msg_id, reply_markup=status_menu_keyboard(), parse_mode="Markdown")
@@ -339,18 +232,18 @@ def handle_query(call):
 
         elif data == "mon_xray":
             bot.answer_callback_query(call.id, "Mengambil data Xray...")
-            bot.send_message(chat_id, get_monitor_xray(), parse_mode="Markdown")
+            bot.send_message(chat_id, api_req("monitor-xray", "GET", chat_id=chat_id), parse_mode="Markdown")
 
         elif data == "mon_ssh":
             bot.answer_callback_query(call.id, "Mengambil data SSH...")
-            bot.send_message(chat_id, get_monitor_ssh(), parse_mode="Markdown")
+            bot.send_message(chat_id, api_req("monitor-ssh", "GET", chat_id=chat_id), parse_mode="Markdown")
         
         elif data == "sys_cek_status":
             bot.answer_callback_query(call.id, "Mengecek...")
-            bot.send_message(chat_id, f"💻 *STATUS SERVER:*\n{api_req('cek-xray', 'GET')}", parse_mode="Markdown")
+            bot.send_message(chat_id, f"💻 *STATUS SERVER:*\n{api_req('cek-xray', 'GET', chat_id=chat_id)}", parse_mode="Markdown")
         
         elif data == "sys_backup":
-            bot.answer_callback_query(call.id, "Memproses...")
+            bot.answer_callback_query(call.id, "Memproses Data Backup...")
             handle_backup_bot(chat_id)
             
         elif data.startswith("prot_"):
@@ -364,22 +257,19 @@ def handle_query(call):
             api_ep = PROT_MAP.get(prot)
             
             if act == "list":
-                bot.answer_callback_query(call.id, "Mengambil data...")
-                bot.send_message(chat_id, get_list_accounts(prot), parse_mode="Markdown")
+                bot.answer_callback_query(call.id, "Mengambil daftar akun...")
+                bot.send_message(chat_id, api_req(f"list-accounts/{prot}", "GET", chat_id=chat_id), parse_mode="Markdown")
                 
             elif act == "trial":
                 bot.answer_callback_query(call.id, "Membuat trial...")
                 payload = {"exp": 60, "limit_ip": 1} if prot == "ssh" else {"exp": 60, "limit_ip": 1, "limit_quota": 1}
-                bot.send_message(chat_id, api_req(f"trial-{api_ep}", "POST", payload), parse_mode="Markdown")
+                bot.send_message(chat_id, api_req(f"trial-{api_ep}", "POST", payload, chat_id), parse_mode="Markdown")
                 
             else:
                 if act == "add":
-                    if prot in ['vmess', 'vless', 'trojan']:
-                        t = "✏️ Data: `User Expired(Hari) Limit_IP Limit_Quota`"
-                    elif prot == "ssh":
-                        t = "✏️ Data: `User Pass Expired(Hari) Limit_IP`"
-                    else:
-                        t = "✏️ Data: `User Pass Expired(Hari)`"
+                    if prot in ['vmess', 'vless', 'trojan']: t = "✏️ Data: `User Expired(Hari) Limit_IP Limit_Quota`"
+                    elif prot == "ssh": t = "✏️ Data: `User Pass Expired(Hari) Limit_IP`"
+                    else: t = "✏️ Data: `User Pass Expired(Hari)`"
                     t += "\nContoh: `budi 30 2 50`"
                 elif act == "renew":
                     t = "🔄 Masukkan: `User Tambah(Hari)`"
@@ -393,8 +283,7 @@ def handle_query(call):
         bot.send_message(chat_id, f"Error: {e}")
 
 def process_action_input(message, action, prot, api_ep):
-    if not message.text:
-        return
+    if not message.text: return
     parts = message.text.split()
     payload = {}
     method = "POST"
@@ -403,25 +292,11 @@ def process_action_input(message, action, prot, api_ep):
     try:
         if action == "add":
             if prot in ['vmess', 'vless', 'trojan']:
-                payload = {
-                    'user': parts[0],
-                    'exp': int(parts[1]) if len(parts) > 1 else 30,
-                    'limit_ip': int(parts[2]) if len(parts) > 2 else 0,
-                    'limit_quota': int(parts[3]) if len(parts) > 3 else 0
-                }
+                payload = {'user': parts[0], 'exp': int(parts[1]) if len(parts) > 1 else 30, 'limit_ip': int(parts[2]) if len(parts) > 2 else 0, 'limit_quota': int(parts[3]) if len(parts) > 3 else 0}
             elif prot == "ssh":
-                payload = {
-                    'user': parts[0],
-                    'password': parts[1] if len(parts) > 1 else "123",
-                    'exp': int(parts[2]) if len(parts) > 2 else 30,
-                    'limit_ip': int(parts[3]) if len(parts) > 3 else 0
-                }
+                payload = {'user': parts[0], 'password': parts[1] if len(parts) > 1 else "123", 'exp': int(parts[2]) if len(parts) > 2 else 30, 'limit_ip': int(parts[3]) if len(parts) > 3 else 0}
             elif prot == "l2tp":
-                payload = {
-                    'user': parts[0],
-                    'password': parts[1] if len(parts) > 1 else "123",
-                    'exp': int(parts[2]) if len(parts) > 2 else 30
-                }
+                payload = {'user': parts[0], 'password': parts[1] if len(parts) > 1 else "123", 'exp': int(parts[2]) if len(parts) > 2 else 30}
         elif action == "renew":
             payload = {'user': parts[0], 'exp': int(parts[1]) if len(parts) > 1 else 30}
         elif action == "del":
@@ -430,15 +305,14 @@ def process_action_input(message, action, prot, api_ep):
         elif action == "detail":
             payload = {'user': parts[0]}
         
-        bot.send_message(message.chat.id, api_req(endpoint, method, payload), parse_mode="Markdown")
+        bot.send_message(message.chat.id, api_req(endpoint, method, payload, chat_id=message.chat.id), parse_mode="Markdown")
     except Exception as e:
         bot.send_message(message.chat.id, f"❌ Format input salah! Detail: {e}")
 
 if __name__ == '__main__':
-    print("Bot Admin Panel sedang berjalan...")
+    print("Bot Master Node Panel sedang berjalan...")
     while True:
-        try:
-            bot.infinity_polling()
+        try: bot.infinity_polling()
         except Exception as e:
             print(f"Bot Polling Error: {e}")
             time.sleep(5)
