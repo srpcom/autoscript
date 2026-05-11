@@ -304,7 +304,11 @@ def add_user(protocol):
 def trial_user(protocol):
     if not check_auth(): return jsonify({"stdout": "Unauthorized"}), 401
     data = request.json or {}
-    exp_min, limit_ip = int(data.get('exp', 60)), int(data.get('limit_ip', 1))
+    
+    # PERBAIKAN: Mengabaikan nilai exp dari request, dan memaksanya menjadi 60 menit untuk semua trial
+    exp_min = 60 
+    limit_ip = int(data.get('limit_ip', 1))
+    
     user = f"trialsrp-{datetime.datetime.now().strftime('%m%d%H%M')}"
     uid = str(uuid.uuid4())
     dt = datetime.datetime.now() + datetime.timedelta(minutes=exp_min)
@@ -532,7 +536,11 @@ def detail_ssh():
 def trial_ssh():
     if not check_auth(): return jsonify({"stdout": "Unauthorized"}), 401
     data = request.json or {}
-    exp_min, limit_ip = int(data.get('exp', 60)), int(data.get('limit_ip', 1))
+    
+    # PERBAIKAN: Mengabaikan nilai exp dari request, dan memaksanya menjadi 60 menit untuk semua trial
+    exp_min = 60 
+    limit_ip = int(data.get('limit_ip', 1))
+    
     user = f"trialsrp-{datetime.datetime.now().strftime('%m%d%H%M')}"
     password = "1"
     
