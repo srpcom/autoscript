@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 # ==========================================
 # bot-admin.py
-# MODULE: TELEGRAM MASTER-NODE PANEL
-# Mengendalikan puluhan VPS dari 1 Bot Telegram
+# MODULE: TELEGRAM MASTER-NODE PANEL (STEP-BY-STEP INPUT)
+# Mengendalikan puluhan VPS dari 1 Bot Telegram secara interaktif
 # ==========================================
 
 import os
@@ -52,7 +52,7 @@ if not BOT_TOKEN or not ADMIN_ID:
     print("Token ditemukan! Bot dijalankan...")
 
 bot = telebot.TeleBot(BOT_TOKEN)
-telebot.logger.setLevel(logging.DEBUG)
+telebot.logger.setLevel(logging.INFO)
 
 PROT_MAP = {'vmess': 'vmessws', 'vless': 'vlessws', 'trojan': 'trojanws', 'ssh': 'ssh', 'l2tp': 'l2tp'}
 
@@ -183,7 +183,7 @@ def monitor_menu_keyboard():
     )
     return markup
 
-# --- HANDLERS ---
+# --- HANDLERS UTAMA ---
 @bot.message_handler(commands=['start', 'menu'])
 def send_welcome(message):
     if not is_admin(message):
@@ -266,48 +266,107 @@ def handle_query(call):
                 bot.send_message(chat_id, api_req(f"trial-{api_ep}", "POST", payload, chat_id), parse_mode="Markdown")
                 
             else:
-                if act == "add":
-                    if prot in ['vmess', 'vless', 'trojan']: t = "✏️ Data: `User Expired(Hari) Limit_IP Limit_Quota`"
-                    elif prot == "ssh": t = "✏️ Data: `User Pass Expired(Hari) Limit_IP`"
-                    else: t = "✏️ Data: `User Pass Expired(Hari)`"
-                    t += "\nContoh: `budi 30 2 50`"
-                elif act == "renew":
-                    t = "🔄 Masukkan: `User Tambah(Hari)`"
-                else:
-                    t = f"🗑️/📄 Masukkan `User` untuk *{act.upper()}*"
-                
-                msg = bot.send_message(chat_id, t, parse_mode="Markdown", reply_markup=ForceReply())
-                bot.register_next_step_handler(msg, process_action_input, act, prot, api_ep)
+                # MULAI STEP-BY-STEP INPUT
+                msg = bot.send_message(chat_id, "👤 Masukkan *Username*:\n_(Ketik 'x' untuk batal)_", parse_mode="Markdown", reply_markup=ForceReply())
+                bot.register_next_step_handler(msg, step_user, act, prot, api_ep, {})
                 
     except Exception as e:
         bot.send_message(chat_id, f"Error: {e}")
 
-def process_action_input(message, action, prot, api_ep):
-    if not message.text: return
-    parts = message.text.split()
-    payload = {}
-    method = "POST"
-    endpoint = f"{action}-{api_ep}"
-    
-    try:
-        if action == "add":
-            if prot in ['vmess', 'vless', 'trojan']:
-                payload = {'user': parts[0], 'exp': int(parts[1]) if len(parts) > 1 else 30, 'limit_ip': int(parts[2]) if len(parts) > 2 else 0, 'limit_quota': int(parts[3]) if len(parts) > 3 else 0}
-            elif prot == "ssh":
-                payload = {'user': parts[0], 'password': parts[1] if len(parts) > 1 else "123", 'exp': int(parts[2]) if len(parts) > 2 else 30, 'limit_ip': int(parts[3]) if len(parts) > 3 else 0}
-            elif prot == "l2tp":
-                payload = {'user': parts[0], 'password': parts[1] if len(parts) > 1 else "123", 'exp': int(parts[2]) if len(parts) > 2 else 30}
-        elif action == "renew":
-            payload = {'user': parts[0], 'exp': int(parts[1]) if len(parts) > 1 else 30}
-        elif action == "del":
-            payload = {'user': parts[0]}
-            method = "POST"
-        elif action == "detail":
-            payload = {'user': parts[0]}
+# ==========================================
+# STEP-BY-STEP LOGIC HANDLERS
+# ==========================================
+def step_user(message, act, prot, api_ep, data):
+    text = message.text.strip()
+    if text.lower() == 'x':
+        bot.send_message(message.chat.id, "🚫 Operasi dibatalkan.")
+        return
         
-        bot.send_message(message.chat.id, api_req(endpoint, method, payload, chat_id=message.chat.id), parse_mode="Markdown")
-    except Exception as e:
-        bot.send_message(message.chat.id, f"❌ Format input salah! Detail: {e}")
+    data['user'] = text
+    
+    if act in ["del", "detail"]:
+        execute_api(message, act, api_ep, data)
+    elif act == "renew":
+        msg = bot.send_message(message.chat.id, "⏱️ Berapa *Tambahan Hari*?\n_(Ketik 'x' untuk batal)_", parse_mode="Markdown", reply_markup=ForceReply())
+        bot.register_next_step_handler(msg, step_exp, act, prot, api_ep, data)
+    elif act == "add":
+        if prot in ["ssh", "l2tp"]:
+            msg = bot.send_message(message.chat.id, "🔑 Masukkan *Password*:\n_(Ketik 'x' untuk batal)_", parse_mode="Markdown", reply_markup=ForceReply())
+            bot.register_next_step_handler(msg, step_pass, act, prot, api_ep, data)
+        else: # vmess, vless, trojan
+            msg = bot.send_message(message.chat.id, "⏱️ Berapa *Masa Aktif (Hari)*?\n_(Ketik 'x' untuk batal)_", parse_mode="Markdown", reply_markup=ForceReply())
+            bot.register_next_step_handler(msg, step_exp, act, prot, api_ep, data)
+
+def step_pass(message, act, prot, api_ep, data):
+    text = message.text.strip()
+    if text.lower() == 'x':
+        bot.send_message(message.chat.id, "🚫 Operasi dibatalkan.")
+        return
+        
+    data['password'] = text
+    msg = bot.send_message(message.chat.id, "⏱️ Berapa *Masa Aktif (Hari)*?\n_(Ketik 'x' untuk batal)_", parse_mode="Markdown", reply_markup=ForceReply())
+    bot.register_next_step_handler(msg, step_exp, act, prot, api_ep, data)
+
+def step_exp(message, act, prot, api_ep, data):
+    text = message.text.strip()
+    if text.lower() == 'x':
+        bot.send_message(message.chat.id, "🚫 Operasi dibatalkan.")
+        return
+        
+    try:
+        data['exp'] = int(text)
+    except ValueError:
+        bot.send_message(message.chat.id, "❌ Error: Masa Aktif harus berupa Angka!")
+        return
+        
+    if act == "renew" or prot == "l2tp":
+        execute_api(message, act, api_ep, data)
+    else: # add untuk xray dan ssh yang punya Limit IP
+        msg = bot.send_message(message.chat.id, "🌐 Berapa *Limit IP*?\n_(Ketik 0 untuk Unlimited, atau 'x' untuk batal)_", parse_mode="Markdown", reply_markup=ForceReply())
+        bot.register_next_step_handler(msg, step_limit_ip, act, prot, api_ep, data)
+
+def step_limit_ip(message, act, prot, api_ep, data):
+    text = message.text.strip()
+    if text.lower() == 'x':
+        bot.send_message(message.chat.id, "🚫 Operasi dibatalkan.")
+        return
+        
+    try:
+        data['limit_ip'] = int(text)
+    except ValueError:
+        bot.send_message(message.chat.id, "❌ Error: Limit IP harus berupa Angka!")
+        return
+        
+    if prot == "ssh":
+        execute_api(message, act, api_ep, data)
+    else: # add untuk xray yang punya Limit Kuota
+        msg = bot.send_message(message.chat.id, "💾 Berapa *Limit Kuota (GB)*?\n_(Ketik 0 untuk Unlimited, atau 'x' untuk batal)_", parse_mode="Markdown", reply_markup=ForceReply())
+        bot.register_next_step_handler(msg, step_limit_quota, act, prot, api_ep, data)
+
+def step_limit_quota(message, act, prot, api_ep, data):
+    text = message.text.strip()
+    if text.lower() == 'x':
+        bot.send_message(message.chat.id, "🚫 Operasi dibatalkan.")
+        return
+        
+    try:
+        data['limit_quota'] = int(text)
+    except ValueError:
+        bot.send_message(message.chat.id, "❌ Error: Limit Kuota harus berupa Angka!")
+        return
+        
+    execute_api(message, act, api_ep, data)
+
+# --- EXECUTE API AFTER ALL STEPS GATHERED ---
+def execute_api(message, act, api_ep, data):
+    bot.send_message(message.chat.id, "⏳ Sedang memproses ke Node Server...", parse_mode="Markdown")
+    endpoint = f"{act}-{api_ep}"
+    
+    # Detail and Del can use POST via JSON body
+    method = "POST" 
+    
+    response = api_req(endpoint, method, data, chat_id=message.chat.id)
+    bot.send_message(message.chat.id, response, parse_mode="Markdown")
 
 if __name__ == '__main__':
     print("Bot Master Node Panel sedang berjalan...")
