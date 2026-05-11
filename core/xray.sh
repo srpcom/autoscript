@@ -71,7 +71,7 @@ add_vmess_ws() {
     echo "$user $exp_date $exp_time" >> /usr/local/etc/xray/expiry.txt
 
     jq '(.inbounds[] | select(.protocol=="vmess") | .settings.clients) += [{"id": "'$uuid'", "alterId": 0, "email": "'$user'"}]' /usr/local/etc/xray/config.json > /tmp/config.json
-    mv /tmp/config.json /usr/local/etc/xray/config.json
+    if [ -s /tmp/config.json ]; then mv /tmp/config.json /usr/local/etc/xray/config.json; fi
     systemctl restart xray
     
     tls_json="{\"v\":\"2\",\"ps\":\"${user}\",\"add\":\"${DOMAIN}\",\"port\":\"443\",\"id\":\"${uuid}\",\"aid\":\"0\",\"scy\":\"auto\",\"net\":\"ws\",\"type\":\"none\",\"host\":\"${DOMAIN}\",\"path\":\"/vmessws\",\"tls\":\"tls\",\"sni\":\"${DOMAIN}\"}"
@@ -103,7 +103,7 @@ add_vless_ws() {
     echo "$user $exp_date $exp_time" >> /usr/local/etc/xray/expiry.txt
 
     jq '(.inbounds[] | select(.protocol=="vless") | .settings.clients) += [{"id": "'$uuid'", "email": "'$user'"}]' /usr/local/etc/xray/config.json > /tmp/config.json
-    mv /tmp/config.json /usr/local/etc/xray/config.json
+    if [ -s /tmp/config.json ]; then mv /tmp/config.json /usr/local/etc/xray/config.json; fi
     systemctl restart xray
     
     link_tls="vless://${uuid}@${DOMAIN}:443?path=/vlessws&security=tls&encryption=none&host=${DOMAIN}&type=ws&sni=${DOMAIN}#${user}"
@@ -133,7 +133,7 @@ add_trojan_ws() {
     echo "$user $exp_date $exp_time" >> /usr/local/etc/xray/expiry.txt
 
     jq '(.inbounds[] | select(.protocol=="trojan") | .settings.clients) += [{"password": "'$uuid'", "email": "'$user'"}]' /usr/local/etc/xray/config.json > /tmp/config.json
-    mv /tmp/config.json /usr/local/etc/xray/config.json
+    if [ -s /tmp/config.json ]; then mv /tmp/config.json /usr/local/etc/xray/config.json; fi
     systemctl restart xray
     
     link_tls="trojan://${uuid}@${DOMAIN}:443?path=/trojanws&security=tls&host=${DOMAIN}&type=ws&sni=${DOMAIN}#${user}"
@@ -172,14 +172,14 @@ add_trial() {
     elif [[ "$prot_opt" == "2" ]]; then
         prot="vless"
         jq '(.inbounds[] | select(.protocol=="vless") | .settings.clients) += [{"id": "'$uuid'", "email": "'$user'"}]' /usr/local/etc/xray/config.json > /tmp/config.json
-    elif [[ "$prot" == "3" ]]; then
+    elif [[ "$prot_opt" == "3" ]]; then
         prot="trojan"
         jq '(.inbounds[] | select(.protocol=="trojan") | .settings.clients) += [{"password": "'$uuid'", "email": "'$user'"}]' /usr/local/etc/xray/config.json > /tmp/config.json
     else
         echo -e "\n=> Pilihan tidak valid!"; sleep 1; add_trial; return
     fi
     
-    mv /tmp/config.json /usr/local/etc/xray/config.json
+    if [ -s /tmp/config.json ]; then mv /tmp/config.json /usr/local/etc/xray/config.json; fi
     echo "$user $exp_date $exp_time" >> /usr/local/etc/xray/expiry.txt
     systemctl restart xray
     
@@ -248,7 +248,8 @@ delete_xray() {
     echo "========================================================="
     echo "                   DELETE XRAY ACCOUNT                   "
     echo "========================================================="
-    mapfile -t users < <(jq -r '.inbounds[].settings.clients[].email' /usr/local/etc/xray/config.json | sort -u)
+    # FIX: Gunakan select dan ?.email untuk mencegah Error 'Cannot iterate over null'
+    mapfile -t users < <(jq -r '.inbounds[] | select(.protocol=="vmess" or .protocol=="vless" or .protocol=="trojan") | .settings.clients[]?.email' /usr/local/etc/xray/config.json 2>/dev/null | sort -u)
     
     if [ ${#users[@]} -eq 0 ] || [ -z "${users[0]}" ] || [ "${users[0]}" == "null" ]; then
         echo "Tidak ada akun untuk dihapus."
@@ -263,11 +264,21 @@ delete_xray() {
 
     if [[ "$choice" -gt 0 && "$choice" -le "${#users[@]}" ]]; then
         user="${users[$((choice-1))]}"
-        jq '(.inbounds[].settings.clients) |= map(select(.email != "'$user'"))' /usr/local/etc/xray/config.json > /tmp/config.json
-        mv /tmp/config.json /usr/local/etc/xray/config.json
-        sed -i "/^$user /d" /usr/local/etc/xray/expiry.txt
-        systemctl restart xray
-        echo -e "\n\e[32m=> Akun '$user' berhasil dihapus!\e[0m"
+        
+        # FIX: Gunakan select eksklusif pada saat memodifikasi inbounds
+        jq '(.inbounds[] | select(.protocol=="vmess" or .protocol=="vless" or .protocol=="trojan") | .settings.clients) |= map(select(.email != "'$user'"))' /usr/local/etc/xray/config.json > /tmp/config.json
+        
+        # FIX: Validasi keamanan jika jq gagal/kosong, jangan overwrite config
+        if [ -s /tmp/config.json ]; then
+            mv /tmp/config.json /usr/local/etc/xray/config.json
+            sed -i "/^$user /d" /usr/local/etc/xray/expiry.txt
+            sed -i "/^$user /d" /usr/local/etc/xray/limit.txt
+            systemctl restart xray
+            echo -e "\n\e[32m=> Akun '$user' berhasil dihapus!\e[0m"
+        else
+            echo -e "\n\e[31m[ERROR]\e[0m Gagal menghapus, pemrosesan file JSON rusak!"
+            rm -f /tmp/config.json
+        fi
         sleep 2
     else
         echo -e "\n=> Pilihan tidak valid!"; sleep 1; delete_xray
@@ -279,7 +290,7 @@ renew_xray() {
     echo "========================================================="
     echo "                   RENEW XRAY ACCOUNT                    "
     echo "========================================================="
-    mapfile -t users < <(jq -r '.inbounds[].settings.clients[].email' /usr/local/etc/xray/config.json | sort -u)
+    mapfile -t users < <(jq -r '.inbounds[] | select(.protocol=="vmess" or .protocol=="vless" or .protocol=="trojan") | .settings.clients[]?.email' /usr/local/etc/xray/config.json 2>/dev/null | sort -u)
     
     if [ ${#users[@]} -eq 0 ] || [ -z "${users[0]}" ] || [ "${users[0]}" == "null" ]; then
         echo "Tidak ada akun untuk diperpanjang."
@@ -323,15 +334,15 @@ list_xray() {
     echo "                   LIST XRAY ACCOUNTS                    "
     echo "========================================================="
     echo -e "\n\e[32m[ VMESS WS ]\e[0m"
-    mapfile -t users < <(jq -r '.inbounds[] | select(.protocol=="vmess") | .settings.clients[].email' /usr/local/etc/xray/config.json 2>/dev/null)
+    mapfile -t users < <(jq -r '.inbounds[] | select(.protocol=="vmess") | .settings.clients[]?.email' /usr/local/etc/xray/config.json 2>/dev/null)
     if [ ${#users[@]} -eq 0 ] || [ -z "${users[0]}" ] || [ "${users[0]}" == "null" ]; then echo "Tidak ada akun."; else print_user_table "hide_back"; fi
     
     echo -e "\n\e[32m[ VLESS WS ]\e[0m"
-    mapfile -t users < <(jq -r '.inbounds[] | select(.protocol=="vless") | .settings.clients[].email' /usr/local/etc/xray/config.json 2>/dev/null)
+    mapfile -t users < <(jq -r '.inbounds[] | select(.protocol=="vless") | .settings.clients[]?.email' /usr/local/etc/xray/config.json 2>/dev/null)
     if [ ${#users[@]} -eq 0 ] || [ -z "${users[0]}" ] || [ "${users[0]}" == "null" ]; then echo "Tidak ada akun."; else print_user_table "hide_back"; fi
     
     echo -e "\n\e[32m[ TROJAN WS ]\e[0m"
-    mapfile -t users < <(jq -r '.inbounds[] | select(.protocol=="trojan") | .settings.clients[].email' /usr/local/etc/xray/config.json 2>/dev/null)
+    mapfile -t users < <(jq -r '.inbounds[] | select(.protocol=="trojan") | .settings.clients[]?.email' /usr/local/etc/xray/config.json 2>/dev/null)
     if [ ${#users[@]} -eq 0 ] || [ -z "${users[0]}" ] || [ "${users[0]}" == "null" ]; then echo "Tidak ada akun."; else print_user_table "hide_back"; fi
     
     echo -e "\n========================================================="
@@ -352,7 +363,7 @@ show_detail() {
     echo "Port TLS : 443"
     
     if [[ "$prot" == "vmess" ]]; then
-        uuid=$(jq -r '.inbounds[] | select(.protocol=="vmess") | .settings.clients[] | select(.email=="'$user'") | .id' /usr/local/etc/xray/config.json)
+        uuid=$(jq -r '.inbounds[] | select(.protocol=="vmess") | .settings.clients[] | select(.email=="'$user'") | .id' /usr/local/etc/xray/config.json 2>/dev/null)
         echo "Port NONE-TLS : 80"
         echo "ID : ${uuid}"
         echo "Network : Websocket"
@@ -364,7 +375,7 @@ show_detail() {
         echo "━━━━━━━━━━━━━━━━━━━━"
         echo "LINK WS NONE-TLS : vmess://$(echo -n "$none_tls_json" | jq -c . | base64 -w 0)"
     elif [[ "$prot" == "vless" ]]; then
-        uuid=$(jq -r '.inbounds[] | select(.protocol=="vless") | .settings.clients[] | select(.email=="'$user'") | .id' /usr/local/etc/xray/config.json)
+        uuid=$(jq -r '.inbounds[] | select(.protocol=="vless") | .settings.clients[] | select(.email=="'$user'") | .id' /usr/local/etc/xray/config.json 2>/dev/null)
         echo "Port NONE-TLS : 80"
         echo "ID : ${uuid}"
         echo "Network : Websocket"
@@ -374,7 +385,7 @@ show_detail() {
         echo "━━━━━━━━━━━━━━━━━━━━"
         echo "LINK WS NONE-TLS : vless://${uuid}@${DOMAIN}:80?path=/vlessws&security=none&encryption=none&host=${DOMAIN}&type=ws#${user}"
     elif [[ "$prot" == "trojan" ]]; then
-        uuid=$(jq -r '.inbounds[] | select(.protocol=="trojan") | .settings.clients[] | select(.email=="'$user'") | .password' /usr/local/etc/xray/config.json)
+        uuid=$(jq -r '.inbounds[] | select(.protocol=="trojan") | .settings.clients[] | select(.email=="'$user'") | .password' /usr/local/etc/xray/config.json 2>/dev/null)
         echo "Password : ${uuid}"
         echo "Network : Websocket"
         echo "Websocket Path : /trojanws"
@@ -400,7 +411,7 @@ detail_list() {
     echo "========================================================="
     echo "                 SELECT ${prot^^} ACCOUNT                 "
     echo "========================================================="
-    mapfile -t users < <(jq -r '.inbounds[] | select(.protocol=="'$prot'") | .settings.clients[].email' /usr/local/etc/xray/config.json 2>/dev/null)
+    mapfile -t users < <(jq -r '.inbounds[] | select(.protocol=="'$prot'") | .settings.clients[]?.email' /usr/local/etc/xray/config.json 2>/dev/null)
     if [ ${#users[@]} -eq 0 ] || [ -z "${users[0]}" ] || [ "${users[0]}" == "null" ]; then
         echo "Tidak ada akun di protokol ini."
         echo "========================================================="
@@ -427,9 +438,9 @@ detail_xray() {
     echo "========================================================="
     echo "                   DETAIL XRAY ACCOUNT                   "
     echo "========================================================="
-    c_vm=$(jq '[.inbounds[] | select(.protocol=="vmess") | .settings.clients[]] | length' /usr/local/etc/xray/config.json 2>/dev/null || echo 0)
-    c_vl=$(jq '[.inbounds[] | select(.protocol=="vless") | .settings.clients[]] | length' /usr/local/etc/xray/config.json 2>/dev/null || echo 0)
-    c_tr=$(jq '[.inbounds[] | select(.protocol=="trojan") | .settings.clients[]] | length' /usr/local/etc/xray/config.json 2>/dev/null || echo 0)
+    c_vm=$(jq '[.inbounds[] | select(.protocol=="vmess") | .settings.clients[]?.email] | length' /usr/local/etc/xray/config.json 2>/dev/null || echo 0)
+    c_vl=$(jq '[.inbounds[] | select(.protocol=="vless") | .settings.clients[]?.email] | length' /usr/local/etc/xray/config.json 2>/dev/null || echo 0)
+    c_tr=$(jq '[.inbounds[] | select(.protocol=="trojan") | .settings.clients[]?.email] | length' /usr/local/etc/xray/config.json 2>/dev/null || echo 0)
 
     echo "1. VMESS ($c_vm)"
     echo "2. VLESS ($c_vl)"
@@ -452,7 +463,7 @@ change_protocol_uuid() {
     echo "========================================================="
     echo "               CHANGE UUID/PASS ${prot^^} WS             "
     echo "========================================================="
-    mapfile -t users < <(jq -r '.inbounds[] | select(.protocol=="'$prot'") | .settings.clients[].email' /usr/local/etc/xray/config.json 2>/dev/null)
+    mapfile -t users < <(jq -r '.inbounds[] | select(.protocol=="'$prot'") | .settings.clients[]?.email' /usr/local/etc/xray/config.json 2>/dev/null)
     if [ ${#users[@]} -eq 0 ] || [ -z "${users[0]}" ] || [ "${users[0]}" == "null" ]; then
         echo "Tidak ada akun di protokol ini."
         echo "========================================================="
@@ -476,11 +487,18 @@ change_protocol_uuid() {
         elif [[ "$prot" == "trojan" ]]; then
             jq '(.inbounds[] | select(.protocol=="'$prot'") | .settings.clients[] | select(.email=="'$selected_user'") | .password) = "'$new_uuid'"' /usr/local/etc/xray/config.json > /tmp/config.json
         fi
-        mv /tmp/config.json /usr/local/etc/xray/config.json
-        systemctl restart xray
-        echo -e "\n=> UUID/Password untuk '$selected_user' berhasil diubah!"
-        sleep 2
-        show_detail "$prot" "$selected_user" "change_uuid"
+        
+        if [ -s /tmp/config.json ]; then
+            mv /tmp/config.json /usr/local/etc/xray/config.json
+            systemctl restart xray
+            echo -e "\n=> UUID/Password untuk '$selected_user' berhasil diubah!"
+            sleep 2
+            show_detail "$prot" "$selected_user" "change_uuid"
+        else
+            echo -e "\n\e[31m[ERROR]\e[0m Terjadi kesalahan pemrosesan JSON."
+            rm -f /tmp/config.json
+            sleep 2
+        fi
     else
         echo -e "\n=> Pilihan tidak valid!"; sleep 1; change_protocol_uuid "$prot"
     fi
