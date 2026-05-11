@@ -450,6 +450,11 @@ wget -q -O /usr/local/bin/srpcom/auto_expired.sh "$GITHUB_RAW/core/auto_expired.
 wget -q -O /usr/local/bin/xray-api.py "$GITHUB_RAW/configs/xray-api.py"
 wget -q -O /usr/local/bin/bot-admin.py "$GITHUB_RAW/configs/bot-admin.py"
 
+# FIX: Hapus karakter DOS (Carriage Return / \r) akibat edit file di Windows
+sed -i 's/\r$//' /usr/local/bin/srpcom/*.sh 2>/dev/null
+sed -i 's/\r$//' /usr/local/bin/xray-api.py 2>/dev/null
+sed -i 's/\r$//' /usr/local/bin/bot-admin.py 2>/dev/null
+
 chmod +x /usr/local/bin/srpcom/*.sh
 chmod +x /usr/local/bin/xray-api.py
 chmod +x /usr/local/bin/bot-admin.py
