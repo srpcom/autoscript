@@ -17,6 +17,7 @@ LIMIT_FILE = '/usr/local/etc/xray/limit.txt'
 LOCKED_FILE = '/usr/local/etc/xray/locked.json'
 ENV_FILE = '/usr/local/etc/srpcom/env.conf'
 BOT_CONF = '/usr/local/etc/xray/bot_setting.conf'
+LICENSE_FILE = '/usr/local/etc/srpcom/license.info'
 
 SSH_EXP = '/usr/local/etc/srpcom/ssh_expiry.txt'
 SSH_LIMIT = '/usr/local/etc/srpcom/ssh_limit.txt'
@@ -42,6 +43,26 @@ def get_api_key():
 
 def check_auth():
     return request.headers.get('x-api-key') == get_api_key()
+
+def is_license_active():
+    try:
+        if os.path.exists(LICENSE_FILE):
+            with open(LICENSE_FILE, 'r') as f:
+                content = f.read()
+                if 'STATUS="EXPIRED"' in content:
+                    return False
+    except:
+        pass
+    return True
+
+@app.before_request
+def check_license_lock():
+    # Mencegat semua request yang merubah database (add, del, renew, trial, lock, change)
+    if request.method in ['POST', 'DELETE']:
+        mutating_paths = ['/add-', '/del-', '/renew-', '/trial-', '/lock-', '/change-uuid']
+        if any(p in request.path for p in mutating_paths):
+            if not is_license_active():
+                return jsonify({"stdout": "❌ AKSES DITOLAK: Masa aktif Lisensi Autoscript untuk Node Server ini telah habis. Eksekusi dibatalkan."}), 403
 
 def load_json(p):
     if not os.path.exists(p): return {}
@@ -688,6 +709,34 @@ def cek_xray():
     if not check_auth(): return jsonify({"stdout": "Unauthorized"}), 401
     out = subprocess.run(['systemctl', 'is-active', 'xray'], capture_output=True, text=True).stdout.strip()
     return jsonify({"stdout": f"Xray status: {out}, Domain: {DOMAIN}"})
+
+@app.route('/user_legend/change-uuid', methods=['POST'])
+def change_uuid():
+    if not check_auth(): return jsonify({"stdout": "Unauthorized"}), 401
+    data = request.json or {}
+    old_uuid = data.get('uuidold')
+    new_uuid = data.get('uuidnew')
+    if not old_uuid or not new_uuid: return jsonify({"stdout": "Error: uuidold and uuidnew required"}), 400
+    
+    cfg = load_json(XRAY_CONF)
+    found = False
+    for ib in cfg.get('inbounds', []):
+        if ib.get('protocol') in ['vmess', 'vless']:
+            for c in ib['settings'].get('clients', []):
+                if c.get('id') == old_uuid:
+                    c['id'] = new_uuid
+                    found = True
+        elif ib.get('protocol') == 'trojan':
+            for c in ib['settings'].get('clients', []):
+                if c.get('password') == old_uuid:
+                    c['password'] = new_uuid
+                    found = True
+                    
+    if found:
+        save_json(XRAY_CONF, cfg)
+        restart_xray()
+        return jsonify({"stdout": f"✅ UUID berhasil diganti menjadi {new_uuid}."})
+    return jsonify({"stdout": f"❌ UUID lama '{old_uuid}' tidak ditemukan di sistem."})
 
 if __name__ == '__main__':
     app.run(host='127.0.0.1', port=5000)
