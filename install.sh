@@ -564,6 +564,11 @@ if ! grep -q "menu" /root/.profile; then echo "menu" >> /root/.profile; fi
 
 echo "0 * * * * root /usr/local/bin/srpcom/auto_expired.sh >/dev/null 2>&1" > /etc/cron.d/auto_expired
 
+# MENGGANTI SIMLINK DENGAN REBUILD SHORTCUTS
+chmod +x /usr/local/bin/srpcom/menu.sh
+source /usr/local/bin/srpcom/menu.sh
+rebuild_shortcuts
+
 systemctl restart xray caddy cron xray-api ipsec xl2tpd dropbear ssh-ws
 
 clear
@@ -574,6 +579,7 @@ echo "Protokol: VMESS, VLESS, TROJAN, L2TP, SSH, OVPN, UDPGW"
 echo "Optimasi: TCP BBR & Swap RAM 2GB Aktif!"
 echo "Default SNI/Bug: support.zoom.us.$DOMAIN"
 echo "Ketik 'menu' untuk masuk ke dashboard manajemen."
+echo "Ketik 'srpcom' untuk melihat daftar perintah cepat."
 echo "------------------------------------------------------"
 echo "Untuk menjadikan VPS ini sebagai MASTER BOT, masuk ke menu:"
 echo "-> [5] Settings -> [9] Setting Telegram Admin Bot -> Mulai Bot"
