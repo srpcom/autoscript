@@ -126,7 +126,7 @@ def server_selection_keyboard():
             with open(SERVERS_FILE, 'r') as f:
                 data = json.load(f)
                 for idx, node in enumerate(data.get("nodes", [])):
-                    markup.add(InlineKeyboardButton(f"🌐 Node: {node['name']}", callback_data=f"sel_srv_{idx}"))
+                    markup.add(InlineKeyboardButton(f"🌐 {node['name']}", callback_data=f"sel_srv_{idx}"))
         except: pass
     return markup
 
