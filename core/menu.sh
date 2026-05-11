@@ -16,7 +16,7 @@ source /usr/local/bin/srpcom/l2tp.sh
 source /usr/local/bin/srpcom/ssh.sh
 source /usr/local/bin/srpcom/monitor.sh
 
-GITHUB_RAW="https://raw.githubusercontent.com/syamsul18782/xray2026/main"
+GITHUB_RAW="https://raw.githubusercontent.com/srpcom/autoscript/main"
 
 # ==========================================
 # FUNGSI PEMBANGUNAN ULANG CADDYFILE
