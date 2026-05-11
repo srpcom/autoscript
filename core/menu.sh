@@ -3,20 +3,143 @@
 # menu.sh
 # MODULE: MAIN MENU (ROUTER)
 # Menampilkan antarmuka CLI utama dan perutean menu
-# Versi : 1.1 (disini isikan tanggal dan jam,menit,detik ,jangan hapus pesan ini agar AI tahu)
+# Versi : 1.2 (Fitur Shortcut & SRPCOM Command)
 # ==========================================
 
-SCRIPT_VERSION="1.1 (11052026 1259)"
+SCRIPT_VERSION="1.2 (Fitur Shortcut & SRPCOM Command)"
 
-source /usr/local/etc/srpcom/env.conf
-source /usr/local/bin/srpcom/utils.sh
-source /usr/local/bin/srpcom/telegram.sh
-source /usr/local/bin/srpcom/xray.sh
-source /usr/local/bin/srpcom/l2tp.sh
-source /usr/local/bin/srpcom/ssh.sh
-source /usr/local/bin/srpcom/monitor.sh
+source /usr/local/etc/srpcom/env.conf 2>/dev/null
+source /usr/local/bin/srpcom/utils.sh 2>/dev/null
+source /usr/local/bin/srpcom/telegram.sh 2>/dev/null
+source /usr/local/bin/srpcom/xray.sh 2>/dev/null
+source /usr/local/bin/srpcom/l2tp.sh 2>/dev/null
+source /usr/local/bin/srpcom/ssh.sh 2>/dev/null
+source /usr/local/bin/srpcom/monitor.sh 2>/dev/null
 
 GITHUB_RAW="https://raw.githubusercontent.com/srpcom/autoscript/main"
+
+# ==========================================
+# FUNGSI PEMBANGUNAN SHORTCUT GLOBAL (WRAPPER)
+# ==========================================
+rebuild_shortcuts() {
+    echo -e "\n=> Membangun Shortcut Commands (Wrapper)..."
+    
+    # Fungsi pembantu untuk membuat file eksekusi di /usr/bin/
+    build_sc() {
+        cat > /usr/bin/$1 << EOFSC
+#!/bin/bash
+source /usr/local/etc/srpcom/env.conf 2>/dev/null
+source /usr/local/bin/srpcom/utils.sh 2>/dev/null
+source /usr/local/bin/srpcom/telegram.sh 2>/dev/null
+source /usr/local/bin/srpcom/xray.sh 2>/dev/null
+source /usr/local/bin/srpcom/ssh.sh 2>/dev/null
+source /usr/local/bin/srpcom/l2tp.sh 2>/dev/null
+source /usr/local/bin/srpcom/monitor.sh 2>/dev/null
+source /usr/local/bin/srpcom/menu.sh 2>/dev/null
+$2
+EOFSC
+        chmod +x /usr/bin/$1
+    }
+    
+    # KATEGORI XRAY
+    build_sc "add-vmess" "add_vmess_ws"
+    build_sc "add-vless" "add_vless_ws"
+    build_sc "add-trojan" "add_trojan_ws"
+    build_sc "trial-xray" "add_trial"
+    build_sc "del-xray" "delete_xray"
+    build_sc "renew-xray" "renew_xray"
+    build_sc "cek-xray" "detail_xray"
+    build_sc "list-xray" "list_xray"
+    build_sc "uuid-xray" "menu_change_uuid"
+    
+    # KATEGORI SSH & OVPN
+    build_sc "add-ssh" "add_ssh"
+    build_sc "trial-ssh" "add_trial_ssh"
+    build_sc "del-ssh" "delete_ssh"
+    build_sc "renew-ssh" "renew_ssh"
+    build_sc "cek-ssh" "detail_ssh"
+    build_sc "list-ssh" "list_ssh"
+    
+    # KATEGORI L2TP
+    build_sc "add-l2tp" "add_l2tp"
+    build_sc "del-l2tp" "delete_l2tp"
+    build_sc "renew-l2tp" "renew_l2tp"
+    build_sc "cek-l2tp" "detail_l2tp"
+    build_sc "list-l2tp" "list_l2tp"
+    
+    # KATEGORI MONITOR & SISTEM
+    build_sc "mon-xray" "monitor_xray"
+    build_sc "mon-ssh" "monitor_ssh"
+    build_sc "backup" "manual_backup_telegram"
+    build_sc "restore" "restore_data"
+    
+    # KATEGORI SETTINGS
+    build_sc "set-domain" "change_domain"
+    build_sc "set-sni" "menu_extra_domain"
+    build_sc "set-apikey" "menu_api_key"
+    build_sc "set-bot" "menu_bot_admin"
+    build_sc "set-node" "menu_node_server"
+    build_sc "set-autokill" "menu_autokill"
+    build_sc "set-autoexp" "menu_auto_expired"
+    build_sc "set-autobackup" "menu_autobackup"
+    build_sc "set-autosend" "menu_autosend"
+    
+    # MEMBANGUN MENU UTAMA
+    build_sc "menu" "main_menu"
+    
+    # MEMBANGUN PERINTAH 'srpcom' (TAMPILAN HELP / CHEAT SHEET)
+    cat > /usr/bin/srpcom << 'EOFSC'
+#!/bin/bash
+clear
+echo "========================================================="
+echo -e "\e[36m              SRPCOM SHORTCUT COMMANDS                   \e[0m"
+echo "========================================================="
+echo -e "\e[32m[ XRAY COMMANDS ]\e[0m"
+echo " add-vmess   : Buat akun VMess WS"
+echo " add-vless   : Buat akun VLess WS"
+echo " add-trojan  : Buat akun Trojan WS"
+echo " trial-xray  : Buat akun Trial Xray (60 Menit)"
+echo " del-xray    : Hapus akun Xray"
+echo " renew-xray  : Perpanjang masa aktif Xray"
+echo " cek-xray    : Cek detail & Link akun Xray"
+echo " list-xray   : Tampilkan semua akun Xray"
+echo " uuid-xray   : Ganti UUID / Password Xray"
+echo ""
+echo -e "\e[32m[ SSH & OVPN COMMANDS ]\e[0m"
+echo " add-ssh     : Buat akun SSH & OpenVPN"
+echo " trial-ssh   : Buat akun Trial SSH (60 Menit)"
+echo " del-ssh     : Hapus akun SSH"
+echo " renew-ssh   : Perpanjang masa aktif SSH"
+echo " cek-ssh     : Cek detail akun SSH"
+echo " list-ssh    : Tampilkan semua akun SSH"
+echo ""
+echo -e "\e[32m[ L2TP IPSEC COMMANDS ]\e[0m"
+echo " add-l2tp    : Buat akun L2TP"
+echo " del-l2tp    : Hapus akun L2TP"
+echo " renew-l2tp  : Perpanjang masa aktif L2TP"
+echo " cek-l2tp    : Cek detail akun L2TP"
+echo " list-l2tp   : Tampilkan semua akun L2TP"
+echo ""
+echo -e "\e[32m[ MONITORING & SYSTEM ]\e[0m"
+echo " mon-xray    : Monitor kuota & IP aktif Xray"
+echo " mon-ssh     : Monitor user SSH yang login"
+echo " backup      : Kirim backup manual ke Telegram"
+echo " restore     : Restore data VPS dari file backup"
+echo ""
+echo -e "\e[32m[ SETTINGS COMMANDS ]\e[0m"
+echo " set-domain  : Ganti domain VPS"
+echo " set-sni     : Manajemen Bug/SNI (Extra Domain)"
+echo " set-apikey  : Ganti API Key Node Server"
+echo " set-node    : Manajemen Remote Node (Bot Master)"
+echo " set-bot     : Pengaturan Telegram Admin Bot"
+echo " set-autokill: Pengaturan Daemon Auto-Kill"
+echo " set-autoexp : Pengaturan Daemon Auto-Expired"
+echo "========================================================="
+echo -e " Ketik \e[33mmenu\e[0m untuk masuk ke antarmuka utama."
+echo "========================================================="
+EOFSC
+    chmod +x /usr/bin/srpcom
+}
 
 # ==========================================
 # FUNGSI PEMBANGUNAN ULANG CADDYFILE
@@ -25,7 +148,6 @@ rebuild_caddyfile() {
     local main_domain="$DOMAIN"
     local main_str="http://$main_domain, https://$main_domain, http://support.zoom.us.$main_domain, https://support.zoom.us.$main_domain"
     
-    # Simpan ke file temporary terlebih dahulu
     cat > /tmp/temp_caddyfile << EOF
 (proxy_rules) {
     handle /user_legend/* {
@@ -57,7 +179,6 @@ $main_str {
 }
 EOF
 
-    # Menambahkan blok khusus untuk extra domains agar main domain tidak terpengaruh
     if [ -s "/usr/local/etc/srpcom/extra_domains.txt" ]; then
         local extra_str=""
         while read -r ext_dom; do
@@ -81,13 +202,10 @@ EOF
         fi
     fi
 
-    # Cek apakah konfigurasi benar-benar berubah sebelum me-reload Caddy
     if ! cmp -s /etc/caddy/Caddyfile /tmp/temp_caddyfile; then
         mv /tmp/temp_caddyfile /etc/caddy/Caddyfile
-        # Reload Caddy secara halus di background (delay 2 detik) agar output CLI sempat muncul di terminal
         nohup bash -c "sleep 2; systemctl reload caddy" >/dev/null 2>&1 &
     else
-        # Jika tidak ada perubahan isi, hapus file temporary dan abaikan reload (mencegah SSH terputus sia-sia)
         rm -f /tmp/temp_caddyfile
     fi
 }
@@ -100,7 +218,7 @@ menu_update() {
         echo "╚════════════════════════════════════════════════════════╝"
         echo " Versi Sistem Saat Ini : $SCRIPT_VERSION"
         echo "---------------------------------------------------------"
-        echo " [1]  Update Modul Utama (menu.sh)"
+        echo " [1]  Update Modul Utama (menu.sh & Shortcuts)"
         echo " [2]  Update Modul Utilitas (utils.sh)"
         echo " [3]  Update Modul Xray (xray.sh)"
         echo " [4]  Update Modul SSH & OVPN (ssh.sh)"
@@ -119,7 +237,12 @@ menu_update() {
                 echo -e "\n=> Mengunduh menu.sh..."
                 wget -q -O /usr/local/bin/srpcom/menu.sh "$GITHUB_RAW/core/menu.sh"
                 chmod +x /usr/local/bin/srpcom/menu.sh
-                echo -e "\e[32m[SUCCESS]\e[0m Modul Utama diperbarui!"
+                
+                # Regenerasi Shortcut jika ada penambahan perintah baru dari GitHub
+                source /usr/local/bin/srpcom/menu.sh
+                rebuild_shortcuts
+                
+                echo -e "\e[32m[SUCCESS]\e[0m Modul Utama & Shortcuts diperbarui!"
                 echo -e "=> Versi Terinstal : $SCRIPT_VERSION"
                 sleep 1.5; exec menu ;;
             2) 
@@ -177,10 +300,14 @@ menu_update() {
                 systemctl daemon-reload
                 systemctl restart xray-api srpcom-bot
                 
-                # Update menu paling akhir agar tidak memutus proses, lalu exec ulang
                 wget -q -O /usr/local/bin/srpcom/menu.sh "$GITHUB_RAW/core/menu.sh"
                 chmod +x /usr/local/bin/srpcom/menu.sh
-                echo -e "\e[32m[SUCCESS]\e[0m Seluruh sistem berhasil diperbarui dari GitHub!"
+                
+                # Regenerasi Shortcut Semua
+                source /usr/local/bin/srpcom/menu.sh
+                rebuild_shortcuts
+                
+                echo -e "\e[32m[SUCCESS]\e[0m Seluruh sistem & Shortcuts berhasil diperbarui dari GitHub!"
                 echo -e "=> Versi Terinstal : $SCRIPT_VERSION"
                 sleep 2; exec menu ;;
             0|x|X) exec menu ;;
@@ -350,10 +477,8 @@ change_domain() {
     sed -i "s/^DOMAIN=.*/DOMAIN=\"$new_domain\"/g" /usr/local/etc/srpcom/env.conf
     source /usr/local/etc/srpcom/env.conf
 
-    # Membangun ulang Caddyfile berdasarkan domain baru dan domain tambahan
     rebuild_caddyfile
 
-    # Regenerate OVPN Client Configs with new Domain
     CA_CERT=$(cat /etc/openvpn/server/keys/ca.crt 2>/dev/null)
     TA_CERT=$(cat /etc/openvpn/server/keys/ta.key 2>/dev/null)
     
@@ -406,9 +531,6 @@ EOF
     sleep 2
 }
 
-# ==========================================
-# MANAJEMEN EXTRA DOMAIN (BUG / SNI)
-# ==========================================
 add_extra_domain() {
     clear
     echo "======================================"
@@ -424,9 +546,7 @@ add_extra_domain() {
     
     if [[ "$input_bug" == "x" || "$input_bug" == "X" || -z "$input_bug" ]]; then return; fi
     
-    # Pencegahan jika user tidak sengaja memasukkan domain utama di belakang
     input_bug=${input_bug%.$DOMAIN}
-    
     full_domain="${input_bug}.${DOMAIN}"
     
     echo -e "\nMemeriksa resolusi DNS untuk $full_domain..."
@@ -440,14 +560,12 @@ add_extra_domain() {
         return
     fi
     
-    # Cek duplikasi
     if grep -q "^$full_domain$" /usr/local/etc/srpcom/extra_domains.txt 2>/dev/null; then
         echo -e "\n\e[33m[INFO]\e[0m Domain $full_domain sudah ada dalam daftar."
         sleep 2
         return
     fi
     
-    # Simpan ke daftar
     echo "$full_domain" >> /usr/local/etc/srpcom/extra_domains.txt
     
     echo -e "\n=> Mengonfigurasi ulang Caddy Server..."
@@ -486,7 +604,6 @@ del_extra_domain() {
     if [[ "$choice" -gt 0 && "$choice" -le "${#domains[@]}" ]]; then
         selected_domain="${domains[$((choice-1))]}"
         
-        # Hapus domain dari file TXT
         sed -i "/^${selected_domain}$/d" /usr/local/etc/srpcom/extra_domains.txt
         
         echo -e "\n=> Mengonfigurasi ulang Caddy Server..."
@@ -550,7 +667,6 @@ import_github_domain() {
     while read -r domain; do
         if [ -z "$domain" ]; then continue; fi
         
-        # Cek apakah domain sudah ada di sistem
         if grep -q "^${domain}$" /usr/local/etc/srpcom/extra_domains.txt 2>/dev/null; then
             echo -e " - $domain \e[33m(Sudah ada, dilewati)\e[0m"
         else
@@ -627,7 +743,6 @@ restore_data() {
     mkdir -p /tmp/restore_temp
     tar -xzf "/root/$backup_name" -C /tmp/restore_temp 2>/dev/null
     
-    # 1. RESTORE XRAY CONFIG.JSON (Hanya Array Clients)
     if [ -f "/tmp/restore_temp/usr/local/etc/xray/config.json" ]; then
         if [ "$restore_mode" == "1" ]; then
             jq -s '.[0].inbounds[0].settings.clients = .[1].inbounds[0].settings.clients | .[0]' \
@@ -648,7 +763,6 @@ restore_data() {
         fi
     fi
     
-    # 2. RESTORE FILE TXT & CHAP-SECRETS (Hanya Database Akun)
     ACCOUNT_FILES="usr/local/etc/xray/expiry.txt usr/local/etc/xray/limit.txt usr/local/etc/srpcom/l2tp_expiry.txt usr/local/etc/srpcom/ssh_expiry.txt usr/local/etc/srpcom/ssh_limit.txt etc/ppp/chap-secrets"
     
     for txt_file in $ACCOUNT_FILES; do
@@ -663,7 +777,6 @@ restore_data() {
         fi
     done
     
-    # 3. REBUILD OS USER (SSH)
     if [ -f "/usr/local/etc/srpcom/ssh_expiry.txt" ]; then
         echo "=> Membangun ulang OS User SSH..."
         while read -r user pass exp_date exp_time; do
@@ -793,14 +906,13 @@ menu_settings() {
             9) menu_bot_admin ;;
             10) menu_extra_domain ;;
             11) menu_node_server ;;
-            0|x|X) exec menu ;;
+            0|x|X) break ;;
             *) echo "Pilihan tidak valid!"; sleep 1 ;;
         esac
     done
 }
 
 main_menu() {
-    # 1. CEK KOMPATIBILITAS (Minta VPS NAME jika klien ini pengguna lawas)
     if [ -z "$VPS_NAME" ]; then
         clear
         echo "========================================================="
@@ -821,13 +933,9 @@ main_menu() {
         fi
     fi
 
-    # 2. CEK STATUS LISENSI DARI CACHE LOKAL
     source /usr/local/etc/srpcom/license.info 2>/dev/null
     
-    # Toleransi: Jika expired di cache, kita tembak 1 kali CURL untuk verifikasi ulang instan
-    # (Siapa tahu klien baru saja membayar perpanjangan 1 menit yang lalu)
     if [ "$STATUS" == "EXPIRED" ]; then
-        # TAMBAHAN: Anti-Spam Cooldown 60 Detik untuk melindungi limit Cloudflare
         CURRENT_TIME=$(date +%s)
         LAST_CHECK=0
         if [ -f /tmp/last_lic_check ]; then LAST_CHECK=$(cat /tmp/last_lic_check); fi
@@ -852,7 +960,6 @@ main_menu() {
         fi
     fi
 
-    # BLOKIR TAMPILAN JIKA TERBUKTI HABIS
     if [ "$STATUS" == "EXPIRED" ]; then
         clear
         echo -e "\e[31m╔════════════════════════════════════════════════════════╗\e[0m"
@@ -933,5 +1040,3 @@ main_menu() {
         esac
     done
 }
-
-main_menu
