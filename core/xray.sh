@@ -311,11 +311,15 @@ renew_xray() {
         current_date=$(echo "$current_data" | awk '{print $2}')
         current_time=$(echo "$current_data" | awk '{print $3}')
         
-        if [ -z "$current_date" ]; then current_date=$(date +"%Y-%m-%d"); fi
+        if [ -z "$current_date" ] || [ "$current_date" == "Lifetime" ]; then current_date=$(date +"%Y-%m-%d"); fi
         if [ -z "$current_time" ]; then current_time=$(date +"%H:%M:%S"); fi
         
-        new_exp_date=$(date -d "$current_date $current_time + $masaaktif days" +"%Y-%m-%d")
-        new_exp_time=$(date -d "$current_date $current_time + $masaaktif days" +"%H:%M:%S")
+        current_sec=$(date -d "$current_date $current_time" +%s 2>/dev/null)
+        if [ -z "$current_sec" ]; then current_sec=$(date +%s); fi
+        
+        new_sec=$((current_sec + (masaaktif * 86400)))
+        new_exp_date=$(date -d "@$new_sec" +"%Y-%m-%d")
+        new_exp_time=$(date -d "@$new_sec" +"%H:%M:%S")
         
         sed -i "/^$user /d" /usr/local/etc/xray/expiry.txt
         echo "$user $new_exp_date $new_exp_time" >> /usr/local/etc/xray/expiry.txt
