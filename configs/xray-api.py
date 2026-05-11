@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # ==========================================
 # xray-api.py
-# MODULE: PYTHON API BACKEND (REVISED)
+# MODULE: PYTHON API BACKEND (MULTI-NODE SUPPORT)
 # ==========================================
 
 from flask import Flask, request, jsonify
@@ -79,6 +79,135 @@ def remove_from_txt(filepath, user):
             if not line.startswith(user + " "): f.write(line)
 
 # ==========================================
+# REMOTE NODE FEATURES (MONITOR, LIST, BACKUP)
+# ==========================================
+@app.route('/user_legend/list-accounts/<protocol>', methods=['GET'])
+def list_accounts(protocol):
+    if not check_auth(): return jsonify({"stdout": "Unauthorized"}), 401
+    result = []
+    if protocol in ['vmess', 'vless', 'trojan']:
+        cfg = load_json(XRAY_CONF)
+        target_users = []
+        for ib in cfg.get('inbounds', []):
+            if ib.get('protocol') == protocol:
+                for c in ib['settings'].get('clients', []):
+                    email = c.get('email')
+                    if email: target_users.append(email)
+        exp_data = {}
+        if os.path.exists(EXP_FILE):
+            with open(EXP_FILE, 'r') as f:
+                for line in f:
+                    p = line.strip().split()
+                    if len(p) >= 2: exp_data[p[0]] = p[1]
+        for u in target_users:
+            exp = exp_data.get(u, "Lifetime")
+            result.append(f"• `{u}` (Exp: {exp})")
+    elif protocol == 'ssh' and os.path.exists(SSH_EXP):
+        with open(SSH_EXP, 'r') as f:
+            for line in f:
+                p = line.strip().split()
+                if len(p) >= 3: result.append(f"• `{p[0]}` (Exp: {p[2]})")
+    elif protocol == 'l2tp' and os.path.exists(L2TP_EXP):
+        with open(L2TP_EXP, 'r') as f:
+            for line in f:
+                p = line.strip().split()
+                if len(p) >= 3: result.append(f"• `{p[0]}` (Exp: {p[2]})")
+
+    if not result:
+        return jsonify({"stdout": f"Belum ada akun aktif untuk protokol {protocol.upper()}."})
+    text = f"📋 *LIST ACCOUNT {protocol.upper()}*\n━━━━━━━━━━━━━━━━━━━━\n" + "\n".join(result)
+    return jsonify({"stdout": text})
+
+@app.route('/user_legend/monitor-xray', methods=['GET'])
+def monitor_xray():
+    if not check_auth(): return jsonify({"stdout": "Unauthorized"}), 401
+    try:
+        ip_data = {}
+        if os.path.exists('/var/log/xray/access.log'):
+            try:
+                out = subprocess.run(['tail', '-n', '3000', '/var/log/xray/access.log'], capture_output=True, text=True)
+                for line in out.stdout.splitlines():
+                    if 'accepted' in line and '127.0.0.1' not in line:
+                        parts = line.split()
+                        if len(parts) >= 7:
+                            user, ip = parts[6], parts[2].replace('tcp:', '').replace('udp:', '').split(':')[0]
+                            if user not in ip_data: ip_data[user] = set()
+                            ip_data[user].add(ip)
+            except: pass
+
+        stats = {}
+        try:
+            out = subprocess.run(['/usr/local/bin/xray', 'api', 'statsquery', '--server=127.0.0.1:10085'], capture_output=True, text=True)
+            for item in json.loads(out.stdout).get('stat', []):
+                np = item['name'].split('>>>')
+                if len(np) >= 4 and np[0] == 'user':
+                    user, t_type = np[1], np[3]
+                    if user not in stats: stats[user] = {'downlink': 0, 'uplink': 0}
+                    stats[user][t_type] = item.get('value', 0)
+        except: pass
+
+        limits = {}
+        if os.path.exists(LIMIT_FILE):
+            with open(LIMIT_FILE, 'r') as f:
+                for line in f:
+                    p = line.strip().split()
+                    if len(p) >= 3: limits[p[0]] = {'ip': int(p[1]), 'quota': int(p[2])}
+
+        all_users = set(list(stats.keys()) + list(ip_data.keys()))
+        if not all_users: return jsonify({"stdout": "Belum ada data pemakaian Xray."})
+
+        res = "📈 *XRAY MONITORING*\n━━━━━━━━━━━━━━━━━━━━\n"
+        for u in sorted(all_users):
+            active_ips = len(ip_data.get(u, set()))
+            lim_ip = limits.get(u, {}).get('ip', 0)
+            lim_ip_str = str(lim_ip) if lim_ip > 0 else 'Unli'
+            
+            tot_gb = ((stats.get(u, {}).get('downlink', 0) + stats.get(u, {}).get('uplink', 0)) / 1048576) / 1024
+            lim_q = limits.get(u, {}).get('quota', 0)
+            lim_q_str = f"{lim_q} GB" if lim_q > 0 else 'Unli'
+            
+            res += f"👤 *{u}*\n├ IP Aktif : {active_ips} / {lim_ip_str}\n└ Kuota : {tot_gb:.2f} GB / {lim_q_str}\n\n"
+        return jsonify({"stdout": res})
+    except Exception as e: return jsonify({"stdout": f"Error: {e}"})
+
+@app.route('/user_legend/monitor-ssh', methods=['GET'])
+def monitor_ssh():
+    if not check_auth(): return jsonify({"stdout": "Unauthorized"}), 401
+    try:
+        res = "💻 *SSH MONITORING*\n━━━━━━━━━━━━━━━━━━━━\n"
+        out = subprocess.run('netstat -tnpa', shell=True, capture_output=True, text=True)
+        active_users = []
+        for line in out.stdout.splitlines():
+            if 'ESTABLISHED' in line and ('dropbear' in line or 'sshd' in line):
+                parts = line.split()
+                if len(parts) >= 7:
+                    pid = parts[6].split('/')[0]
+                    ip = parts[4].split(':')[0]
+                    try:
+                        u_out = subprocess.run(['ps', '-o', 'user=', '-p', pid], capture_output=True, text=True)
+                        user = u_out.stdout.strip()
+                        if user and user != 'root': active_users.append(f"👤 `{user}` | 🌐 {ip}")
+                    except: pass
+        if not active_users: return jsonify({"stdout": res + "Belum ada user aktif."})
+        return jsonify({"stdout": res + "\n".join(active_users)})
+    except Exception as e: return jsonify({"stdout": f"Error: {e}"})
+
+@app.route('/user_legend/sys-backup', methods=['GET'])
+def sys_backup():
+    if not check_auth(): return jsonify({"stdout": "Unauthorized"}), 401
+    now_str = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+    backup_file = f"/tmp/srpcom-backup-{now_str}.tar.gz"
+    files = [XRAY_CONF, EXP_FILE, LIMIT_FILE, L2TP_EXP, SSH_EXP, SSH_LIMIT, CHAP_SECRETS]
+    valid = [f for f in files if os.path.exists(f)]
+    if valid:
+        subprocess.run(['tar', '-czf', backup_file, '-C', '/'] + [f.lstrip('/') for f in valid])
+        with open(backup_file, 'rb') as doc:
+            encoded = base64.b64encode(doc.read()).decode('utf-8')
+        os.remove(backup_file)
+        return jsonify({"filename": f"srpcom-backup-{now_str}.tar.gz", "data": encoded})
+    return jsonify({"stdout": "Tidak ada data untuk dibackup."})
+
+# ==========================================
 # XRAY ENDPOINTS
 # ==========================================
 def generate_account_detail(protocol, user, uid, exp_date_str, is_trial=False, limit_ip=0, limit_quota=0):
@@ -98,52 +227,26 @@ def generate_account_detail(protocol, user, uid, exp_date_str, is_trial=False, l
         link_tls = f"trojan://{uid}@{DOMAIN}:443?path=/trojanws&security=tls&host={DOMAIN}&type=ws&sni={DOMAIN}#{user}"
         link_none = ""
 
-    # msg_cli: Format polos tanpa backtick untuk WEB/API Output
     msg_cli = (
-        f"━━━━━━━━━━━━━━━━━━━━\n"
-        f"❖ XRAY/{protocol.upper()} WS{trial_txt} ❖\n"
-        f"━━━━━━━━━━━━━━━━━━━━\n"
-        f"Remarks : {user}\n"
-        f"IP Address : {IP_ADD}\n"
-        f"Domain : {DOMAIN}\n"
-        f"Port TLS : 443\n"
-        f"Port NONE-TLS : 80\n"
-        f"{'Password' if protocol == 'trojan' else 'ID'} : {uid}\n"
-        f"Network : Websocket\n"
-        f"Websocket Path : /{protocol}ws\n"
-        f"━━━━━━━━━━━━━━━━━━━━\n"
-        f"Limit IP : {lim_ip_str}\n"
-        f"Limit Kuota : {lim_q_str}\n"
-        f"━━━━━━━━━━━━━━━━━━━━\n"
-        f"LINK WS TLS : {link_tls}\n"
-        f"{'━━━━━━━━━━━━━━━━━━━━' if protocol != 'trojan' else ''}\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n❖ XRAY/{protocol.upper()} WS{trial_txt} ❖\n━━━━━━━━━━━━━━━━━━━━\n"
+        f"Remarks : {user}\nIP Address : {IP_ADD}\nDomain : {DOMAIN}\n"
+        f"Port TLS : 443\nPort NONE-TLS : 80\n{'Password' if protocol == 'trojan' else 'ID'} : {uid}\n"
+        f"Network : Websocket\nWebsocket Path : /{protocol}ws\n━━━━━━━━━━━━━━━━━━━━\n"
+        f"Limit IP : {lim_ip_str}\nLimit Kuota : {lim_q_str}\n━━━━━━━━━━━━━━━━━━━━\n"
+        f"LINK WS TLS : {link_tls}\n{'━━━━━━━━━━━━━━━━━━━━' if protocol != 'trojan' else ''}\n"
         f"{'LINK WS NONE-TLS : ' + link_none if protocol != 'trojan' else ''}\n"
-        f"━━━━━━━━━━━━━━━━━━━━\n"
-        f"Expired On : {exp_date_str} WIB"
+        f"━━━━━━━━━━━━━━━━━━━━\nExpired On : {exp_date_str} WIB"
     )
 
-    # msg_tg: Format markdown dengan backtick untuk BOT TELEGRAM
     msg_tg = (
-        f"━━━━━━━━━━━━━━━━━━━━\n"
-        f"❖ XRAY/{protocol.upper()} WS{trial_txt} ❖\n"
-        f"━━━━━━━━━━━━━━━━━━━━\n"
-        f"Remarks : `{user}`\n"
-        f"IP Address : {IP_ADD}\n"
-        f"Domain : {DOMAIN}\n"
-        f"Port TLS : 443\n"
-        f"Port NONE-TLS : 80\n"
-        f"{'Password' if protocol == 'trojan' else 'ID'} : `{uid}`\n"
-        f"Network : Websocket\n"
-        f"Websocket Path : /{protocol}ws\n"
-        f"━━━━━━━━━━━━━━━━━━━━\n"
-        f"Limit IP : {lim_ip_str}\n"
-        f"Limit Kuota : {lim_q_str}\n"
-        f"━━━━━━━━━━━━━━━━━━━━\n"
-        f"LINK WS TLS : `{link_tls}`\n"
-        f"{'━━━━━━━━━━━━━━━━━━━━' if protocol != 'trojan' else ''}\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n❖ XRAY/{protocol.upper()} WS{trial_txt} ❖\n━━━━━━━━━━━━━━━━━━━━\n"
+        f"Remarks : `{user}`\nIP Address : {IP_ADD}\nDomain : {DOMAIN}\n"
+        f"Port TLS : 443\nPort NONE-TLS : 80\n{'Password' if protocol == 'trojan' else 'ID'} : `{uid}`\n"
+        f"Network : Websocket\nWebsocket Path : /{protocol}ws\n━━━━━━━━━━━━━━━━━━━━\n"
+        f"Limit IP : {lim_ip_str}\nLimit Kuota : {lim_q_str}\n━━━━━━━━━━━━━━━━━━━━\n"
+        f"LINK WS TLS : `{link_tls}`\n{'━━━━━━━━━━━━━━━━━━━━' if protocol != 'trojan' else ''}\n"
         f"{'LINK WS NONE-TLS : `' + link_none + '`' if protocol != 'trojan' else ''}\n"
-        f"━━━━━━━━━━━━━━━━━━━━\n"
-        f"Expired On : {exp_date_str} WIB"
+        f"━━━━━━━━━━━━━━━━━━━━\nExpired On : {exp_date_str} WIB"
     )
     
     return msg_cli, msg_tg
@@ -285,13 +388,11 @@ def add_ssh():
     limit_ip = int(data.get('limit_ip', 0))
     if not user: return jsonify({"stdout": "Error: User required"}), 400
     
-    # Check if user exists in OS
     res = subprocess.run(['id', user], capture_output=True)
     if res.returncode == 0: return jsonify({"stdout": f"Error: User '{user}' sudah ada di Linux!"}), 400
     
     dt = datetime.datetime.now() + datetime.timedelta(days=exp)
-    exp_date = dt.strftime('%Y-%m-%d')
-    exp_time = dt.strftime('%H:%M:%S')
+    exp_date, exp_time = dt.strftime('%Y-%m-%d'), dt.strftime('%H:%M:%S')
     
     subprocess.run(['useradd', '-e', exp_date, '-s', '/bin/false', '-M', user])
     subprocess.run(f"echo '{user}:{password}' | chpasswd", shell=True)
@@ -450,7 +551,6 @@ def add_l2tp():
     user, password, exp = data.get('user'), data.get('password', '123'), int(data.get('exp', 30))
     if not user: return jsonify({"stdout": "Error: User required"}), 400
     
-    # Check if exists
     if os.path.exists(CHAP_SECRETS):
         with open(CHAP_SECRETS, 'r') as f:
             if f'"{user}" l2tpd' in f.read():
@@ -555,7 +655,7 @@ def detail_l2tp():
 @app.route('/user_legend/trial-l2tp', methods=['POST'])
 def trial_l2tp():
     if not check_auth(): return jsonify({"stdout": "Unauthorized"}), 401
-    return jsonify({"stdout": "L2TP Trial created (Demo via API)"}) # Optional if needed
+    return jsonify({"stdout": "L2TP Trial created (Demo via API)"})
 
 # ==========================================
 # LOCK ENDPOINTS (AUTOKILL)
