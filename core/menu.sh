@@ -712,7 +712,7 @@ list_extra_domain() {
 import_github_domain() {
     clear
     echo "======================================"
-    echo "     IMPORT EXTRA DOMAIN (GITHUB)     "
+    echo "         IMPORT EXTRA DOMAIN          "
     echo "======================================"
     echo "=> Sedang mengambil data dari GitHub..."
     
@@ -1002,7 +1002,7 @@ main_menu() {
         echo "5. SETTINGS (Backup/Autokill/Bot)"
         echo "6. RESTART SERVICES (All)"
         echo "7. CEK STATUS SERVICES"
-        echo "8. UPDATE SCRIPT DARI GITHUB"
+        echo "8. UPDATE SCRIPT"
         echo "0/x. Exit CLI"
         echo ""
         read -p "Pilih opsi [0-8 or x]: " opt
