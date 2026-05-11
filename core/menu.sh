@@ -827,18 +827,27 @@ main_menu() {
     # Toleransi: Jika expired di cache, kita tembak 1 kali CURL untuk verifikasi ulang instan
     # (Siapa tahu klien baru saja membayar perpanjangan 1 menit yang lalu)
     if [ "$STATUS" == "EXPIRED" ]; then
-        FORMATTED_NAME=$(echo "$VPS_NAME" | sed 's/ /%20/g')
-        API_CHECK_URL="https://tuban.store/api/license/check?ip=$IP_ADD&name=$FORMATTED_NAME"
-        
-        RESPONSE=$(curl -sS --max-time 5 -w "\n%{http_code}" "$API_CHECK_URL" 2>/dev/null)
-        if [ $? -eq 0 ]; then
-            HTTP_STATUS=$(echo "$RESPONSE" | tail -n1)
-            if [ "$HTTP_STATUS" == "200" ]; then
-                JSON_BODY=$(echo "$RESPONSE" | sed '$d')
-                EXP_DATE_NEW=$(echo "$JSON_BODY" | grep -o '"expires_at":"[^"]*' | cut -d'"' -f4)
-                echo "STATUS=\"ACTIVE\"" > /usr/local/etc/srpcom/license.info
-                echo "EXP_DATE=\"$EXP_DATE_NEW\"" >> /usr/local/etc/srpcom/license.info
-                STATUS="ACTIVE"
+        # TAMBAHAN: Anti-Spam Cooldown 60 Detik untuk melindungi limit Cloudflare
+        CURRENT_TIME=$(date +%s)
+        LAST_CHECK=0
+        if [ -f /tmp/last_lic_check ]; then LAST_CHECK=$(cat /tmp/last_lic_check); fi
+        TIME_DIFF=$((CURRENT_TIME - LAST_CHECK))
+
+        if [ "$TIME_DIFF" -ge 60 ]; then
+            echo "$CURRENT_TIME" > /tmp/last_lic_check
+            FORMATTED_NAME=$(echo "$VPS_NAME" | sed 's/ /%20/g')
+            API_CHECK_URL="https://tuban.store/api/license/check?ip=$IP_ADD&name=$FORMATTED_NAME"
+            
+            RESPONSE=$(curl -sS --max-time 5 -w "\n%{http_code}" "$API_CHECK_URL" 2>/dev/null)
+            if [ $? -eq 0 ]; then
+                HTTP_STATUS=$(echo "$RESPONSE" | tail -n1)
+                if [ "$HTTP_STATUS" == "200" ]; then
+                    JSON_BODY=$(echo "$RESPONSE" | sed '$d')
+                    EXP_DATE_NEW=$(echo "$JSON_BODY" | grep -o '"expires_at":"[^"]*' | cut -d'"' -f4)
+                    echo "STATUS=\"ACTIVE\"" > /usr/local/etc/srpcom/license.info
+                    echo "EXP_DATE=\"$EXP_DATE_NEW\"" >> /usr/local/etc/srpcom/license.info
+                    STATUS="ACTIVE"
+                fi
             fi
         fi
     fi
