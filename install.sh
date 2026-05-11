@@ -5,7 +5,7 @@
 # OS Support: Ubuntu 20.04 / 22.04 / 24.04 LTS
 # ==========================================
 
-GITHUB_RAW="https://raw.githubusercontent.com/syamsul18782/xray2026/main"
+GITHUB_RAW="https://raw.githubusercontent.com/srpcom/autoscript/main"
 
 if [ "${EUID}" -ne 0 ]; then
     echo -e "\e[31m[ERROR]\e[0m Script ini harus dijalankan sebagai root (Gunakan 'sudo su' terlebih dahulu)."
