@@ -34,71 +34,77 @@ done
 
 echo -e "\nMemeriksa Validitas Lisensi IP ($VPS_IP) dan Nama ($VPS_NAME)..."
 
-# Menggunakan sed untuk merubah spasi pada Nama VPS menjadi %20 agar URL API tidak rusak
 FORMATTED_NAME=$(echo "$VPS_NAME" | sed 's/ /%20/g')
 API_CHECK_URL="https://tuban.store/api/license/check?ip=$VPS_IP&name=$FORMATTED_NAME"
 
-# Melakukan Request ke API dan menangkap HTTP status code di baris terakhir
-RESPONSE=$(curl -sS -w "\n%{http_code}" "$API_CHECK_URL")
+RESPONSE=$(curl -sS --max-time 10 -w "\n%{http_code}" "$API_CHECK_URL")
 HTTP_STATUS=$(echo "$RESPONSE" | tail -n1)
 JSON_BODY=$(echo "$RESPONSE" | sed '$d')
 
-# Memeriksa HTTP Status (Hanya lolos jika API mengembalikan kode 200 OK)
 if [ "$HTTP_STATUS" != "200" ]; then
     echo -e "\e[31m[ERROR] LISENSI DITOLAK ATAU TIDAK VALID!\e[0m"
-    
-    # Mencoba mengekstrak pesan error dari JSON response menggunakan bash utilities (grep/cut)
     ERR_MSG=$(echo "$JSON_BODY" | grep -o '"message":"[^"]*' | cut -d'"' -f4)
-    if [ -n "$ERR_MSG" ]; then
-        echo -e "\e[33mAlasan:\e[0m $ERR_MSG"
-    else
-        echo -e "\e[33mAlasan:\e[0m IP $VPS_IP belum terdaftar di sistem atau masa aktif habis."
-    fi
+    if [ -n "$ERR_MSG" ]; then echo -e "\e[33mAlasan:\e[0m $ERR_MSG"
+    else echo -e "\e[33mAlasan:\e[0m IP $VPS_IP belum terdaftar atau masa aktif habis."; fi
     
     echo -e "Silakan beli/perpanjang lisensi Anda di: \e[36mhttps://tuban.store/lisensi\e[0m"
     exit 1
 fi
 
-echo -e "\e[32m[SUCCESS]\e[0m Lisensi Valid! Melanjutkan instalasi...\n"
+# Mengambil tanggal expired dari JSON (Grep manual karena jq belum terinstall)
+EXP_DATE_INIT=$(echo "$JSON_BODY" | grep -o '"expires_at":"[^"]*' | cut -d'"' -f4)
+echo -e "\e[32m[SUCCESS]\e[0m Lisensi Valid (Exp: $EXP_DATE_INIT)! Melanjutkan instalasi...\n"
 # ==========================================
-
 
 while true; do
     read -p "Masukkan Domain VPS Anda (contoh: aw.srpcom.cloud): " DOMAIN
     if [ -z "$DOMAIN" ]; then echo -e "\e[31m[ERROR]\e[0m Domain tidak boleh kosong!\n"; continue; fi
+    
+    # FITUR BYPASS: Mencegah user terjebak looping jika DNS sedang masa propagasi lambat
+    if [[ "$DOMAIN" == "skip" || "$DOMAIN" == "SKIP" ]]; then
+        read -p "Masukkan Domain secara manual (tanpa validasi DNS): " DOMAIN
+        echo -e "\e[33m[WARNING]\e[0m Validasi DNS dilewati secara paksa untuk domain: $DOMAIN"
+        break
+    fi
+    
     DOMAIN_IP=$(getent ahostsv4 "$DOMAIN" | awk '{ print $1 }' | head -n 1)
     if [ "$DOMAIN_IP" == "$VPS_IP" ]; then
         echo -e "\e[32m[SUCCESS]\e[0m Domain valid! ($DOMAIN -> $VPS_IP)"
         break
     else
         echo -e "\e[31m[ERROR] VERIFIKASI DOMAIN GAGAL!\e[0m"
-        echo -e "\e[33m[Solusi]\e[0m Pastikan A Record di DNS mengarah ke IP $VPS_IP (DNS Only).\n"
+        echo -e "\e[33m[Solusi]\e[0m Pastikan A Record di DNS mengarah ke IP $VPS_IP (DNS Only)."
+        echo -e "Ketik \e[32mskip\e[0m jika Anda YAKIN DNS sudah disetting dan sedang menunggu propagasi (Propagasi bisa memakan waktu 5-30 menit).\n"
     fi
 done
 
 echo -e "\n[1/11] Memperbarui sistem & dependensi..."
 export DEBIAN_FRONTEND=noninteractive
 apt update && apt upgrade -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold"
-# Menambahkan net-tools untuk kebutuhan monitoring dan autokill SSH
 apt install curl wget unzip uuid-runtime jq tzdata ufw cron gnupg2 gnupg python3 python3-flask python3-pip strongswan xl2tpd iptables dropbear openvpn cmake make gcc git net-tools -y
 timedatectl set-timezone Asia/Jakarta
 
-# Menginstal Modul Python Telegram Bot
 pip3 install pyTelegramBotAPI requests --break-system-packages 2>/dev/null || pip3 install pyTelegramBotAPI requests
 
 mkdir -p /usr/local/etc/srpcom
 mkdir -p /usr/local/bin/srpcom
 mkdir -p /usr/local/etc/xray
 
+# SIMPAN VPS NAME SECARA PERMANEN
 cat > /usr/local/etc/srpcom/env.conf << EOF
 DOMAIN="$DOMAIN"
 IP_ADD="$VPS_IP"
+VPS_NAME="$VPS_NAME"
 EOF
 
-# File untuk menyimpan daftar extra domain caddy
+# SIMPAN CACHE LISENSI AWAL
+cat > /usr/local/etc/srpcom/license.info << EOF
+STATUS="ACTIVE"
+EXP_DATE="$EXP_DATE_INIT"
+EOF
+
 touch /usr/local/etc/srpcom/extra_domains.txt
 
-# File Konfigurasi Kosong untuk Bot Admin (Disetting via menu VPS nanti)
 cat > /usr/local/etc/xray/bot_admin.conf << 'EOF'
 BOT_TOKEN=""
 ADMIN_ID=""
@@ -114,8 +120,6 @@ if [ ! -f "/swapfile" ]; then
     if ! grep -q "/swapfile" /etc/fstab; then
         echo "/swapfile swap swap defaults 0 0" >> /etc/fstab
     fi
-else
-    echo "=> Swap Memory sudah aktif."
 fi
 
 echo "=> Mengaktifkan TCP BBR..."
@@ -327,7 +331,11 @@ openssl x509 -req -days 3650 -in server.csr -CA ca.crt -CAkey ca.key -CAcreatese
 # PERBAIKAN: Menambahkan --secret agar ta.key berhasil dibuat tanpa error
 openvpn --genkey --secret ta.key
 
-PAM_PLUGIN=$(find /usr -name "openvpn-plugin-auth-pam.so" | head -n 1)
+# PERBAIKAN: Mempercepat pencarian plugin PAM agar instalasi tidak terkesan macet/hang
+PAM_PLUGIN=$(find /usr/lib -name "openvpn-plugin-auth-pam.so" | head -n 1)
+if [ -z "$PAM_PLUGIN" ]; then
+    PAM_PLUGIN="/usr/lib/x86_64-linux-gnu/openvpn/plugins/openvpn-plugin-auth-pam.so"
+fi
 
 cat > /etc/openvpn/server/server-udp.conf << EOF
 port 2200
@@ -478,9 +486,6 @@ EOF
 systemctl daemon-reload
 systemctl enable xray-api
 systemctl start xray-api
-
-# PERBAIKAN MASTER-NODE: Service bot sengaja di-disable agar tidak terjadi bentrok (conflict polling)
-# jika script diinstal di banyak VPS (Node). Bot hanya dinyalakan manual di 1 VPS Master.
 systemctl disable srpcom-bot >/dev/null 2>&1
 
 echo -e "\n[9/11] Mengonfigurasi Firewall (UFW & Iptables NAT L2TP/OVPN)..."
@@ -492,11 +497,11 @@ ufw allow 443/tcp
 ufw allow 500/udp
 ufw allow 4500/udp
 ufw allow 1701/udp
-ufw allow 1194/tcp # OVPN TCP
-ufw allow 2200/udp # OVPN UDP
-ufw allow 7100/udp # BadVPN
-ufw allow 7200/udp # BadVPN
-ufw allow 7300/udp # BadVPN
+ufw allow 1194/tcp
+ufw allow 2200/udp
+ufw allow 7100/udp
+ufw allow 7200/udp
+ufw allow 7300/udp
 ufw --force enable
 
 ETH=$(ip route ls | grep default | awk '{print $5}' | head -n 1)
@@ -525,7 +530,6 @@ curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | gpg --dearmo
 curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | tee /etc/apt/sources.list.d/caddy-stable.list
 apt update && apt install caddy -y
 
-# Menerapkan support eksplisit untuk support.zoom.us.DOMAIN
 DOMAINS_STR="http://$DOMAIN, https://$DOMAIN, http://support.zoom.us.$DOMAIN, https://support.zoom.us.$DOMAIN"
 
 cat > /etc/caddy/Caddyfile << EOF
@@ -558,7 +562,6 @@ EOF
 echo -e "\n[11/11] Setup Cronjob Selesai..."
 if ! grep -q "menu" /root/.profile; then echo "menu" >> /root/.profile; fi
 
-# Menambahkan cronjob untuk Auto Expired (Berjalan setiap jam ke-0)
 echo "0 * * * * root /usr/local/bin/srpcom/auto_expired.sh >/dev/null 2>&1" > /etc/cron.d/auto_expired
 
 systemctl restart xray caddy cron xray-api ipsec xl2tpd dropbear ssh-ws
