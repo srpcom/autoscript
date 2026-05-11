@@ -3,10 +3,10 @@
 # menu.sh
 # MODULE: MAIN MENU (ROUTER)
 # Menampilkan antarmuka CLI utama dan perutean menu
-# Versi : 1.2 (Fitur Shortcut & SRPCOM Command)
+# Versi : 1.3 (Security Patch: Global License Lock on Shortcuts)
 # ==========================================
 
-SCRIPT_VERSION="1.2 (Fitur Shortcut & SRPCOM Command)"
+SCRIPT_VERSION="1.3 (Global License Lock)"
 
 source /usr/local/etc/srpcom/env.conf 2>/dev/null
 source /usr/local/bin/srpcom/utils.sh 2>/dev/null
@@ -19,12 +19,89 @@ source /usr/local/bin/srpcom/monitor.sh 2>/dev/null
 GITHUB_RAW="https://raw.githubusercontent.com/srpcom/autoscript/main"
 
 # ==========================================
+# FUNGSI VALIDASI LISENSI GLOBAL (CEGAH BYPASS)
+# ==========================================
+validate_license_cli() {
+    # 1. Cek jika klien ini pengguna lawas yang belum punya VPS_NAME
+    if [ -z "$VPS_NAME" ]; then
+        clear
+        echo "========================================================="
+        echo "          UPDATE SISTEM: REGISTRASI NAMA VPS             "
+        echo "========================================================="
+        echo "Sistem mendeteksi bahwa Nama VPS Anda belum tersimpan."
+        echo "Data ini wajib ada untuk Sinkronisasi Lisensi Script."
+        echo "========================================================="
+        read -p "Masukkan Nama VPS Anda (Sesuai web): " input_name
+        if [ -n "$input_name" ]; then
+            echo "VPS_NAME=\"$input_name\"" >> /usr/local/etc/srpcom/env.conf
+            VPS_NAME="$input_name"
+            echo "=> Berhasil disimpan! Memuat menu..."
+            sleep 1
+        else
+            echo "Batal. Anda akan keluar dari menu."
+            exit 0
+        fi
+    fi
+
+    # 2. Cek Cache Lisensi
+    source /usr/local/etc/srpcom/license.info 2>/dev/null
+    
+    # Toleransi: Jika expired di cache, tembak API 1 kali (Dengan Cooldown 60 Detik)
+    if [ "$STATUS" == "EXPIRED" ]; then
+        CURRENT_TIME=$(date +%s)
+        LAST_CHECK=0
+        if [ -f /tmp/last_lic_check ]; then LAST_CHECK=$(cat /tmp/last_lic_check); fi
+        TIME_DIFF=$((CURRENT_TIME - LAST_CHECK))
+
+        if [ "$TIME_DIFF" -ge 60 ]; then
+            echo "$CURRENT_TIME" > /tmp/last_lic_check
+            FORMATTED_NAME=$(echo "$VPS_NAME" | sed 's/ /%20/g')
+            API_CHECK_URL="https://tuban.store/api/license/check?ip=$IP_ADD&name=$FORMATTED_NAME"
+            
+            RESPONSE=$(curl -sS --max-time 5 -w "\n%{http_code}" "$API_CHECK_URL" 2>/dev/null)
+            if [ $? -eq 0 ]; then
+                HTTP_STATUS=$(echo "$RESPONSE" | tail -n1)
+                if [ "$HTTP_STATUS" == "200" ]; then
+                    JSON_BODY=$(echo "$RESPONSE" | sed '$d')
+                    EXP_DATE_NEW=$(echo "$JSON_BODY" | grep -o '"expires_at":"[^"]*' | cut -d'"' -f4)
+                    echo "STATUS=\"ACTIVE\"" > /usr/local/etc/srpcom/license.info
+                    echo "EXP_DATE=\"$EXP_DATE_NEW\"" >> /usr/local/etc/srpcom/license.info
+                    STATUS="ACTIVE"
+                fi
+            fi
+        fi
+    fi
+
+    # 3. BLOKIR EKSEKUSI JIKA HABIS
+    if [ "$STATUS" == "EXPIRED" ]; then
+        clear
+        echo -e "\e[31m╔════════════════════════════════════════════════════════╗\e[0m"
+        echo -e "\e[31m║                  AKSES MENU DITOLAK                    ║\e[0m"
+        echo -e "\e[31m╚════════════════════════════════════════════════════════╝\e[0m"
+        echo -e "\e[33m Masa aktif lisensi Autoscript untuk VPS ini telah HABIS.\e[0m"
+        echo -e " Nama VPS   : $VPS_NAME"
+        echo -e " IP Address : $IP_ADD"
+        echo -e ""
+        echo -e " Jangan khawatir, seluruh layanan VPN klien Anda tetap"
+        echo -e " berjalan normal. Namun, akses ke panel manajemen ini"
+        echo -e " (CLI) dikunci sementara."
+        echo -e ""
+        echo -e " Silakan perpanjang lisensi Anda di:"
+        echo -e " \e[36mhttps://tuban.store/lisensi\e[0m"
+        echo -e ""
+        echo -e " Jika sudah membayar, ketik ulang perintah \e[32mmenu\e[0m"
+        echo -e "\e[31m==========================================================\e[0m"
+        exit 0
+    fi
+}
+
+# ==========================================
 # FUNGSI PEMBANGUNAN SHORTCUT GLOBAL (WRAPPER)
 # ==========================================
 rebuild_shortcuts() {
     echo -e "\n=> Membangun Shortcut Commands (Wrapper)..."
     
-    # Fungsi pembantu untuk membuat file eksekusi di /usr/bin/
+    # Fungsi pembantu: Menyuntikkan validate_license_cli() pada setiap eksekusi
     build_sc() {
         cat > /usr/bin/$1 << EOFSC
 #!/bin/bash
@@ -36,6 +113,8 @@ source /usr/local/bin/srpcom/ssh.sh 2>/dev/null
 source /usr/local/bin/srpcom/l2tp.sh 2>/dev/null
 source /usr/local/bin/srpcom/monitor.sh 2>/dev/null
 source /usr/local/bin/srpcom/menu.sh 2>/dev/null
+
+validate_license_cli
 $2
 EOFSC
         chmod +x /usr/bin/$1
@@ -913,74 +992,6 @@ menu_settings() {
 }
 
 main_menu() {
-    if [ -z "$VPS_NAME" ]; then
-        clear
-        echo "========================================================="
-        echo "          UPDATE SISTEM: REGISTRASI NAMA VPS             "
-        echo "========================================================="
-        echo "Sistem mendeteksi bahwa Nama VPS Anda belum tersimpan."
-        echo "Data ini wajib ada untuk Sinkronisasi Lisensi Script."
-        echo "========================================================="
-        read -p "Masukkan Nama VPS Anda (Sesuai web): " input_name
-        if [ -n "$input_name" ]; then
-            echo "VPS_NAME=\"$input_name\"" >> /usr/local/etc/srpcom/env.conf
-            VPS_NAME="$input_name"
-            echo "=> Berhasil disimpan! Memuat menu..."
-            sleep 1
-        else
-            echo "Batal. Anda akan keluar dari menu."
-            exit 0
-        fi
-    fi
-
-    source /usr/local/etc/srpcom/license.info 2>/dev/null
-    
-    if [ "$STATUS" == "EXPIRED" ]; then
-        CURRENT_TIME=$(date +%s)
-        LAST_CHECK=0
-        if [ -f /tmp/last_lic_check ]; then LAST_CHECK=$(cat /tmp/last_lic_check); fi
-        TIME_DIFF=$((CURRENT_TIME - LAST_CHECK))
-
-        if [ "$TIME_DIFF" -ge 60 ]; then
-            echo "$CURRENT_TIME" > /tmp/last_lic_check
-            FORMATTED_NAME=$(echo "$VPS_NAME" | sed 's/ /%20/g')
-            API_CHECK_URL="https://tuban.store/api/license/check?ip=$IP_ADD&name=$FORMATTED_NAME"
-            
-            RESPONSE=$(curl -sS --max-time 5 -w "\n%{http_code}" "$API_CHECK_URL" 2>/dev/null)
-            if [ $? -eq 0 ]; then
-                HTTP_STATUS=$(echo "$RESPONSE" | tail -n1)
-                if [ "$HTTP_STATUS" == "200" ]; then
-                    JSON_BODY=$(echo "$RESPONSE" | sed '$d')
-                    EXP_DATE_NEW=$(echo "$JSON_BODY" | grep -o '"expires_at":"[^"]*' | cut -d'"' -f4)
-                    echo "STATUS=\"ACTIVE\"" > /usr/local/etc/srpcom/license.info
-                    echo "EXP_DATE=\"$EXP_DATE_NEW\"" >> /usr/local/etc/srpcom/license.info
-                    STATUS="ACTIVE"
-                fi
-            fi
-        fi
-    fi
-
-    if [ "$STATUS" == "EXPIRED" ]; then
-        clear
-        echo -e "\e[31m╔════════════════════════════════════════════════════════╗\e[0m"
-        echo -e "\e[31m║                  AKSES MENU DITOLAK                    ║\e[0m"
-        echo -e "\e[31m╚════════════════════════════════════════════════════════╝\e[0m"
-        echo -e "\e[33m Masa aktif lisensi Autoscript untuk VPS ini telah HABIS.\e[0m"
-        echo -e " Nama VPS   : $VPS_NAME"
-        echo -e " IP Address : $IP_ADD"
-        echo -e ""
-        echo -e " Jangan khawatir, seluruh layanan VPN klien Anda tetap"
-        echo -e " berjalan normal. Namun, akses ke panel manajemen ini"
-        echo -e " (CLI) dikunci sementara."
-        echo -e ""
-        echo -e " Silakan perpanjang lisensi Anda di:"
-        echo -e " \e[36mhttps://tuban.store/lisensi\e[0m"
-        echo -e ""
-        echo -e " Jika sudah membayar, ketik ulang perintah \e[32mmenu\e[0m"
-        echo -e "\e[31m==========================================================\e[0m"
-        exit 0
-    fi
-
     while true; do
         print_header
         
