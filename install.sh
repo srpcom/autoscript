@@ -453,7 +453,6 @@ wget -q -O /usr/local/bin/bot-admin.py "$GITHUB_RAW/configs/bot-admin.py"
 chmod +x /usr/local/bin/srpcom/*.sh
 chmod +x /usr/local/bin/xray-api.py
 chmod +x /usr/local/bin/bot-admin.py
-ln -sf /usr/local/bin/srpcom/menu.sh /usr/bin/menu
 
 echo -e "\n[8/11] Mengonfigurasi Layanan API & Bot Admin..."
 cat > /etc/systemd/system/xray-api.service << EOF
@@ -564,10 +563,13 @@ if ! grep -q "menu" /root/.profile; then echo "menu" >> /root/.profile; fi
 
 echo "0 * * * * root /usr/local/bin/srpcom/auto_expired.sh >/dev/null 2>&1" > /etc/cron.d/auto_expired
 
-# MENGGANTI SIMLINK DENGAN REBUILD SHORTCUTS
+# ==========================================
+# REBUILD SHORTCUTS (WRAPPER)
+# ==========================================
 chmod +x /usr/local/bin/srpcom/menu.sh
 source /usr/local/bin/srpcom/menu.sh
 rebuild_shortcuts
+# ==========================================
 
 systemctl restart xray caddy cron xray-api ipsec xl2tpd dropbear ssh-ws
 
