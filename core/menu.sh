@@ -600,23 +600,6 @@ menu_extra_domain() {
     done
 }
 
-menu_api_key() {
-    clear
-    echo "======================================"
-    echo "       SETTING API KEY WEBSITE        "
-    echo "======================================"
-    current_key=$(cat /usr/local/etc/xray/api_key.conf 2>/dev/null)
-    echo "Current API Key: ${current_key}"
-    echo "======================================"
-    read -p "Input New API Key (tekan 'x' untuk batal): " new_key
-    if [[ "$new_key" != "x" && "$new_key" != "X" && -n "$new_key" ]]; then
-        echo "$new_key" > /usr/local/etc/xray/api_key.conf
-        systemctl restart xray-api
-        echo -e "\n\e[32m[SUCCESS]\e[0m API Key berhasil diubah dan sistem direstart!"
-        sleep 2
-    fi
-}
-
 restore_data() {
     clear
     echo "======================================"
@@ -697,6 +680,86 @@ restore_data() {
     pause
 }
 
+menu_api_key() {
+    clear
+    echo "======================================"
+    echo "       SETTING API KEY WEBSITE        "
+    echo "======================================"
+    current_key=$(cat /usr/local/etc/xray/api_key.conf 2>/dev/null)
+    echo "Current API Key: ${current_key}"
+    echo "======================================"
+    read -p "Input New API Key (tekan 'x' untuk batal): " new_key
+    if [[ "$new_key" != "x" && "$new_key" != "X" && -n "$new_key" ]]; then
+        echo "$new_key" > /usr/local/etc/xray/api_key.conf
+        systemctl restart xray-api
+        echo -e "\n\e[32m[SUCCESS]\e[0m API Key berhasil diubah dan sistem direstart!"
+        sleep 2
+    fi
+}
+
+menu_node_server() {
+    local srv_file="/usr/local/etc/xray/servers.json"
+    if [ ! -f "$srv_file" ]; then
+        echo '{"nodes": []}' > "$srv_file"
+    fi
+
+    while true; do
+        clear
+        echo "======================================"
+        echo "      MANAJEMEN NODE SERVER (BOT)     "
+        echo "======================================"
+        echo "Daftar Server yang diremote oleh Bot:"
+        echo "--------------------------------------"
+        local count=$(jq '.nodes | length' "$srv_file" 2>/dev/null || echo 0)
+        if [[ "$count" -eq 0 ]]; then
+            echo " (Belum ada node server tambahan)"
+        else
+            jq -r '.nodes | to_entries | .[] | "\(.key+1). \(.value.name) (\(.value.domain))"' "$srv_file"
+        fi
+        echo "--------------------------------------"
+        echo "1. Tambah Node Server"
+        echo "2. Hapus Node Server"
+        echo "0/x. Kembali ke Settings"
+        echo "======================================"
+        read -p "Pilih opsi [0-2 or x]: " opt
+        case $opt in
+            1)
+                echo ""
+                read -p "Masukkan Nama Server (contoh: SG 1): " n_name
+                read -p "Masukkan Domain Server (tanpa http/https): " n_dom
+                read -p "Masukkan API Key Server tersebut: " n_key
+                if [[ -n "$n_name" && -n "$n_dom" && -n "$n_key" ]]; then
+                    jq --arg name "$n_name" --arg dom "$n_dom" --arg key "$n_key" \
+                       '.nodes += [{"name": $name, "domain": $dom, "api_key": $key}]' "$srv_file" > /tmp/srv.json
+                    mv /tmp/srv.json "$srv_file"
+                    echo -e "\n=> Server '$n_name' berhasil ditambahkan!"
+                    systemctl restart srpcom-bot
+                    sleep 2
+                else
+                    echo -e "\n=> Input tidak boleh kosong!"; sleep 2
+                fi
+                ;;
+            2)
+                echo ""
+                read -p "Masukkan nomor server yang akan dihapus: " del_id
+                if [[ "$del_id" =~ ^[0-9]+$ ]] && [[ "$del_id" -gt 0 ]] && [[ "$del_id" -le "$count" ]]; then
+                    local idx=$((del_id-1))
+                    local del_name=$(jq -r ".nodes[$idx].name" "$srv_file")
+                    jq "del(.nodes[$idx])" "$srv_file" > /tmp/srv.json
+                    mv /tmp/srv.json "$srv_file"
+                    echo -e "\n=> Server '$del_name' berhasil dihapus!"
+                    systemctl restart srpcom-bot
+                    sleep 2
+                else
+                    echo -e "\n=> Nomor tidak valid!"; sleep 2
+                fi
+                ;;
+            0|x|X) break ;;
+            *) echo -e "\n=> Pilihan tidak valid!"; sleep 1 ;;
+        esac
+    done
+}
+
 menu_settings() {
     while true; do
         clear
@@ -713,10 +776,11 @@ menu_settings() {
         echo " [8] SETTING AUTO-DELETE EXPIRED"
         echo " [9] SETTING TELEGRAM ADMIN BOT"
         echo " [10] MANAJEMEN DOMAIN BUG / SNI"
+        echo " [11] MANAJEMEN NODE SERVER (MULTI-VPS)"
         echo "---------------------------------------------------------"
         echo " [0/x] Back to Main Menu"
         echo "========================================================="
-        read -p " Select option [0-10 or x]: " opt
+        read -p " Select option [0-11 or x]: " opt
         case $opt in
             1) menu_autobackup ;;
             2) menu_autosend ;;
@@ -728,6 +792,7 @@ menu_settings() {
             8) menu_auto_expired ;;
             9) menu_bot_admin ;;
             10) menu_extra_domain ;;
+            11) menu_node_server ;;
             0|x|X) exec menu ;;
             *) echo "Pilihan tidak valid!"; sleep 1 ;;
         esac
