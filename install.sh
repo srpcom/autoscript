@@ -478,7 +478,10 @@ EOF
 systemctl daemon-reload
 systemctl enable xray-api
 systemctl start xray-api
-systemctl enable srpcom-bot
+
+# PERBAIKAN MASTER-NODE: Service bot sengaja di-disable agar tidak terjadi bentrok (conflict polling)
+# jika script diinstal di banyak VPS (Node). Bot hanya dinyalakan manual di 1 VPS Master.
+systemctl disable srpcom-bot >/dev/null 2>&1
 
 echo -e "\n[9/11] Mengonfigurasi Firewall (UFW & Iptables NAT L2TP/OVPN)..."
 ufw allow 22/tcp
@@ -568,6 +571,9 @@ echo "Protokol: VMESS, VLESS, TROJAN, L2TP, SSH, OVPN, UDPGW"
 echo "Optimasi: TCP BBR & Swap RAM 2GB Aktif!"
 echo "Default SNI/Bug: support.zoom.us.$DOMAIN"
 echo "Ketik 'menu' untuk masuk ke dashboard manajemen."
-echo "Untuk mengaktifkan Bot Telegram Admin, masuk ke menu:"
-echo "-> [5] Settings -> [9] Setting Telegram Admin Bot"
+echo "------------------------------------------------------"
+echo "Untuk menjadikan VPS ini sebagai MASTER BOT, masuk ke menu:"
+echo "-> [5] Settings -> [9] Setting Telegram Admin Bot -> Mulai Bot"
+echo "Untuk menghubungkan Node lain, gunakan API Key Default:"
+echo "SANGATRAHASIA123 (Ubah di menu 5 -> 5 jika perlu)"
 echo "======================================================"
