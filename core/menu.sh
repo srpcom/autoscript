@@ -3,10 +3,10 @@
 # menu.sh
 # MODULE: MAIN MENU (ROUTER)
 # Menampilkan antarmuka CLI utama dan perutean menu
-# Versi : 1.0 (10 Mei 2026 10:29 WIB)>> update time setiap script berubah, jangan hapus pesan ini agar AI tahu apa yang harus dilakukan
+# Versi : 1.1 (disini isikan tanggal dan jam,menit,detik ,jangan hapus pesan ini agar AI tahu)
 # ==========================================
 
-SCRIPT_VERSION="1.0 (10 Mei 2026 10:29 WIB)"
+SCRIPT_VERSION="1.1 (11052026 1259)"
 
 source /usr/local/etc/srpcom/env.conf
 source /usr/local/bin/srpcom/utils.sh
@@ -800,6 +800,71 @@ menu_settings() {
 }
 
 main_menu() {
+    # 1. CEK KOMPATIBILITAS (Minta VPS NAME jika klien ini pengguna lawas)
+    if [ -z "$VPS_NAME" ]; then
+        clear
+        echo "========================================================="
+        echo "          UPDATE SISTEM: REGISTRASI NAMA VPS             "
+        echo "========================================================="
+        echo "Sistem mendeteksi bahwa Nama VPS Anda belum tersimpan."
+        echo "Data ini wajib ada untuk Sinkronisasi Lisensi Script."
+        echo "========================================================="
+        read -p "Masukkan Nama VPS Anda (Sesuai web): " input_name
+        if [ -n "$input_name" ]; then
+            echo "VPS_NAME=\"$input_name\"" >> /usr/local/etc/srpcom/env.conf
+            VPS_NAME="$input_name"
+            echo "=> Berhasil disimpan! Memuat menu..."
+            sleep 1
+        else
+            echo "Batal. Anda akan keluar dari menu."
+            exit 0
+        fi
+    fi
+
+    # 2. CEK STATUS LISENSI DARI CACHE LOKAL
+    source /usr/local/etc/srpcom/license.info 2>/dev/null
+    
+    # Toleransi: Jika expired di cache, kita tembak 1 kali CURL untuk verifikasi ulang instan
+    # (Siapa tahu klien baru saja membayar perpanjangan 1 menit yang lalu)
+    if [ "$STATUS" == "EXPIRED" ]; then
+        FORMATTED_NAME=$(echo "$VPS_NAME" | sed 's/ /%20/g')
+        API_CHECK_URL="https://tuban.store/api/license/check?ip=$IP_ADD&name=$FORMATTED_NAME"
+        
+        RESPONSE=$(curl -sS --max-time 5 -w "\n%{http_code}" "$API_CHECK_URL" 2>/dev/null)
+        if [ $? -eq 0 ]; then
+            HTTP_STATUS=$(echo "$RESPONSE" | tail -n1)
+            if [ "$HTTP_STATUS" == "200" ]; then
+                JSON_BODY=$(echo "$RESPONSE" | sed '$d')
+                EXP_DATE_NEW=$(echo "$JSON_BODY" | grep -o '"expires_at":"[^"]*' | cut -d'"' -f4)
+                echo "STATUS=\"ACTIVE\"" > /usr/local/etc/srpcom/license.info
+                echo "EXP_DATE=\"$EXP_DATE_NEW\"" >> /usr/local/etc/srpcom/license.info
+                STATUS="ACTIVE"
+            fi
+        fi
+    fi
+
+    # BLOKIR TAMPILAN JIKA TERBUKTI HABIS
+    if [ "$STATUS" == "EXPIRED" ]; then
+        clear
+        echo -e "\e[31m╔════════════════════════════════════════════════════════╗\e[0m"
+        echo -e "\e[31m║                  AKSES MENU DITOLAK                    ║\e[0m"
+        echo -e "\e[31m╚════════════════════════════════════════════════════════╝\e[0m"
+        echo -e "\e[33m Masa aktif lisensi Autoscript untuk VPS ini telah HABIS.\e[0m"
+        echo -e " Nama VPS   : $VPS_NAME"
+        echo -e " IP Address : $IP_ADD"
+        echo -e ""
+        echo -e " Jangan khawatir, seluruh layanan VPN klien Anda tetap"
+        echo -e " berjalan normal. Namun, akses ke panel manajemen ini"
+        echo -e " (CLI) dikunci sementara."
+        echo -e ""
+        echo -e " Silakan perpanjang lisensi Anda di:"
+        echo -e " \e[36mhttps://tuban.store/lisensi\e[0m"
+        echo -e ""
+        echo -e " Jika sudah membayar, ketik ulang perintah \e[32mmenu\e[0m"
+        echo -e "\e[31m==========================================================\e[0m"
+        exit 0
+    fi
+
     while true; do
         print_header
         
@@ -860,5 +925,4 @@ main_menu() {
     done
 }
 
-# Eksekusi fungsi utama
 main_menu
