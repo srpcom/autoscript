@@ -106,34 +106,70 @@ manual_backup_telegram() {
 }
 
 # ==========================================
-# MENU AUTOBACKUP TOGGLE
+# MENU AUTOBACKUP TOGGLE DENGAN FREKUENSI
 # ==========================================
 menu_autobackup() {
     while true; do
         clear
         local status=$(grep "^AUTOBACKUP_STATUS=" /usr/local/etc/xray/bot_setting.conf 2>/dev/null | cut -d'=' -f2 | tr -d '"')
-        if [[ "$status" == "ON" ]]; then st="\e[32m[ ON ]\e[0m"; else st="\e[31m[ OFF ]\e[0m"; fi
+        local freq_info=""
+        
+        if [[ "$status" == "ON" ]]; then 
+            st="\e[32m[ ON ]\e[0m"
+            # Mengecek frekuensi dari file cron
+            if grep -q "0 \*/12" /etc/cron.d/xray_autobackup 2>/dev/null; then freq_info="(Setiap 12 Jam / 2x Sehari)"
+            elif grep -q "0 \*/6" /etc/cron.d/xray_autobackup 2>/dev/null; then freq_info="(Setiap 6 Jam / 4x Sehari)"
+            elif grep -q "0 \*/4" /etc/cron.d/xray_autobackup 2>/dev/null; then freq_info="(Setiap 4 Jam / 6x Sehari)"
+            elif grep -q "0 \*/2" /etc/cron.d/xray_autobackup 2>/dev/null; then freq_info="(Setiap 2 Jam / 12x Sehari)"
+            elif grep -q "0 \*" /etc/cron.d/xray_autobackup 2>/dev/null; then freq_info="(Setiap 1 Jam / 24x Sehari)"
+            elif grep -q "0 0" /etc/cron.d/xray_autobackup 2>/dev/null; then freq_info="(Setiap Jam 00:00 / 1x Sehari)"
+            else freq_info="(Aktif)"
+            fi
+        else 
+            st="\e[31m[ OFF ]\e[0m"
+        fi
         
         echo "======================================"
         echo "     AUTO BACKUP TELEGRAM SETTING     "
         echo "======================================"
-        echo -e "Status Auto Backup : $st (Setiap Jam 00:00)"
+        echo -e "Status Auto Backup : $st $freq_info"
         echo "======================================"
         echo "Fitur ini akan mencadangkan seluruh data"
         echo "akun VPN Anda dan mengirimkannya ke bot"
-        echo "Telegram setiap tengah malam otomatis."
+        echo "Telegram otomatis sesuai frekuensi."
         echo "======================================"
-        echo "1. Turn ON Auto Backup"
+        echo "1. Turn ON / Ubah Frekuensi Backup"
         echo "2. Turn OFF Auto Backup"
         echo "0. Back"
         echo "======================================"
         read -p "Select Option [0-2]: " opt
         case $opt in
             1) 
+                echo ""
+                echo "Pilih Frekuensi Backup:"
+                echo "1. 1 Kali Sehari (Tengah Malam/Jam 00:00)"
+                echo "2. 2 Kali Sehari (Setiap 12 Jam)"
+                echo "3. 4 Kali Sehari (Setiap 6 Jam)"
+                echo "4. 6 Kali Sehari (Setiap 4 Jam)"
+                echo "5. 12 Kali Sehari (Setiap 2 Jam)"
+                echo "6. 24 Kali Sehari (Setiap 1 Jam)"
+                read -p "Pilih Frekuensi [1-6]: " freq
+                
+                local cron_time=""
+                case $freq in
+                    1) cron_time="0 0 * * *" ;;
+                    2) cron_time="0 */12 * * *" ;;
+                    3) cron_time="0 */6 * * *" ;;
+                    4) cron_time="0 */4 * * *" ;;
+                    5) cron_time="0 */2 * * *" ;;
+                    6) cron_time="0 * * * *" ;;
+                    *) echo -e "\n=> Pilihan tidak valid!"; sleep 1; continue ;;
+                esac
+
                 sed -i 's/^AUTOBACKUP_STATUS=.*/AUTOBACKUP_STATUS="ON"/g' /usr/local/etc/xray/bot_setting.conf
-                echo "0 0 * * * root /usr/local/bin/srpcom/telegram.sh run_autobackup >/dev/null 2>&1" > /etc/cron.d/xray_autobackup
+                echo "$cron_time root /usr/local/bin/srpcom/telegram.sh run_autobackup >/dev/null 2>&1" > /etc/cron.d/xray_autobackup
                 systemctl restart cron
-                echo -e "\n=> Auto Backup BERHASIL DIAKTIFKAN!"; sleep 2 ;;
+                echo -e "\n=> Auto Backup BERHASIL DIAKTIFKAN dengan frekuensi baru!"; sleep 2 ;;
             2) 
                 sed -i 's/^AUTOBACKUP_STATUS=.*/AUTOBACKUP_STATUS="OFF"/g' /usr/local/etc/xray/bot_setting.conf
                 rm -f /etc/cron.d/xray_autobackup
