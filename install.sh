@@ -96,6 +96,10 @@ timedatectl set-timezone Asia/Jakarta
 
 pip3 install pyTelegramBotAPI requests --break-system-packages 2>/dev/null || pip3 install pyTelegramBotAPI requests
 
+echo -e "\n=> Menginstal Speedtest CLI Resmi Ookla..."
+curl -s https://packagecloud.io/install/repositories/ookla/speedtest-cli/script.deb.sh | bash
+apt install speedtest -y
+
 mkdir -p /usr/local/etc/srpcom
 mkdir -p /usr/local/bin/srpcom
 mkdir -p /usr/local/etc/xray
