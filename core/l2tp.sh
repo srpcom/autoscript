@@ -15,10 +15,16 @@ add_l2tp() {
     read -p "Username (x = Batal) : " user
     if [[ "$user" == "x" || "$user" == "X" ]]; then return; fi
     
-    # Cek apakah user sudah ada
-    if grep -q "^\"$user\" l2tpd" /etc/ppp/chap-secrets 2>/dev/null; then
-        echo -e "\n\e[31m[ERROR]\e[0m Username '$user' sudah digunakan!"
-        sleep 2; return
+    # Cek apakah user sudah ada, jika ada tambahkan angka berurutan (2, 3, dst)
+    original_user="$user"
+    counter=2
+    while grep -q "^\"$user\" l2tpd" /etc/ppp/chap-secrets 2>/dev/null; do
+        user="${original_user}${counter}"
+        ((counter++))
+    done
+    
+    if [[ "$original_user" != "$user" ]]; then
+        echo -e "\n\e[33m[INFO]\e[0m Username '$original_user' sudah digunakan. Akun akan dibuat dengan nama: $user"
     fi
     
     read -p "Password       : " password
