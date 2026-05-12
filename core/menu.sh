@@ -768,20 +768,58 @@ restore_data() {
 }
 
 menu_api_key() {
-    clear
-    echo "======================================"
-    echo "       SETTING API KEY WEBSITE        "
-    echo "======================================"
-    current_key=$(cat /usr/local/etc/xray/api_key.conf 2>/dev/null)
-    echo "Current Key: ${current_key}"
-    echo "======================================"
-    read -p "Input New Key (x=batal): " new_key
-    if [[ "$new_key" != "x" && "$new_key" != "X" && -n "$new_key" ]]; then
-        echo "$new_key" > /usr/local/etc/xray/api_key.conf
-        systemctl restart xray-api
-        echo -e "\n\e[32m[SUCCESS]\e[0m Berhasil disimpan!"
-        sleep 2
-    fi
+    while true; do
+        clear
+        echo "======================================"
+        echo "       SETTING API KEY WEBSITE        "
+        echo "======================================"
+        current_key=$(cat /usr/local/etc/xray/api_key.conf 2>/dev/null)
+        auth_status=$(cat /usr/local/etc/xray/api_auth.conf 2>/dev/null)
+
+        # Jika file belum ada, anggap OFF
+        if [[ -z "$auth_status" ]]; then auth_status="OFF"; fi
+
+        if [[ "$auth_status" == "ON" ]]; then
+            st="\e[32m[ ON ]\e[0m"
+        else
+            st="\e[31m[ OFF ]\e[0m"
+        fi
+
+        echo -e "Status API Auth : $st"
+        echo "Current Key     : ${current_key}"
+        echo "======================================"
+        echo " 1. Turn ON / OFF API Authentication"
+        echo " 2. Ubah API Key"
+        echo " 0. Kembali"
+        echo "======================================"
+        read -p " Pilih opsi [0-2]: " opt
+        case $opt in
+            1)
+                if [[ "$auth_status" == "ON" ]]; then
+                    echo "OFF" > /usr/local/etc/xray/api_auth.conf
+                    echo -e "\n=> API Authentication DIMATIKAN!"
+                else
+                    echo "ON" > /usr/local/etc/xray/api_auth.conf
+                    echo -e "\n=> API Authentication DIAKTIFKAN!"
+                fi
+                # Restart API agar langsung membaca status baru
+                systemctl restart xray-api
+                sleep 2
+                ;;
+            2)
+                echo ""
+                read -p "Input New Key (x=batal): " new_key
+                if [[ "$new_key" != "x" && "$new_key" != "X" && -n "$new_key" ]]; then
+                    echo "$new_key" > /usr/local/etc/xray/api_key.conf
+                    systemctl restart xray-api
+                    echo -e "\n\e[32m[SUCCESS]\e[0m Berhasil disimpan!"
+                    sleep 2
+                fi
+                ;;
+            0|x|X) break ;;
+            *) echo -e "\n=> Pilihan tidak valid!"; sleep 1 ;;
+        esac
+    done
 }
 
 menu_node_server() {
