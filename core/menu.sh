@@ -6,7 +6,7 @@
 # Versi : 1.3 (Security Patch: Global License Lock on Shortcuts)
 # ==========================================
 
-SCRIPT_VERSION="1.3 (11060723)"
+SCRIPT_VERSION="1.3 (1106 0745)"
 
 source /usr/local/etc/srpcom/env.conf 2>/dev/null
 source /usr/local/bin/srpcom/utils.sh 2>/dev/null
