@@ -3,10 +3,10 @@
 # menu.sh
 # MODULE: MAIN MENU (ROUTER)
 # Menampilkan antarmuka CLI utama dan perutean menu
-# Versi : 1.3 (Security Patch: Global License Lock on Shortcuts)
+# Versi : 1.4 (Fitur: API Auth & Web Panel Update)
 # ==========================================
 
-SCRIPT_VERSION="1.3 (1106 0745)"
+SCRIPT_VERSION="1.4 (1106 0745)"
 
 source /usr/local/etc/srpcom/env.conf 2>/dev/null
 source /usr/local/bin/srpcom/utils.sh 2>/dev/null
@@ -205,6 +205,12 @@ rebuild_caddyfile() {
         root * /usr/local/etc/srpcom
         file_server
     }
+    handle /panel/* {
+        root * /usr/local/etc/srpcom
+        file_server
+    }
+    redir /panel /panel/
+    
     handle / {
         respond "Server is running normally." 200
     }
@@ -276,10 +282,11 @@ menu_update() {
         echo " 8. Update API Backend & Bot"
         echo " 9. Update Modul Notifikasi"
         echo " 10. Update SEMUA Modul"
+        echo " 11. Update UI Web Panel"
         echo "--------------------------------------"
         echo " 0/x. Kembali ke Menu Utama"
         echo "======================================"
-        read -p " Pilih opsi [0-10 or x]: " opt
+        read -p " Pilih opsi [0-11 or x]: " opt
         
         case $opt in
             1) 
@@ -354,6 +361,16 @@ menu_update() {
                 rebuild_shortcuts
                 echo -e "\e[32m[SUCCESS]\e[0m Seluruh sistem berhasil diperbarui!"
                 sleep 2; exec menu ;;
+            11)
+                echo -e "\n=> Mengunduh update UI Web Panel dari GitHub..."
+                mkdir -p /usr/local/etc/srpcom/panel
+                wget -q -O /usr/local/etc/srpcom/panel/index.html "$GITHUB_RAW/core/index.html"
+                if [ -s /usr/local/etc/srpcom/panel/index.html ]; then
+                    echo -e "\e[32m[SUCCESS]\e[0m Web Panel berhasil diperbarui!"
+                else
+                    echo -e "\e[31m[ERROR]\e[0m Gagal mengunduh Web Panel!"
+                fi
+                sleep 1.5 ;;
             0|x|X) exec menu ;;
             *) echo -e "\n=> Pilihan tidak valid!"; sleep 1 ;;
         esac
