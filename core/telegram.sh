@@ -21,9 +21,10 @@ send_telegram() {
     local autosend=$(grep "^AUTOSEND_STATUS=" /usr/local/etc/xray/bot_setting.conf 2>/dev/null | cut -d'=' -f2 | tr -d '"' | tr -d "'")
     
     if [[ "$autosend" == "ON" && -n "$token" && -n "$chat_id" ]]; then
+        # MENGGUNAKAN --data-urlencode AGAR KARAKTER '&' TIDAK MEMOTONG PESAN
         curl -s -X POST "https://api.telegram.org/bot${token}/sendMessage" \
             -d chat_id="${chat_id}" \
-            -d text="$msg" \
+            --data-urlencode text="$msg" \
             -d parse_mode="Markdown" > /dev/null 2>&1
     fi
 }
