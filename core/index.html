@@ -95,11 +95,11 @@
                 </button>
                 
                 <p class="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-3 mt-8 px-2">Sistem & Utility</p>
+                <button onclick="setMode('monitor')" id="nav-monitor" class="nav-btn w-full flex items-center px-3 py-2.5 text-slate-300 hover:bg-slate-700 hover:text-white rounded-lg transition group">
+                    <i class="fas fa-desktop w-6 text-slate-400 group-hover:text-blue-400 transition-colors"></i> Monitor Panel
+                </button>
                 <button onclick="executeMonitor('cek-xray', 'GET')" class="w-full flex items-center px-3 py-2.5 text-slate-300 hover:bg-slate-700 hover:text-white rounded-lg transition group">
                     <i class="fas fa-heartbeat w-6 text-slate-400 group-hover:text-pink-400 transition-colors"></i> Status Server
-                </button>
-                <button onclick="executeMonitor('monitor-xray', 'GET')" class="w-full flex items-center px-3 py-2.5 text-slate-300 hover:bg-slate-700 hover:text-white rounded-lg transition group">
-                    <i class="fas fa-chart-pie w-6 text-slate-400 group-hover:text-blue-400 transition-colors"></i> Usage Monitor
                 </button>
                 <button onclick="executeMonitor('sys-backup', 'GET')" class="w-full flex items-center px-3 py-2.5 text-slate-300 hover:bg-slate-700 hover:text-white rounded-lg transition group">
                     <i class="fas fa-cloud-download-alt w-6 text-slate-400 group-hover:text-orange-400 transition-colors"></i> Request Backup
@@ -155,67 +155,107 @@
                         
                         <!-- Form Builder (Kiri) -->
                         <div id="form-container" class="lg:col-span-5 bg-slate-800 rounded-2xl p-6 border border-slate-700 shadow-xl flex flex-col hidden opacity-0 transition-opacity duration-300">
-                            <div class="flex items-center justify-between mb-5 pb-4 border-b border-slate-700">
-                                <h3 class="text-lg font-bold text-white"><i class="fas fa-sliders-h text-blue-400 mr-2"></i> Parameter Kontrol</h3>
+                            <div class="flex items-center justify-between mb-5 pb-4 border-b border-slate-700 shrink-0">
+                                <h3 class="text-lg font-bold text-white"><i class="fas fa-sliders-h text-blue-400 mr-2" id="panel-icon"></i> <span id="panel-title">Parameter Kontrol</span></h3>
                             </div>
 
-                            <div class="space-y-5 flex-1 overflow-y-auto pr-2 custom-scrollbar">
-                                <div>
-                                    <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Aksi Eksekusi</label>
-                                    <div class="relative">
-                                        <select id="action-type" onchange="updateFormVisibility()" class="w-full bg-slate-900 border border-slate-600 text-white rounded-lg py-3 px-4 appearance-none focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 cursor-pointer font-medium">
-                                            <option value="add">➕ Create New Account</option>
-                                            <option value="trial">⏱️ Create Trial (60m)</option>
-                                            <option value="renew">🔄 Renew Account</option>
-                                            <option value="detail">🔍 Check Detail</option>
-                                            <option value="del">❌ Delete Account</option>
-                                            <option value="list-accounts" id="opt-list">📋 List All Accounts</option>
-                                        </select>
-                                        <i class="fas fa-chevron-down absolute right-4 top-4 text-slate-500 pointer-events-none"></i>
+                            <!-- CRUD Form Area -->
+                            <div id="crud-form-area" class="flex flex-col flex-1 min-h-0">
+                                <div class="space-y-5 flex-1 overflow-y-auto pr-2 custom-scrollbar">
+                                    <div>
+                                        <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Aksi Eksekusi</label>
+                                        <div class="relative">
+                                            <select id="action-type" onchange="updateFormVisibility()" class="w-full bg-slate-900 border border-slate-600 text-white rounded-lg py-3 px-4 appearance-none focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 cursor-pointer font-medium">
+                                                <option value="add">➕ Create New Account</option>
+                                                <option value="trial">⏱️ Create Trial (60m)</option>
+                                                <option value="renew">🔄 Renew Account</option>
+                                                <option value="detail">🔍 Check Detail</option>
+                                                <option value="del">❌ Delete Account</option>
+                                                <option value="list-accounts" id="opt-list">📋 List All Accounts</option>
+                                            </select>
+                                            <i class="fas fa-chevron-down absolute right-4 top-4 text-slate-500 pointer-events-none"></i>
+                                        </div>
                                     </div>
-                                </div>
 
-                                <div>
-                                    <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Pilih Protokol</label>
-                                    <div class="relative">
-                                        <select id="protocol-type" class="w-full bg-slate-900 border border-slate-600 text-white rounded-lg py-3 px-4 appearance-none focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 cursor-pointer">
-                                            <!-- Diisi oleh JS -->
-                                        </select>
-                                        <i class="fas fa-chevron-down absolute right-4 top-4 text-slate-500 pointer-events-none"></i>
+                                    <div>
+                                        <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Pilih Protokol</label>
+                                        <div class="relative">
+                                            <select id="protocol-type" class="w-full bg-slate-900 border border-slate-600 text-white rounded-lg py-3 px-4 appearance-none focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 cursor-pointer">
+                                                <!-- Diisi oleh JS -->
+                                            </select>
+                                            <i class="fas fa-chevron-down absolute right-4 top-4 text-slate-500 pointer-events-none"></i>
+                                        </div>
                                     </div>
-                                </div>
 
-                                <div id="input-fields" class="space-y-5 pt-2">
-                                    <div id="field-user">
-                                        <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Username / Remarks</label>
-                                        <input type="text" id="inp-user" placeholder="Ketik username..." class="w-full bg-slate-900 border border-slate-600 text-white rounded-lg py-3 px-4 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 placeholder-slate-500">
-                                    </div>
-                                    
-                                    <div id="field-pass" class="hidden">
-                                        <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Password Login</label>
-                                        <input type="text" id="inp-pass" placeholder="Ketik password..." class="w-full bg-slate-900 border border-slate-600 text-white rounded-lg py-3 px-4 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 placeholder-slate-500">
-                                    </div>
-                                    
-                                    <div class="grid grid-cols-2 gap-4" id="field-limits">
-                                        <div id="field-exp">
-                                            <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Masa Aktif (Hari)</label>
-                                            <input type="number" id="inp-exp" value="30" min="1" class="w-full bg-slate-900 border border-slate-600 text-white rounded-lg py-3 px-4 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-center font-mono text-lg">
+                                    <div id="input-fields" class="space-y-5 pt-2">
+                                        <div id="field-user">
+                                            <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Username / Remarks</label>
+                                            <input type="text" id="inp-user" placeholder="Ketik username..." class="w-full bg-slate-900 border border-slate-600 text-white rounded-lg py-3 px-4 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 placeholder-slate-500">
                                         </div>
-                                        <div id="field-ip">
-                                            <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Limit IP (0=Unli)</label>
-                                            <input type="number" id="inp-ip" value="0" min="0" class="w-full bg-slate-900 border border-slate-600 text-white rounded-lg py-3 px-4 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-center font-mono text-lg">
+                                        
+                                        <div id="field-pass" class="hidden">
+                                            <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Password Login</label>
+                                            <input type="text" id="inp-pass" placeholder="Ketik password..." class="w-full bg-slate-900 border border-slate-600 text-white rounded-lg py-3 px-4 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 placeholder-slate-500">
                                         </div>
-                                        <div id="field-quota" class="hidden col-span-2">
-                                            <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Limit Kuota GB (0=Unli)</label>
-                                            <input type="number" id="inp-quota" value="0" min="0" class="w-full bg-slate-900 border border-slate-600 text-white rounded-lg py-3 px-4 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-center font-mono text-lg">
+                                        
+                                        <div class="grid grid-cols-2 gap-4" id="field-limits">
+                                            <div id="field-exp">
+                                                <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Masa Aktif (Hari)</label>
+                                                <input type="number" id="inp-exp" value="30" min="1" class="w-full bg-slate-900 border border-slate-600 text-white rounded-lg py-3 px-4 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-center font-mono text-lg">
+                                            </div>
+                                            <div id="field-ip">
+                                                <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Limit IP (0=Unli)</label>
+                                                <input type="number" id="inp-ip" value="0" min="0" class="w-full bg-slate-900 border border-slate-600 text-white rounded-lg py-3 px-4 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-center font-mono text-lg">
+                                            </div>
+                                            <div id="field-quota" class="hidden col-span-2">
+                                                <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Limit Kuota GB (0=Unli)</label>
+                                                <input type="number" id="inp-quota" value="0" min="0" class="w-full bg-slate-900 border border-slate-600 text-white rounded-lg py-3 px-4 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-center font-mono text-lg">
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
+                                <button onclick="submitAction()" id="btn-submit" class="mt-6 shrink-0 w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3.5 px-4 rounded-xl shadow-[0_4px_14px_0_rgba(37,99,235,0.39)] hover:shadow-[0_6px_20px_rgba(37,99,235,0.23)] hover:-translate-y-0.5 transition-all duration-200 flex items-center justify-center group">
+                                    <i class="fas fa-terminal mr-2 group-hover:animate-pulse"></i> <span>Eksekusi Perintah</span>
+                                </button>
                             </div>
 
-                            <button onclick="submitAction()" id="btn-submit" class="mt-6 shrink-0 w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3.5 px-4 rounded-xl shadow-[0_4px_14px_0_rgba(37,99,235,0.39)] hover:shadow-[0_6px_20px_rgba(37,99,235,0.23)] hover:-translate-y-0.5 transition-all duration-200 flex items-center justify-center group">
-                                <i class="fas fa-terminal mr-2 group-hover:animate-pulse"></i> <span>Eksekusi Perintah</span>
-                            </button>
+                            <!-- Monitor Buttons Area -->
+                            <div id="monitor-buttons-area" class="hidden flex-col flex-1 overflow-y-auto pr-2 custom-scrollbar pb-2">
+                                <p class="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Usage & Resource</p>
+                                <div class="space-y-2 mb-6">
+                                    <button onclick="executeMonitor('monitor-ssh', 'GET')" class="w-full text-left px-4 py-3 bg-slate-900 hover:bg-slate-700 border border-slate-700 rounded-lg text-sm text-slate-300 transition flex items-center shadow-md">
+                                        <i class="fas fa-users w-6 text-green-400 mr-3"></i> SSH & Dropbear (Live)
+                                    </button>
+                                    <button onclick="executeMonitor('monitor-xray', 'GET')" class="w-full text-left px-4 py-3 bg-slate-900 hover:bg-slate-700 border border-slate-700 rounded-lg text-sm text-slate-300 transition flex items-center shadow-md">
+                                        <i class="fas fa-chart-line w-6 text-yellow-400 mr-3"></i> Xray & Kuota (Tabel)
+                                    </button>
+                                    <button onclick="executeMonitor('sys-resource', 'GET')" class="w-full text-left px-4 py-3 bg-slate-900 hover:bg-slate-700 border border-slate-700 rounded-lg text-sm text-slate-300 transition flex items-center shadow-md">
+                                        <i class="fas fa-memory w-6 text-blue-400 mr-3"></i> System Resource (CPU/RAM)
+                                    </button>
+                                    <button onclick="executeMonitor('speedtest', 'GET')" class="w-full text-left px-4 py-3 bg-slate-900 hover:bg-slate-700 border border-slate-700 rounded-lg text-sm text-slate-300 transition flex items-center shadow-md">
+                                        <i class="fas fa-tachometer-alt w-6 text-purple-400 mr-3"></i> Speedtest Server
+                                    </button>
+                                </div>
+
+                                <p class="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">System Logs (Live Tail 50)</p>
+                                <div class="space-y-2">
+                                    <button onclick="executeMonitor('log-xray-access', 'GET')" class="w-full text-left px-4 py-3 bg-slate-900 hover:bg-slate-700 border border-slate-700 rounded-lg text-sm text-slate-300 transition flex items-center shadow-md">
+                                        <i class="fas fa-file-alt w-6 text-slate-400 mr-3"></i> Xray Access Log
+                                    </button>
+                                    <button onclick="executeMonitor('log-xray-error', 'GET')" class="w-full text-left px-4 py-3 bg-slate-900 hover:bg-slate-700 border border-slate-700 rounded-lg text-sm text-slate-300 transition flex items-center shadow-md">
+                                        <i class="fas fa-exclamation-triangle w-6 text-red-400 mr-3"></i> Xray Error Log
+                                    </button>
+                                    <button onclick="executeMonitor('log-l2tp', 'GET')" class="w-full text-left px-4 py-3 bg-slate-900 hover:bg-slate-700 border border-slate-700 rounded-lg text-sm text-slate-300 transition flex items-center shadow-md">
+                                        <i class="fas fa-network-wired w-6 text-cyan-400 mr-3"></i> L2TP & IPsec Log
+                                    </button>
+                                    <button onclick="executeMonitor('log-openvpn', 'GET')" class="w-full text-left px-4 py-3 bg-slate-900 hover:bg-slate-700 border border-slate-700 rounded-lg text-sm text-slate-300 transition flex items-center shadow-md">
+                                        <i class="fas fa-shield-alt w-6 text-orange-400 mr-3"></i> OpenVPN Log
+                                    </button>
+                                    <button onclick="executeMonitor('log-caddy', 'GET')" class="w-full text-left px-4 py-3 bg-slate-900 hover:bg-slate-700 border border-slate-700 rounded-lg text-sm text-slate-300 transition flex items-center shadow-md">
+                                        <i class="fas fa-server w-6 text-teal-400 mr-3"></i> Caddy Proxy Log
+                                    </button>
+                                </div>
+                            </div>
                         </div>
 
                         <!-- Terminal Output Window (Kanan) -->
@@ -260,9 +300,9 @@
                     <i class="fas fa-network-wired text-xl mb-1"></i>
                     <span class="text-[10px] font-bold">L2TP</span>
                 </button>
-                <button onclick="executeMonitor('cek-xray', 'GET')" class="flex flex-col items-center p-2 mb-1 flex-1 text-slate-400 hover:text-blue-400 transition">
-                    <i class="fas fa-heartbeat text-xl mb-1"></i>
-                    <span class="text-[10px] font-bold">STATUS</span>
+                <button onclick="setMode('monitor')" class="flex flex-col items-center p-2 mb-1 flex-1 text-slate-400 hover:text-blue-400 transition nav-btn-mobile" id="nav-mob-monitor">
+                    <i class="fas fa-desktop text-xl mb-1"></i>
+                    <span class="text-[10px] font-bold">MONITOR</span>
                 </button>
             </nav>
         </main>
@@ -407,13 +447,12 @@
 
             // Mobile
             document.querySelectorAll('.nav-btn-mobile').forEach(el => {
-                el.classList.remove('text-blue-400');
+                el.classList.remove('text-blue-400', 'text-yellow-400', 'text-green-400', 'text-purple-400');
                 el.classList.add('text-slate-400');
             });
             const activeMobNav = document.getElementById(`nav-mob-${mode}`);
             if(activeMobNav) {
-                // Determine color based on mode
-                let colorClass = mode === 'xray' ? 'text-yellow-400' : (mode === 'ssh' ? 'text-green-400' : 'text-purple-400');
+                let colorClass = mode === 'xray' ? 'text-yellow-400' : (mode === 'ssh' ? 'text-green-400' : (mode === 'l2tp' ? 'text-purple-400' : 'text-blue-400'));
                 activeMobNav.classList.remove('text-slate-400');
                 activeMobNav.classList.add(colorClass);
             }
@@ -469,6 +508,32 @@
             container.classList.remove('hidden');
             // Trigger animation
             setTimeout(() => container.classList.remove('opacity-0'), 10);
+
+            const crudArea = document.getElementById('crud-form-area');
+            const monitorArea = document.getElementById('monitor-buttons-area');
+            const panelTitle = document.getElementById('panel-title');
+            const panelIcon = document.getElementById('panel-icon');
+
+            if (mode === 'monitor') {
+                document.getElementById('mode-title').innerText = 'Monitoring Panel';
+                document.getElementById('mode-desc').innerText = 'Pantau aktivitas server, logs, dan resource sistem.';
+                
+                panelTitle.innerText = 'Pilih Fitur Monitor';
+                panelIcon.className = 'fas fa-desktop text-blue-400 mr-2';
+                
+                crudArea.classList.add('hidden');
+                monitorArea.classList.remove('hidden');
+                
+                document.getElementById('terminal-output').innerHTML = '';
+                printToTerminal('> Mode Monitor Aktif.\n> Silakan pilih menu untuk mulai menampilkan laporan.', 'info');
+                return;
+            }
+
+            // Revert back to CRUD mode
+            crudArea.classList.remove('hidden');
+            monitorArea.classList.add('hidden');
+            panelTitle.innerText = 'Parameter Kontrol';
+            panelIcon.className = 'fas fa-sliders-h text-blue-400 mr-2';
 
             const protSelect = document.getElementById('protocol-type');
             protSelect.innerHTML = '';
@@ -551,7 +616,13 @@
 
         async function executeMonitor(endpoint, method) {
             document.getElementById('terminal-output').innerHTML = '';
-            printToTerminal(`> Requesting sistem monitor [${endpoint}]...`, 'info');
+            
+            if (endpoint === 'speedtest') {
+                printToTerminal(`> Menjalankan Pengujian Kecepatan (Speedtest Ookla)...\n> Proses ini memakan waktu 20-30 detik. Harap tunggu...`, 'warning');
+            } else {
+                printToTerminal(`> Requesting sistem monitor [${endpoint}]...`, 'info');
+            }
+            
             await fetchAPI(`/user_legend/${endpoint}`, method);
         }
 
