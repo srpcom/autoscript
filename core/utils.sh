@@ -45,7 +45,7 @@ print_header() {
     clear
     echo -e "${CYAN}╔══════════════════════════════════════╗${NC}"
     printf "${CYAN}║ %-36s ║\n${NC}" "         SRPCOM AUTO SCRIPT"
-    printf "${CYAN}║ %-36s ║\n${NC}" "    ${SCRIPT_VERSION:-v.1}"
+    printf "${CYAN}║ %-36s ║\n${NC}" "  Ver:  ${SCRIPT_VERSION:-v.1}"
     printf "${CYAN}║ %-36s ║\n${NC}" "  License Exp: ${EXP_DATE:-Unknown}"
     echo -e "${CYAN}╚══════════════════════════════════════╝${NC}"
     
