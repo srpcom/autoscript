@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SRPCOM V5 - Web Panel</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        slate: {
+                            850: '#151f32',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-slate-900 text-slate-200 font-sans antialiased overflow-hidden h-screen" onload="initApp()">
+
+    <!-- Login Overlay -->
+    <div id="login-overlay" class="absolute inset-0 bg-slate-900 z-50 flex items-center justify-center transition-opacity duration-300">
+        <div class="bg-slate-800 p-8 rounded-2xl shadow-2xl border border-slate-700 max-w-md w-full mx-4">
+            <div class="text-center mb-8">
+                <div class="w-16 h-16 bg-blue-500/20 text-blue-400 rounded-full flex items-center justify-center text-3xl mx-auto mb-4">
+                    <i class="fas fa-shield-alt"></i>
+                </div>
+                <h2 class="text-2xl font-bold text-white">SRPCOM Panel</h2>
+                <p class="text-slate-400 text-sm mt-2">Masukkan API Key Node Server Anda</p>
+            </div>
+            
+            <div class="space-y-4">
+                <div>
+                    <input type="password" id="inp-apikey" class="w-full bg-slate-900 border border-slate-600 text-slate-200 rounded-lg py-3 px-4 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-center tracking-widest placeholder:tracking-normal" placeholder="API Key / Password">
+                </div>
+                <button onclick="performLogin()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-lg transition duration-200 shadow-lg shadow-blue-900/20">
+                    Masuk ke Panel
+                </button>
+            </div>
+            <p id="login-error" class="text-red-400 text-sm text-center mt-4 hidden">API Key salah atau server tidak merespons.</p>
+        </div>
+    </div>
+
+    <!-- App Container -->
+    <div id="app-container" class="flex h-full w-full hidden opacity-0 transition-opacity duration-300">
+        <!-- Sidebar -->
+        <aside class="w-64 bg-slate-800 border-r border-slate-700 flex-col hidden md:flex z-20 shadow-xl">
+            <div class="h-16 flex items-center justify-center border-b border-slate-700 bg-slate-850">
+                <h1 class="text-xl font-bold text-blue-400 tracking-wide"><i class="fas fa-server mr-2"></i>SRPCOM</h1>
+            </div>
+            <nav class="flex-1 overflow-y-auto py-4 px-3 space-y-1">
+                <p class="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 mt-4 px-3">Layanan VPN</p>
+                <a href="#" onclick="setMode('xray')" id="nav-xray" class="nav-btn flex items-center px-3 py-2.5 text-slate-300 hover:bg-slate-700 hover:text-white rounded-lg transition">
+                    <i class="fas fa-bolt w-6 text-yellow-400"></i> Xray (WS/TLS)
+                </a>
+                <a href="#" onclick="setMode('ssh')" id="nav-ssh" class="nav-btn flex items-center px-3 py-2.5 text-slate-300 hover:bg-slate-700 hover:text-white rounded-lg transition">
+                    <i class="fas fa-shield-alt w-6 text-green-400"></i> SSH & OpenVPN
+                </a>
+                <a href="#" onclick="setMode('l2tp')" id="nav-l2tp" class="nav-btn flex items-center px-3 py-2.5 text-slate-300 hover:bg-slate-700 hover:text-white rounded-lg transition">
+                    <i class="fas fa-network-wired w-6 text-purple-400"></i> L2TP IPsec
+                </a>
+                
+                <p class="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 mt-6 px-3">Sistem & Utility</p>
+                <a href="#" onclick="executeMonitor('monitor-xray', 'GET')" class="flex items-center px-3 py-2.5 text-slate-300 hover:bg-slate-700 hover:text-white rounded-lg transition">
+                    <i class="fas fa-chart-line w-6 text-blue-400"></i> Usage Monitor
+                </a>
+                <a href="#" onclick="executeMonitor('sys-backup', 'GET')" class="flex items-center px-3 py-2.5 text-slate-300 hover:bg-slate-700 hover:text-white rounded-lg transition">
+                    <i class="fas fa-download w-6 text-orange-400"></i> Request Backup
+                </a>
+            </nav>
+            <div class="p-4 border-t border-slate-700 bg-slate-850">
+                <button onclick="performLogout()" class="flex items-center justify-center w-full bg-slate-700 hover:bg-red-600/90 text-white py-2.5 rounded-lg transition font-medium">
+                    <i class="fas fa-sign-out-alt mr-2"></i> Logout
+                </button>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="flex-1 flex flex-col h-full bg-slate-900 overflow-hidden relative">
+            <!-- Header Mobile -->
+            <header class="h-16 bg-slate-800 border-b border-slate-700 flex items-center justify-between px-6 md:hidden z-20">
+                <h1 class="text-lg font-bold text-blue-400"><i class="fas fa-server mr-2"></i>SRPCOM</h1>
+                <button onclick="performLogout()" class="text-slate-400 hover:text-red-400 transition"><i class="fas fa-sign-out-alt text-xl"></i></button>
+            </header>
+
+            <div class="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8">
+                <div class="max-w-4xl mx-auto flex flex-col gap-6 h-full pb-20 md:pb-0">
+                    
+                    <!-- Status Bar -->
+                    <div class="bg-slate-800/80 backdrop-blur-sm rounded-xl p-5 border border-slate-700/50 shadow-lg flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                        <div>
+                            <h2 class="text-xl md:text-2xl font-bold text-white mb-1" id="mode-title">Server Terhubung</h2>
+                            <p class="text-slate-400 text-sm">Pilih layanan di menu untuk mengelola akun Anda.</p>
+                        </div>
+                        <div class="bg-slate-900/50 px-4 py-2 rounded-lg border border-slate-700">
+                            <p class="text-xs text-slate-500 uppercase font-semibold mb-1 tracking-wider">Host Server</p>
+                            <p class="font-mono text-blue-400 text-sm font-medium flex items-center" id="display-domain">
+                                <span class="w-2 h-2 rounded-full bg-green-500 mr-2 animate-pulse"></span>
+                                Memuat...
+                            </p>
+                        </div>
+                    </div>
+
+                    <!-- Form Builder -->
+                    <div id="form-container" class="bg-slate-800 rounded-xl p-6 border border-slate-700 shadow-lg hidden transition-all duration-300">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-5 mb-5">
+                            <div>
+                                <label class="block text-sm font-medium text-slate-300 mb-2">Aksi (Action)</label>
+                                <div class="relative">
+                                    <select id="action-type" class="w-full bg-slate-900 border border-slate-600 text-slate-200 rounded-lg py-2.5 px-4 appearance-none focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
+                                        <option value="add">➕ Create Account</option>
+                                        <option value="trial">⏱️ Trial Account (60m)</option>
+                                        <option value="renew">🔄 Renew Account</option>
+                                        <option value="detail">🔍 Cek Detail Akun</option>
+                                        <option value="del">❌ Delete Account</option>
+                                        <option value="list-accounts" id="opt-list">📋 List Semua Akun</option>
+                                    </select>
+                                    <i class="fas fa-chevron-down absolute right-4 top-3.5 text-slate-500 pointer-events-none"></i>
+                                </div>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-slate-300 mb-2">Protokol</label>
+                                <div class="relative">
+                                    <select id="protocol-type" class="w-full bg-slate-900 border border-slate-600 text-slate-200 rounded-lg py-2.5 px-4 appearance-none focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
+                                        <!-- Diisi oleh JS -->
+                                    </select>
+                                    <i class="fas fa-chevron-down absolute right-4 top-3.5 text-slate-500 pointer-events-none"></i>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div id="input-fields" class="space-y-5 bg-slate-900/30 p-4 rounded-lg border border-slate-700/50">
+                            <div>
+                                <label class="block text-sm font-medium text-slate-300 mb-2">Username / Remarks</label>
+                                <input type="text" id="inp-user" placeholder="Misal: client_01" class="w-full bg-slate-900 border border-slate-600 text-slate-200 rounded-lg py-2.5 px-4 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
+                            </div>
+                            <div id="field-pass" class="hidden">
+                                <label class="block text-sm font-medium text-slate-300 mb-2">Password Login</label>
+                                <input type="text" id="inp-pass" placeholder="Misal: rahasia123" class="w-full bg-slate-900 border border-slate-600 text-slate-200 rounded-lg py-2.5 px-4 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
+                            </div>
+                            <div class="grid grid-cols-2 gap-5" id="field-limits">
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-300 mb-2">Masa Aktif (Hari)</label>
+                                    <input type="number" id="inp-exp" value="30" class="w-full bg-slate-900 border border-slate-600 text-slate-200 rounded-lg py-2.5 px-4 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-300 mb-2">Limit IP (0 = Unli)</label>
+                                    <input type="number" id="inp-ip" value="0" class="w-full bg-slate-900 border border-slate-600 text-slate-200 rounded-lg py-2.5 px-4 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
+                                </div>
+                            </div>
+                        </div>
+
+                        <button onclick="submitAction()" id="btn-submit" class="mt-6 w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3.5 px-4 rounded-lg shadow-lg transition duration-200 flex items-center justify-center">
+                            <i class="fas fa-paper-plane mr-2"></i> <span>Eksekusi Perintah</span>
+                        </button>
+                    </div>
+
+                    <!-- Terminal Output Window -->
+                    <div class="bg-[#0f1419] rounded-xl border border-slate-700 shadow-2xl flex flex-col flex-1 min-h-[300px]">
+                        <div class="bg-slate-800 px-4 py-2.5 border-b border-slate-700 flex justify-between items-center">
+                            <div class="flex items-center gap-2">
+                                <div class="w-3 h-3 rounded-full bg-red-500"></div>
+                                <div class="w-3 h-3 rounded-full bg-yellow-500"></div>
+                                <div class="w-3 h-3 rounded-full bg-green-500"></div>
+                                <span class="ml-3 text-xs text-slate-400 font-mono">sys_output@srpcom:~</span>
+                            </div>
+                            <button onclick="clearTerminal()" class="text-slate-500 hover:text-slate-300 transition text-xs" title="Clear Terminal">
+                                <i class="fas fa-trash-alt"></i>
+                            </button>
+                        </div>
+                        <div class="p-4 flex-1 overflow-y-auto font-mono text-sm leading-relaxed text-[#00ff00] break-words" id="terminal-output">
+                            > SRPCOM Panel OS initialized.<br>> Awaiting commands...
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+            
+            <!-- Mobile Menu Bar (Bottom) -->
+            <nav class="md:hidden fixed bottom-0 w-full bg-slate-800 border-t border-slate-700 flex justify-around p-2 pb-safe z-30">
+                <a href="#" onclick="setMode('xray')" class="flex flex-col items-center p-2 text-slate-400 hover:text-blue-400 transition">
+                    <i class="fas fa-bolt text-lg mb-1"></i>
+                    <span class="text-[10px]">Xray</span>
+                </a>
+                <a href="#" onclick="setMode('ssh')" class="flex flex-col items-center p-2 text-slate-400 hover:text-blue-400 transition">
+                    <i class="fas fa-shield-alt text-lg mb-1"></i>
+                    <span class="text-[10px]">SSH</span>
+                </a>
+                <a href="#" onclick="setMode('l2tp')" class="flex flex-col items-center p-2 text-slate-400 hover:text-blue-400 transition">
+                    <i class="fas fa-network-wired text-lg mb-1"></i>
+                    <span class="text-[10px]">L2TP</span>
+                </a>
+                <a href="#" onclick="executeMonitor('sys-backup', 'GET')" class="flex flex-col items-center p-2 text-slate-400 hover:text-blue-400 transition">
+                    <i class="fas fa-download text-lg mb-1"></i>
+                    <span class="text-[10px]">Backup</span>
+                </a>
+            </nav>
+        </main>
+    </div>
+
+    <script>
+        let currentMode = '';
+
+        function initApp() {
+            const key = localStorage.getItem('srpcom_api_key');
+            if(key) {
+                // Lakukan ping ke server untuk memastikan key valid
+                verifyKey(key);
+            }
+        }
+
+        async function verifyKey(key) {
+            const btn = document.querySelector('#login-overlay button');
+            if(btn) btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Menghubungkan...';
+            
+            try {
+                // Cek status server sekaligus memverifikasi API Key
+                const res = await fetch('/user_legend/cek-xray', {
+                    headers: { 'x-api-key': key }
+                });
+                
+                if(res.ok) {
+                    const data = await res.json();
+                    
+                    // Ekstrak domain dari respons text (misal: "Xray status: active, Domain: xyz.com")
+                    const domainMatch = data.stdout ? data.stdout.match(/Domain:\s*([^\s,]+)/i) : null;
+                    if(domainMatch && domainMatch[1]) {
+                        document.getElementById('display-domain').innerHTML = `<span class="w-2 h-2 rounded-full bg-green-500 mr-2 animate-pulse"></span>${domainMatch[1]}`;
+                    } else {
+                        document.getElementById('display-domain').innerHTML = `<span class="w-2 h-2 rounded-full bg-green-500 mr-2 animate-pulse"></span>${window.location.hostname}`;
+                    }
+
+                    // Tampilkan UI App
+                    const overlay = document.getElementById('login-overlay');
+                    const app = document.getElementById('app-container');
+                    
+                    overlay.classList.add('opacity-0');
+                    setTimeout(() => {
+                        overlay.classList.add('hidden');
+                        app.classList.remove('hidden');
+                        setTimeout(() => app.classList.remove('opacity-0'), 50);
+                    }, 300);
+                    
+                } else {
+                    throw new Error("Unauthorized");
+                }
+            } catch (err) {
+                localStorage.removeItem('srpcom_api_key');
+                document.getElementById('login-error').classList.remove('hidden');
+                if(btn) btn.innerHTML = 'Masuk ke Panel';
+            }
+        }
+
+        function performLogin() {
+            const key = document.getElementById('inp-apikey').value.trim();
+            if(!key) return;
+            localStorage.setItem('srpcom_api_key', key);
+            verifyKey(key);
+        }
+
+        function performLogout() {
+            localStorage.removeItem('srpcom_api_key');
+            window.location.reload();
+        }
+
+        // --- Logic UI Panel ---
+        function clearTerminal() {
+            document.getElementById('terminal-output').innerHTML = "> Terminal cleared.";
+        }
+
+        function updateActiveNav(mode) {
+            document.querySelectorAll('.nav-btn').forEach(el => {
+                el.classList.remove('bg-slate-700', 'text-white');
+                el.classList.add('text-slate-300');
+            });
+            const activeNav = document.getElementById(`nav-${mode}`);
+            if(activeNav) {
+                activeNav.classList.add('bg-slate-700', 'text-white');
+                activeNav.classList.remove('text-slate-300');
+            }
+        }
+
+        function setMode(mode) {
+            currentMode = mode;
+            updateActiveNav(mode);
+            document.getElementById('form-container').classList.remove('hidden');
+            const protSelect = document.getElementById('protocol-type');
+            protSelect.innerHTML = '';
+            
+            if(mode === 'xray') {
+                document.getElementById('mode-title').innerText = 'Manajemen Xray';
+                protSelect.innerHTML = '<option value="vmessws">VMess WS</option><option value="vlessws">VLess WS</option><option value="trojanws">Trojan WS</option>';
+                document.getElementById('field-pass').classList.add('hidden');
+                document.getElementById('field-limits').classList.remove('hidden');
+            } else if(mode === 'ssh') {
+                document.getElementById('mode-title').innerText = 'Manajemen SSH & OVPN';
+                protSelect.innerHTML = '<option value="ssh">SSH & OVPN</option>';
+                document.getElementById('field-pass').classList.remove('hidden');
+                document.getElementById('field-limits').classList.remove('hidden');
+            } else if(mode === 'l2tp') {
+                document.getElementById('mode-title').innerText = 'Manajemen L2TP IPsec';
+                protSelect.innerHTML = '<option value="l2tp">L2TP IPsec</option>';
+                document.getElementById('field-pass').classList.remove('hidden');
+                document.getElementById('field-limits').classList.remove('hidden');
+            }
+        }
+
+        document.getElementById('action-type').addEventListener('change', function() {
+            const act = this.value;
+            const inputs = document.getElementById('input-fields');
+            if(act === 'list-accounts' || act === 'trial') {
+                inputs.classList.add('hidden');
+            } else {
+                inputs.classList.remove('hidden');
+            }
+        });
+
+        async function submitAction() {
+            const act = document.getElementById('action-type').value;
+            const prot = document.getElementById('protocol-type').value;
+            const user = document.getElementById('inp-user').value;
+            const pass = document.getElementById('inp-pass').value;
+            const exp = document.getElementById('inp-exp').value;
+            const limit_ip = document.getElementById('inp-ip').value;
+
+            let endpoint = `/user_legend/${act}-${prot}`;
+            let method = (act === 'list-accounts' || act === 'detail') ? 'GET' : 'POST';
+            if (act === 'del') method = 'DELETE';
+
+            let payload = {};
+            if (act !== 'list-accounts' && act !== 'trial') {
+                if(!user) {
+                    printToTerminal(`<span class="text-red-400">❌ Error: Username wajib diisi!</span>`);
+                    return;
+                }
+                payload.user = user;
+                if(currentMode !== 'xray') payload.password = pass || '123';
+                payload.exp = parseInt(exp) || 30;
+                payload.limit_ip = parseInt(limit_ip) || 0;
+            }
+
+            const btn = document.getElementById('btn-submit');
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Memproses...';
+            btn.disabled = true;
+
+            printToTerminal(`\n<span class="text-blue-400">> root@server:~#</span> Executing ${act} on ${prot}...`);
+            await fetchAPI(endpoint, method, method === 'GET' ? null : payload);
+            
+            btn.innerHTML = '<i class="fas fa-paper-plane mr-2"></i> Eksekusi Perintah';
+            btn.disabled = false;
+        }
+
+        async function executeMonitor(endpoint, method) {
+            printToTerminal(`\n<span class="text-blue-400">> root@server:~#</span> Requesting ${endpoint}...`);
+            await fetchAPI(`/user_legend/${endpoint}`, method);
+        }
+
+        async function fetchAPI(endpoint, method, payload = null) {
+            try {
+                const key = localStorage.getItem('srpcom_api_key');
+                const options = {
+                    method: method,
+                    headers: { 'Content-Type': 'application/json', 'x-api-key': key }
+                };
+                if(payload && method !== 'GET') options.body = JSON.stringify(payload);
+
+                const res = await fetch(endpoint, options);
+                const data = await res.json();
+                
+                if (res.status === 401 || res.status === 403) {
+                    printToTerminal(`<span class="text-red-400">❌ Akses Ditolak (Unauthorized). Silakan login ulang atau periksa status API Auth.</span>`);
+                    if(res.status === 401) setTimeout(performLogout, 2000);
+                    return;
+                }
+
+                if (data.data && endpoint.includes('backup')) {
+                    printToTerminal("✅ File Backup berhasil di-generate. Data Base64 telah diterima (cek Console/Telegram).");
+                } else if(data.stdout) {
+                    printToTerminal(data.stdout);
+                } else {
+                    printToTerminal(`<span class="text-yellow-400">Response: ${JSON.stringify(data)}</span>`);
+                }
+            } catch (err) {
+                printToTerminal(`<span class="text-red-400">❌ Terjadi Kesalahan Koneksi: ${err.message}</span>`);
+            }
+        }
+
+        function printToTerminal(text) {
+            const term = document.getElementById('terminal-output');
+            term.innerHTML += `<br>${text}`;
+            term.scrollTop = term.scrollHeight; // Auto scroll to bottom
+        }
+
+        // Eksekusi aksi jika tekan tombol Enter di form
+        document.getElementById('input-fields').addEventListener('keypress', function (e) {
+            if (e.key === 'Enter') {
+                submitAction();
+            }
+        });
+    </script>
+</body>
+</html>
