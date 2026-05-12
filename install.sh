@@ -3,7 +3,6 @@
 # install.sh
 # MODULE: AUTO INSTALLER XRAY, CADDY, L2TP, SSH, OVPN, BADVPN, WEB PANEL
 # OS Support: Ubuntu 20.04 / 22.04 / 24.04 LTS
-# ARCHITECTURE: V5 (SQLITE DATABASE & API)
 # ==========================================
 
 GITHUB_RAW="https://raw.githubusercontent.com/srpcom/autoscript/main"
@@ -15,7 +14,7 @@ fi
 
 clear
 echo "=========================================="
-echo "  SRPCOM AUTOSCRIPT VERSI 5.0 (SQLITE)    "
+echo "  SRPCOM AUTOSCRIPT VERSI 1.0             "
 echo "  MEMULAI INSTALASI VPN MULTIPORT V5      "
 echo "  XRAY, CADDY, L2TP, SSH, OVPN, BADVPN    "
 echo "=========================================="
@@ -26,13 +25,14 @@ echo "  GUNAKAN TOOL INI UNTUK MENDAPATKAN      "
 echo "  HAK AKSES ROOT MURNI :                  "
 echo "  bash <(curl -Ls https://srpcom.cloud/getroot.sh)"
 echo "  skip jika sudah paham"
-echo "  note : saran OS ubuntu 20/22"
+echo "  note : saran OS ubuntu 20"
 echo "=========================================="
+
 
 VPS_IP=$(curl -sS --max-time 5 ipv4.icanhazip.com || curl -sS --max-time 5 ifconfig.me)
 
 # ==========================================
-# PENGECEKAN LISENSI SCRIPT
+# PENGECEKAN LISENSI SCRIPT KE DATABASE CLOUDFLARE
 # ==========================================
 echo -e "\n=========================================="
 echo -e "  VERIFIKASI LISENSI AUTOSCRIPT PREMIUM   "
@@ -62,16 +62,16 @@ if [ "$HTTP_STATUS" != "200" ]; then
     exit 1
 fi
 
+# Mengambil tanggal expired dari JSON (Grep manual karena jq belum terinstall)
 EXP_DATE_INIT=$(echo "$JSON_BODY" | grep -o '"expires_at":"[^"]*' | cut -d'"' -f4)
 echo -e "\e[32m[SUCCESS]\e[0m Lisensi Valid (Exp: $EXP_DATE_INIT)! Melanjutkan instalasi...\n"
+# ==========================================
 
-# ==========================================
-# VALIDASI DOMAIN
-# ==========================================
 while true; do
     read -p "Masukkan Domain VPS Anda (contoh: aw.srpcom.cloud): " DOMAIN
     if [ -z "$DOMAIN" ]; then echo -e "\e[31m[ERROR]\e[0m Domain tidak boleh kosong!\n"; continue; fi
     
+    # FITUR BYPASS: Mencegah user terjebak looping jika DNS sedang masa propagasi lambat
     if [[ "$DOMAIN" == "skip" || "$DOMAIN" == "SKIP" ]]; then
         read -p "Masukkan Domain secara manual (tanpa validasi DNS): " DOMAIN
         echo -e "\e[33m[WARNING]\e[0m Validasi DNS dilewati secara paksa untuk domain: $DOMAIN"
@@ -85,18 +85,14 @@ while true; do
     else
         echo -e "\e[31m[ERROR] VERIFIKASI DOMAIN GAGAL!\e[0m"
         echo -e "\e[33m[Solusi]\e[0m Pastikan A Record di DNS mengarah ke IP $VPS_IP (DNS Only)."
-        echo -e "Ketik \e[32mskip\e[0m jika Anda YAKIN DNS sudah disetting dan sedang menunggu propagasi.\n"
+        echo -e "Ketik \e[32mskip\e[0m jika Anda YAKIN DNS sudah disetting dan sedang menunggu propagasi (Propagasi bisa memakan waktu 5-30 menit).\n"
     fi
 done
 
-# ==========================================
-# 1. INSTALASI DEPENDENSI & SQLITE
-# ==========================================
 echo -e "\n[1/12] Memperbarui sistem & dependensi..."
 export DEBIAN_FRONTEND=noninteractive
 apt update && apt upgrade -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold"
-# MENAMBAHKAN sqlite3 DAN python3-flask
-apt install curl wget unzip uuid-runtime jq tzdata ufw cron gnupg2 gnupg python3 python3-flask python3-pip sqlite3 strongswan xl2tpd iptables dropbear openvpn cmake make gcc git net-tools -y
+apt install curl wget unzip uuid-runtime jq tzdata ufw cron gnupg2 gnupg python3 python3-flask python3-pip strongswan xl2tpd iptables dropbear openvpn cmake make gcc git net-tools -y
 timedatectl set-timezone Asia/Jakarta
 
 pip3 install pyTelegramBotAPI requests --break-system-packages 2>/dev/null || pip3 install pyTelegramBotAPI requests
@@ -110,12 +106,14 @@ mkdir -p /usr/local/bin/srpcom
 mkdir -p /usr/local/etc/xray
 mkdir -p /usr/local/etc/srpcom/panel
 
+# SIMPAN VPS NAME SECARA PERMANEN
 cat > /usr/local/etc/srpcom/env.conf << EOF
 DOMAIN="$DOMAIN"
 IP_ADD="$VPS_IP"
 VPS_NAME="$VPS_NAME"
 EOF
 
+# SIMPAN CACHE LISENSI AWAL
 cat > /usr/local/etc/srpcom/license.info << EOF
 STATUS="ACTIVE"
 EXP_DATE="$EXP_DATE_INIT"
@@ -123,47 +121,12 @@ EOF
 
 touch /usr/local/etc/srpcom/extra_domains.txt
 
-# ==========================================
-# 2. INISIALISASI DATABASE SQLITE
-# ==========================================
-echo -e "\n[2/12] Membangun Database SQLite V5..."
-cat << 'EOF' > /usr/local/bin/srpcom/db_init.py
-#!/usr/bin/env python3
-import sqlite3, os
-DB_DIR = '/usr/local/etc/srpcom'
-DB_PATH = os.path.join(DB_DIR, 'database.db')
-os.makedirs(DB_DIR, exist_ok=True)
-
-try:
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    cursor.execute('''CREATE TABLE IF NOT EXISTS vpn_accounts (
-        id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT NOT NULL, uuid_pass TEXT NOT NULL,
-        protocol TEXT NOT NULL, expired_at TEXT NOT NULL, limit_ip INTEGER DEFAULT 0,
-        limit_quota INTEGER DEFAULT 0, status TEXT DEFAULT 'active', UNIQUE(username, protocol))''')
-    cursor.execute('''CREATE TABLE IF NOT EXISTS vpn_stats (
-        id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT NOT NULL, total_download INTEGER DEFAULT 0,
-        total_upload INTEGER DEFAULT 0, last_login TEXT, UNIQUE(username))''')
-    cursor.execute('''CREATE TABLE IF NOT EXISTS system_settings (key_name TEXT PRIMARY KEY, key_value TEXT NOT NULL)''')
-    
-    cursor.execute("INSERT OR IGNORE INTO system_settings (key_name, key_value) VALUES ('api_auth', 'OFF')")
-    cursor.execute("INSERT OR IGNORE INTO system_settings (key_name, key_value) VALUES ('api_key', 'SANGATRAHASIA123')")
-    cursor.execute("INSERT OR IGNORE INTO system_settings (key_name, key_value) VALUES ('bot_autosend', 'OFF')")
-    
-    conn.commit()
-    conn.close()
-    print("-> Database terinisialisasi.")
-except Exception as e:
-    print(f"-> Gagal membuat database: {e}")
+cat > /usr/local/etc/xray/bot_admin.conf << 'EOF'
+BOT_TOKEN=""
+ADMIN_ID=""
 EOF
 
-chmod +x /usr/local/bin/srpcom/db_init.py
-python3 /usr/local/bin/srpcom/db_init.py
-
-# ==========================================
-# 3. OPTIMASI PERFORMA & INSTALASI CORE
-# ==========================================
-echo -e "\n[3/12] Optimasi Performa Server (BBR & Swap RAM)..."
+echo -e "\n[2/12] Optimasi Performa Server (BBR & Swap RAM)..."
 if [ ! -f "/swapfile" ]; then
     echo "=> Membuat Swap Memory 2GB..."
     dd if=/dev/zero of=/swapfile bs=1M count=2048 status=none
@@ -175,18 +138,22 @@ if [ ! -f "/swapfile" ]; then
     fi
 fi
 
+echo "=> Mengaktifkan TCP BBR..."
 if ! grep -q "net.ipv4.tcp_congestion_control=bbr" /etc/sysctl.conf; then
     cat >> /etc/sysctl.conf << EOF
+
+# Optimasi TCP BBR & Network
 net.core.default_qdisc=fq
 net.ipv4.tcp_congestion_control=bbr
 EOF
     sysctl -p >/dev/null 2>&1
 fi
 
-echo -e "\n[4/12] Menginstal Xray-core..."
+echo -e "\n[3/12] Menginstal Xray-core..."
 bash -c "$(curl -L https://github.com/XTLS/Xray-install/raw/main/install-release.sh)" @ install
 systemctl enable xray
 
+echo -e "\n[4/12] Mengonfigurasi Xray Core (Limit & Kuota Enabled)..."
 mkdir -p /var/log/xray
 touch /var/log/xray/access.log
 touch /var/log/xray/error.log
@@ -209,10 +176,20 @@ cat > /usr/local/etc/xray/config.json << EOF
   "routing": {"rules": [{"inboundTag": ["api"], "outboundTag": "api", "type": "field"}]}
 }
 EOF
+touch /usr/local/etc/xray/expiry.txt
+touch /usr/local/etc/xray/limit.txt
+cat > /usr/local/etc/xray/bot_setting.conf << 'EOF'
+BOT_TOKEN=""
+CHAT_ID=""
+AUTOBACKUP_STATUS="OFF"
+BACKUP_TIME="24"
+AUTOSEND_STATUS="OFF"
+EOF
 
-# ==========================================
-# 4. INSTALASI L2TP & IPSEC
-# ==========================================
+# KONFIGURASI DEFAULT API
+echo "SANGATRAHASIA123" > /usr/local/etc/xray/api_key.conf
+echo "OFF" > /usr/local/etc/xray/api_auth.conf
+
 echo -e "\n[5/12] Mengonfigurasi L2TP & IPsec..."
 mkdir -p /etc/xl2tpd
 mkdir -p /etc/ppp
@@ -271,11 +248,9 @@ debug
 proxyarp
 connect-delay 5000
 EOF
+touch /usr/local/etc/srpcom/l2tp_expiry.txt
 systemctl enable ipsec xl2tpd
 
-# ==========================================
-# 5. INSTALASI SSH, OVPN, BADVPN
-# ==========================================
 echo -e "\n[6/12] Mengonfigurasi SSH, Dropbear, SSH-WS, BadVPN & OpenVPN..."
 cat > /etc/default/dropbear << 'EOF'
 NO_START=0
@@ -334,6 +309,9 @@ systemctl daemon-reload
 systemctl enable ssh-ws
 systemctl start ssh-ws
 
+touch /usr/local/etc/srpcom/ssh_expiry.txt
+touch /usr/local/etc/srpcom/ssh_limit.txt
+
 echo -e "Membuat layanan BadVPN (UDP Custom)..."
 git clone https://github.com/ambrop72/badvpn.git /tmp/badvpn >/dev/null 2>&1
 mkdir -p /tmp/badvpn/build && cd /tmp/badvpn/build
@@ -346,13 +324,16 @@ cat > /etc/systemd/system/badvpn-$port.service << EOF
 [Unit]
 Description=BadVPN UDPGW Service Port $port
 After=network.target
+
 [Service]
 ExecStart=/usr/local/bin/badvpn-udpgw --listen-addr 127.0.0.1:$port --max-clients 500
 User=root
 Restart=always
+
 [Install]
 WantedBy=multi-user.target
 EOF
+systemctl daemon-reload
 systemctl enable badvpn-$port
 systemctl start badvpn-$port
 done
@@ -365,8 +346,11 @@ openssl req -new -x509 -days 3650 -key ca.key -out ca.crt -subj "/CN=SRPCOM_CA"
 openssl ecparam -genkey -name prime256v1 -out server.key
 openssl req -new -key server.key -out server.csr -subj "/CN=SRPCOM_Server"
 openssl x509 -req -days 3650 -in server.csr -CA ca.crt -CAkey ca.key -CAcreateserial -out server.crt
+
+# PERBAIKAN: Menambahkan --secret agar ta.key berhasil dibuat tanpa error
 openvpn --genkey --secret ta.key
 
+# PERBAIKAN: Mempercepat pencarian plugin PAM agar instalasi tidak terkesan macet/hang
 PAM_PLUGIN=$(find /usr/lib -name "openvpn-plugin-auth-pam.so" | head -n 1)
 if [ -z "$PAM_PLUGIN" ]; then
     PAM_PLUGIN="/usr/lib/x86_64-linux-gnu/openvpn/plugins/openvpn-plugin-auth-pam.so"
@@ -472,18 +456,20 @@ $TA_CERT
 </tls-auth>
 EOF
 
-# ==========================================
-# 6. UNDUH MODUL SYSTEM V5
-# ==========================================
-echo -e "\n[7/12] Mendownload Modul Sistem (V5 SQLite) dari GitHub..."
-FILES=("menu.sh" "xray.sh" "ssh.sh" "l2tp.sh" "monitor.sh" "utils.sh" "telegram.sh" "auto_expired.sh" "autokill.sh")
-for file in "${FILES[@]}"; do
-    wget -qO /usr/local/bin/srpcom/$file "${GITHUB_RAW}/core/$file"
-done
+echo -e "\n[7/12] Mendownload Modul Sistem dari GitHub..."
+wget -q -O /usr/local/bin/srpcom/utils.sh "$GITHUB_RAW/core/utils.sh"
+wget -q -O /usr/local/bin/srpcom/telegram.sh "$GITHUB_RAW/core/telegram.sh"
+wget -q -O /usr/local/bin/srpcom/xray.sh "$GITHUB_RAW/core/xray.sh"
+wget -q -O /usr/local/bin/srpcom/l2tp.sh "$GITHUB_RAW/core/l2tp.sh"
+wget -q -O /usr/local/bin/srpcom/ssh.sh "$GITHUB_RAW/core/ssh.sh"
+wget -q -O /usr/local/bin/srpcom/monitor.sh "$GITHUB_RAW/core/monitor.sh"
+wget -q -O /usr/local/bin/srpcom/autokill.sh "$GITHUB_RAW/core/autokill.sh"
+wget -q -O /usr/local/bin/srpcom/menu.sh "$GITHUB_RAW/core/menu.sh"
+wget -q -O /usr/local/bin/srpcom/auto_expired.sh "$GITHUB_RAW/core/auto_expired.sh"
+wget -q -O /usr/local/bin/xray-api.py "$GITHUB_RAW/configs/xray-api.py"
+wget -q -O /usr/local/bin/bot-admin.py "$GITHUB_RAW/configs/bot-admin.py"
 
-wget -qO /usr/local/bin/xray-api.py "${GITHUB_RAW}/configs/xray-api.py"
-wget -qO /usr/local/bin/bot-admin.py "${GITHUB_RAW}/configs/bot-admin.py"
-
+# FIX: Hapus karakter DOS (Carriage Return / \r) akibat edit file di Windows
 sed -i 's/\r$//' /usr/local/bin/srpcom/*.sh 2>/dev/null
 sed -i 's/\r$//' /usr/local/bin/xray-api.py 2>/dev/null
 sed -i 's/\r$//' /usr/local/bin/bot-admin.py 2>/dev/null
@@ -492,9 +478,6 @@ chmod +x /usr/local/bin/srpcom/*.sh
 chmod +x /usr/local/bin/xray-api.py
 chmod +x /usr/local/bin/bot-admin.py
 
-# ==========================================
-# 7. SETUP SERVICE API & BOT
-# ==========================================
 echo -e "\n[8/12] Mengonfigurasi Layanan API & Bot Admin..."
 cat > /etc/systemd/system/xray-api.service << EOF
 [Unit]
@@ -528,9 +511,6 @@ systemctl enable xray-api
 systemctl start xray-api
 systemctl disable srpcom-bot >/dev/null 2>&1
 
-# ==========================================
-# 8. SETUP FIREWALL & IPTABLES
-# ==========================================
 echo -e "\n[9/12] Mengonfigurasi Firewall (UFW & Iptables NAT L2TP/OVPN)..."
 ufw allow 22/tcp
 ufw allow 80/tcp
@@ -545,13 +525,12 @@ ufw allow 2200/udp
 ufw allow 7100/udp
 ufw allow 7200/udp
 ufw allow 7300/udp
-ufw allow 5000/tcp
 ufw --force enable
 
 ETH=$(ip route ls | grep default | awk '{print $5}' | head -n 1)
 cat > /etc/systemd/system/vpn-nat.service << EOF
 [Unit]
-Description=VPN NAT IPTables Rules
+Description=VPN NAT IPTables Rules (L2TP & OVPN)
 After=network.target ufw.service
 [Service]
 Type=oneshot
@@ -568,14 +547,14 @@ systemctl start vpn-nat
 sed -i '/net.ipv4.ip_forward/s/^#//g' /etc/sysctl.conf
 sysctl -p
 
-# ==========================================
-# 9. UNDUH WEB PANEL & CADDY
-# ==========================================
 echo -e "\n[10/12] Mendownload WEB PANEL HTML..."
-mkdir -p /var/www/html/panel
 wget -q -O /usr/local/etc/srpcom/panel/index.html "$GITHUB_RAW/core/index.html"
+if [ ! -s "/usr/local/etc/srpcom/panel/index.html" ]; then
+    echo -e "\e[33m[WARNING]\e[0m Gagal mengunduh index.html Web Panel. Akan dibuat template dasar."
+    echo "<h1>Web Panel Sedang Maintenance</h1>" > /usr/local/etc/srpcom/panel/index.html
+fi
 
-echo -e "\n[11/12] Menginstal & Mengonfigurasi Caddy Server..."
+echo -e "\n[11/12] Menginstal & Mengonfigurasi Caddy..."
 apt install -y debian-keyring debian-archive-keyring apt-transport-https
 curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | gpg --dearmor --yes -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
 curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | tee /etc/apt/sources.list.d/caddy-stable.list
@@ -616,29 +595,27 @@ $DOMAINS_STR {
 }
 EOF
 
-# ==========================================
-# 10. SETUP CRONJOB & SHORTCUT
-# ==========================================
 echo -e "\n[12/12] Setup Cronjob Selesai..."
 if ! grep -q "menu" /root/.profile; then echo "menu" >> /root/.profile; fi
 
 echo "0 * * * * root /usr/local/bin/srpcom/auto_expired.sh >/dev/null 2>&1" > /etc/cron.d/auto_expired
-echo "*/3 * * * * root /usr/local/bin/srpcom/autokill.sh run_kill >/dev/null 2>&1" > /etc/cron.d/srpcom_autokill
-echo "0 0 * * * root /usr/local/bin/srpcom/telegram.sh run_autobackup >/dev/null 2>&1" > /etc/cron.d/xray_autobackup
 
+# ==========================================
+# REBUILD SHORTCUTS (WRAPPER)
+# ==========================================
 chmod +x /usr/local/bin/srpcom/menu.sh
 source /usr/local/bin/srpcom/menu.sh
 rebuild_shortcuts
+# ==========================================
 
 systemctl restart xray caddy cron xray-api ipsec xl2tpd dropbear ssh-ws
 
 clear
 echo "======================================================"
-echo "    INSTALASI SELESAI & BERHASIL! (V5 FINAL SQLite)   "
+echo "    INSTALASI SELESAI & BERHASIL! (V5 FINAL)          "
 echo "======================================================"
 echo "Protokol: VMESS, VLESS, TROJAN, L2TP, SSH, OVPN, UDPGW"
 echo "Optimasi: TCP BBR & Swap RAM 2GB Aktif!"
-echo "Database: SQLite3 & Python Flask API (Port 5000)"
 echo "Default SNI/Bug: support.zoom.us.$DOMAIN"
 echo "------------------------------------------------------"
 echo -e "\e[36m[ AKSES SISTEM ]\e[0m"
