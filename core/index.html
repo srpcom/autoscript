@@ -681,6 +681,12 @@
         function printToTerminal(text, type = 'normal') {
             const term = document.getElementById('terminal-output');
             
+            // PERBAIKAN: Regex untuk mengubah teks URL menjadi Clickable Link
+            const urlRegex = /(https?:\/\/[^\s]+)/g;
+            const textWithLinks = text.replace(urlRegex, function(url) {
+                return `<a href="${url}" target="_blank" class="text-blue-400 hover:text-blue-300 underline decoration-blue-500/50 underline-offset-4 pointer-events-auto transition-colors">${url}</a>`;
+            });
+            
             // Pewarnaan teks terminal berdasarkan tipe pesan
             let colorClass = 'text-[#00ff00]'; // default green
             if (type === 'error') colorClass = 'text-red-400';
@@ -689,7 +695,7 @@
             else if (type === 'success') colorClass = 'text-teal-300'; // slightly different green for api success responses
 
             // Bungkus output dengan span berwarna
-            const formattedText = `<span class="${colorClass}">${text}</span>`;
+            const formattedText = `<span class="${colorClass}">${textWithLinks}</span>`;
             
             // Tambahkan newline jika belum ada di akhir teks sebelumnya
             const prefix = term.innerHTML === '' ? '' : '\n';
