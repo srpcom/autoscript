@@ -179,7 +179,10 @@ AUTOBACKUP_STATUS="OFF"
 BACKUP_TIME="24"
 AUTOSEND_STATUS="OFF"
 EOF
+
+# KONFIGURASI DEFAULT API
 echo "SANGATRAHASIA123" > /usr/local/etc/xray/api_key.conf
+echo "OFF" > /usr/local/etc/xray/api_auth.conf
 
 echo -e "\n[5/11] Mengonfigurasi L2TP & IPsec..."
 mkdir -p /etc/xl2tpd
