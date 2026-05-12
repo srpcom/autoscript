@@ -2,7 +2,7 @@
 # ==========================================
 # uninstall.sh
 # MODULE: FULL UNINSTALLER VPN MULTIPORT V5
-# Menghapus Xray, Caddy, L2TP, SSH, OVPN, BadVPN & Bot
+# Menghapus Xray, Caddy, L2TP, SSH, OVPN, BadVPN, Bot & Speedtest
 # ==========================================
 
 if [ "${EUID}" -ne 0 ]; then
@@ -21,6 +21,7 @@ echo " - L2TP/IPsec (xl2tpd & strongswan)"
 echo " - SSH-WS, Dropbear, & Akun-akun SSH"
 echo " - OpenVPN & BadVPN UDPGW"
 echo " - Bot Telegram Admin & API Backend"
+echo " - Speedtest Ookla & Repositori"
 echo " - Seluruh cronjob, firewall, dan file sistem srpcom"
 echo "====================================================="
 read -p "Apakah Anda YAKIN ingin menghapus semuanya? (y/n): " confirm
@@ -51,8 +52,8 @@ echo -e "\n[3/7] Menghapus Xray Core..."
 # Menjalankan script uninstaller resmi dari XTLS
 bash -c "$(curl -L https://github.com/XTLS/Xray-install/raw/main/install-release.sh)" @ remove >/dev/null 2>&1
 
-echo -e "\n[4/7] Menghapus Paket VPN (Caddy, Dropbear, OpenVPN, dll)..."
-apt-get purge -y caddy dropbear openvpn xl2tpd strongswan >/dev/null 2>&1
+echo -e "\n[4/7] Menghapus Paket VPN (Caddy, Dropbear, OpenVPN, Speedtest, dll)..."
+apt-get purge -y caddy dropbear openvpn xl2tpd strongswan speedtest >/dev/null 2>&1
 apt-get autoremove -y >/dev/null 2>&1
 
 echo -e "\n[5/7] Membersihkan Aturan Firewall & Jaringan..."
@@ -81,6 +82,10 @@ rm -f /usr/local/bin/bot-admin.py
 rm -f /usr/local/bin/ssh-ws.py
 rm -f /usr/local/bin/badvpn-udpgw
 rm -f /usr/bin/menu
+
+# Membersihkan Repositori pihak ketiga yang ditambahkan (Speedtest & Caddy)
+rm -f /etc/apt/sources.list.d/ookla_speedtest-cli.list
+rm -f /etc/apt/sources.list.d/caddy-stable.list
 
 # Menghapus File Services (Systemd)
 rm -f /etc/systemd/system/xray-api.service
