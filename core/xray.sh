@@ -161,7 +161,10 @@ add_trial() {
     
     if [[ "$prot_opt" == "0" ]]; then return; fi
     
-    user="trialsrp-$(date +%m%d%H%M)"
+    # PERBAIKAN: Format Jam-Menit-Detik + 1 Karakter Random
+    rand_char=$(tr -dc 'a-z' < /dev/urandom | head -c 1)
+    user="trialsrp-$(date +%H%M%S)${rand_char}"
+    
     masaaktif="60 Minutes"
     exp_date=$(date -d "+60 minutes" +"%Y-%m-%d")
     exp_time=$(date -d "+60 minutes" +"%H:%M:%S")
