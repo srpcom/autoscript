@@ -14,9 +14,19 @@ fi
 
 clear
 echo "=========================================="
+echo "  SRPCOM AUTOSCRIPT VERSI 1.0             "
 echo "  MEMULAI INSTALASI VPN MULTIPORT V5      "
 echo "  XRAY, CADDY, L2TP, SSH, OVPN, BADVPN    "
 echo "=========================================="
+echo "=========================================="
+echo "  PASTIKAN BAHWA ANDA SUDAH LOGIN         "
+echo "  SEBAGAI USER ROOT MURNI                 "
+echo "  GUNAKAN TOOL INI UNTUK MENDAPATKAN      "
+echo "  HAK AKSES ROOT MURNI :                  "
+echo "  bash <(curl -Ls https://srpcom.cloud/getroot.sh)"
+echo "  skip jika sudah paham"
+echo "=========================================="
+
 
 VPS_IP=$(curl -sS --max-time 5 ipv4.icanhazip.com || curl -sS --max-time 5 ifconfig.me)
 
