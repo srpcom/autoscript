@@ -1,238 +1,523 @@
 #!/bin/bash
 # ==========================================
 # xray.sh
-# MODULE: XRAY LOGIC (SQLITE VERSION - FULL FEATURES)
-# Mengelola akun Xray dengan integrasi murni ke API & Database
+# MODULE: XRAY LOGIC
+# Berisi logika pembuatan, penghapusan, dan manajemen akun Xray
 # ==========================================
 
 source /usr/local/etc/srpcom/env.conf
-DB_PATH="/usr/local/etc/srpcom/database.db"
 
-# Ambil API Key untuk otentikasi
-API_KEY=$(sqlite3 "$DB_PATH" "SELECT key_value FROM system_settings WHERE key_name='api_key';" 2>/dev/null)
-if [ -z "$API_KEY" ]; then API_KEY="SANGATRAHASIA123"; fi
+# Fungsi Pintar untuk membuat Tabel Daftar User Xray (Mobile Optimized)
+print_user_table() {
+    local back_type=$1
+    printf " %-3s | %-16s | %-10s\n" "No" "Username" "Sisa Hari"
+    echo "--------------------------------------"
+    for i in "${!users[@]}"; do
+        local user="${users[$i]}"
+        local exp_data=$(grep "^$user " /usr/local/etc/xray/expiry.txt 2>/dev/null)
+        local exp_date=""
+        local sisa_hari=""
+        
+        if [ -z "$exp_data" ]; then
+            sisa_hari="Lifetime"
+        else
+            exp_date=$(echo "$exp_data" | awk '{print $2}')
+            local exp_time=$(echo "$exp_data" | awk '{print $3}')
+            local exp_sec=$(date -d "$exp_date $exp_time" +%s 2>/dev/null)
+            local now_sec=$(date +%s)
+            
+            if [ -n "$exp_sec" ]; then
+                local diff=$((exp_sec - now_sec))
+                if [ "$diff" -lt 0 ]; then
+                    sisa_hari="Expired"
+                else
+                    sisa_hari=$((diff / 86400))
+                    if [ "$sisa_hari" -eq 0 ]; then
+                        sisa_hari="<1 Hari"
+                    else
+                        sisa_hari="${sisa_hari} Hari"
+                    fi
+                fi
+            else
+                sisa_hari="Unknown"
+            fi
+        fi
+        
+        # Potong panjang string user max 16 char agar tabel HP tidak pecah
+        local display_user="${user:0:16}"
+        printf " %-3s | %-16s | %-10s\n" "$((i+1))." "$display_user" "$sisa_hari"
+    done
+    
+    if [ "$back_type" == "hide_back" ]; then
+        : # Tidak print tombol back
+    elif [ "$back_type" == "back_to_protocol" ]; then
+        echo "--------------------------------------"
+        echo " 0.  | Kembali ke Menu Protocol"
+    else
+        echo "--------------------------------------"
+        echo " 0.  | Kembali"
+    fi
+}
 
-# ==========================================
-# FUNGSI HELPER: REQUEST KE API
-# ==========================================
-call_api() {
-    local endpoint=$1
-    local method=$2
-    local data=$3
-    
-    echo -e "\n=> Memproses ke Sistem Database & Core..."
-    result=$(curl -s -X $method -H "Content-Type: application/json" -H "x-api-key: $API_KEY" -d "$data" "http://127.0.0.1:5000/user_legend/$endpoint")
-    
+add_vmess_ws() {
     clear
-    # Ekstrak pesan menggunakan jq agar output rapi
-    echo "$result" | jq -r '.stdout'
+    echo "======================================"
+    echo "       CREATE VMESS WS ACCOUNT        "
+    echo "======================================"
+    read -p "Username (x = Batal) : " user
+    if [[ "$user" == "x" || "$user" == "X" ]]; then return; fi
+    read -p "Expired (Days) : " masaaktif
+    uuid=$(uuidgen)
+    
+    exp_date=$(date -d "$masaaktif days" +"%Y-%m-%d")
+    exp_time=$(date -d "$masaaktif days" +"%H:%M:%S")
+    echo "$user $exp_date $exp_time" >> /usr/local/etc/xray/expiry.txt
+
+    jq '(.inbounds[] | select(.protocol=="vmess") | .settings.clients) += [{"id": "'$uuid'", "alterId": 0, "email": "'$user'"}]' /usr/local/etc/xray/config.json > /tmp/config.json
+    if [ -s /tmp/config.json ]; then mv /tmp/config.json /usr/local/etc/xray/config.json; fi
+    systemctl restart xray
+    
+    tls_json="{\"v\":\"2\",\"ps\":\"${user}\",\"add\":\"${DOMAIN}\",\"port\":\"443\",\"id\":\"${uuid}\",\"aid\":\"0\",\"scy\":\"auto\",\"net\":\"ws\",\"type\":\"none\",\"host\":\"${DOMAIN}\",\"path\":\"/vmessws\",\"tls\":\"tls\",\"sni\":\"${DOMAIN}\"}"
+    none_tls_json="{\"v\":\"2\",\"ps\":\"${user}\",\"add\":\"${DOMAIN}\",\"port\":\"80\",\"id\":\"${uuid}\",\"aid\":\"0\",\"scy\":\"auto\",\"net\":\"ws\",\"type\":\"none\",\"host\":\"${DOMAIN}\",\"path\":\"/vmessws\",\"tls\":\"\",\"sni\":\"\"}"
+    link_tls="vmess://$(echo -n "$tls_json" | jq -c . | base64 -w 0)"
+    link_none_tls="vmess://$(echo -n "$none_tls_json" | jq -c . | base64 -w 0)"
+    
+    msg_cli=$(echo -e "━━━━━━━━━━━━━━━━━━━━\n❖ XRAY/VMESS WS ❖\n━━━━━━━━━━━━━━━━━━━━\nRemarks : ${user}\nIP Address : ${IP_ADD}\nDomain : ${DOMAIN}\nPort TLS : 443\nPort NONE-TLS : 80\nID : ${uuid}\nNetwork : Websocket\nWebsocket Path : /vmessws\n━━━━━━━━━━━━━━━━━━━━\nLINK WS TLS : ${link_tls}\n━━━━━━━━━━━━━━━━━━━━\nLINK WS NONE-TLS : ${link_none_tls}\n━━━━━━━━━━━━━━━━━━━━\nEXPIRED ON : ${exp_date} ${exp_time} WIB (${masaaktif} days)")
+    msg_tg=$(echo -e "━━━━━━━━━━━━━━━━━━━━\n❖ XRAY/VMESS WS ❖\n━━━━━━━━━━━━━━━━━━━━\nRemarks : \`${user}\`\nIP Address : ${IP_ADD}\nDomain : ${DOMAIN}\nPort TLS : 443\nPort NONE-TLS : 80\nID : \`${uuid}\`\nNetwork : Websocket\nWebsocket Path : /vmessws\n━━━━━━━━━━━━━━━━━━━━\nLINK WS TLS : \`${link_tls}\`\n━━━━━━━━━━━━━━━━━━━━\nLINK WS NONE-TLS : \`${link_none_tls}\`\n━━━━━━━━━━━━━━━━━━━━\nEXPIRED ON : ${exp_date} ${exp_time} WIB (${masaaktif} days)")
+    
+    clear; echo "$msg_cli"
+    send_telegram "$msg_tg"
     pause
 }
 
-# ==========================================
-# FUNGSI HELPER: CETAK TABEL USER (Cepat via SQLite)
-# ==========================================
-print_user_table() {
-    local filter_prot=$1
-    clear
-    echo "======================================================="
-    echo "                 DAFTAR AKUN XRAY AKTIF                "
-    echo "======================================================="
-    printf " %-3s | %-14s | %-8s | %-12s\n" "No" "Username" "Protocol" "Sisa Hari"
-    echo "-------------------------------------------------------"
-    
-    local query="SELECT username, protocol, expired_at FROM vpn_accounts WHERE protocol IN ('vmessws', 'vlessws', 'trojanws')"
-    if [ -n "$filter_prot" ]; then
-        query="$query AND protocol='${filter_prot}ws'"
-    fi
-    query="$query ORDER BY protocol ASC"
-    
-    local no=1
-    sqlite3 "$DB_PATH" "$query" 2>/dev/null | while read -r line; do
-        u=$(echo "$line" | cut -d'|' -f1)
-        p=$(echo "$line" | cut -d'|' -f2)
-        e=$(echo "$line" | cut -d'|' -f3)
-        
-        # Hitung sisa hari
-        if [[ "$e" == "Lifetime" ]]; then
-            sisa="\e[32mLifetime\e[0m"
-        else
-            exp_sec=$(date -d "$e" +%s 2>/dev/null)
-            now_sec=$(date +%s)
-            diff=$((exp_sec - now_sec))
-            if [ "$diff" -lt 0 ]; then sisa="\e[31mExpired\e[0m"
-            else sisa="$((diff / 86400)) Hari"; fi
-        fi
-        
-        # Format protocol string (hapus 'ws' di belakang)
-        prot_disp=${p%ws}
-        
-        printf " %-3s | %-14s | %-8s | %-19b\n" "$no" "$u" "${prot_disp^^}" "$sisa"
-        no=$((no + 1))
-    done
-    echo "======================================================="
-}
-
-# ==========================================
-# MENU CREATE ACCOUNT
-# ==========================================
-add_xray() {
+add_vless_ws() {
     clear
     echo "======================================"
-    echo "         CREATE XRAY ACCOUNT          "
+    echo "       CREATE VLESS WS ACCOUNT        "
     echo "======================================"
-    echo " 1. VMess WebSocket"
-    echo " 2. VLess WebSocket"
-    echo " 3. Trojan WebSocket"
-    echo "======================================"
-    read -p " Pilih Protokol [1-3 or 0]: " prot_opt
-    
-    case $prot_opt in
-        1) prot="vmessws" ;;
-        2) prot="vlessws" ;;
-        3) prot="trojanws" ;;
-        0) return ;;
-        *) echo "Pilihan tidak valid!"; sleep 1; return ;;
-    esac
-
-    echo "--------------------------------------"
     read -p "Username (x = Batal) : " user
-    if [[ "$user" == "x" || "$user" == "X" || -z "$user" ]]; then return; fi
+    if [[ "$user" == "x" || "$user" == "X" ]]; then return; fi
+    read -p "Expired (Days) : " masaaktif
+    uuid=$(uuidgen)
     
-    local pwd=""
-    if [[ "$prot" == "trojanws" ]]; then
-        read -p "Custom Password (Kosong=Random): " pwd
-    fi
+    exp_date=$(date -d "$masaaktif days" +"%Y-%m-%d")
+    exp_time=$(date -d "$masaaktif days" +"%H:%M:%S")
+    echo "$user $exp_date $exp_time" >> /usr/local/etc/xray/expiry.txt
 
-    read -p "Limit IP (0=Unli)    : " limit_ip
-    read -p "Limit Kuota GB (0=Unli): " limit_quota
-    read -p "Expired (Hari)       : " masaaktif
-
-    if [ -z "$limit_ip" ]; then limit_ip=0; fi
-    if [ -z "$limit_quota" ]; then limit_quota=0; fi
-    if [ -z "$masaaktif" ]; then masaaktif=30; fi
-
-    data="{\"user\":\"$user\", \"password\":\"$pwd\", \"exp\":$masaaktif, \"limit_ip\":$limit_ip, \"limit_quota\":$limit_quota}"
-    call_api "add-$prot" "POST" "$data"
+    jq '(.inbounds[] | select(.protocol=="vless") | .settings.clients) += [{"id": "'$uuid'", "email": "'$user'"}]' /usr/local/etc/xray/config.json > /tmp/config.json
+    if [ -s /tmp/config.json ]; then mv /tmp/config.json /usr/local/etc/xray/config.json; fi
+    systemctl restart xray
+    
+    link_tls="vless://${uuid}@${DOMAIN}:443?path=/vlessws&security=tls&encryption=none&host=${DOMAIN}&type=ws&sni=${DOMAIN}#${user}"
+    link_none_tls="vless://${uuid}@${DOMAIN}:80?path=/vlessws&security=none&encryption=none&host=${DOMAIN}&type=ws#${user}"
+    
+    msg_cli=$(echo -e "━━━━━━━━━━━━━━━━━━━━\n❖ XRAY/VLESS WS ❖\n━━━━━━━━━━━━━━━━━━━━\nRemarks : ${user}\nIP Address : ${IP_ADD}\nDomain : ${DOMAIN}\nPort TLS : 443\nPort NONE-TLS : 80\nID : ${uuid}\nNetwork : Websocket\nWebsocket Path : /vlessws\n━━━━━━━━━━━━━━━━━━━━\nLINK WS TLS : ${link_tls}\n━━━━━━━━━━━━━━━━━━━━\nLINK WS NONE-TLS : ${link_none_tls}\n━━━━━━━━━━━━━━━━━━━━\nEXPIRED ON : ${exp_date} ${exp_time} WIB (${masaaktif} days)")
+    msg_tg=$(echo -e "━━━━━━━━━━━━━━━━━━━━\n❖ XRAY/VLESS WS ❖\n━━━━━━━━━━━━━━━━━━━━\nRemarks : \`${user}\`\nIP Address : ${IP_ADD}\nDomain : ${DOMAIN}\nPort TLS : 443\nPort NONE-TLS : 80\nID : \`${uuid}\`\nNetwork : Websocket\nWebsocket Path : /vlessws\n━━━━━━━━━━━━━━━━━━━━\nLINK WS TLS : \`${link_tls}\`\n━━━━━━━━━━━━━━━━━━━━\nLINK WS NONE-TLS : \`${link_none_tls}\`\n━━━━━━━━━━━━━━━━━━━━\nEXPIRED ON : ${exp_date} ${exp_time} WIB (${masaaktif} days)")
+    
+    clear; echo "$msg_cli"
+    send_telegram "$msg_tg"
+    pause
 }
 
-add_trial_xray() {
+add_trojan_ws() {
     clear
     echo "======================================"
-    echo "         CREATE TRIAL ACCOUNT         "
+    echo "       CREATE TROJAN WS ACCOUNT       "
     echo "======================================"
-    echo " Pilih Protokol Trial (60 Menit):"
-    echo " 1. VMess WebSocket"
-    echo " 2. VLess WebSocket"
-    echo " 3. Trojan WebSocket"
-    echo "======================================"
-    read -p " Pilih [1-3 or x]: " prot_opt
+    read -p "Username (x = Batal) : " user
+    if [[ "$user" == "x" || "$user" == "X" ]]; then return; fi
+    read -p "Expired (Days) : " masaaktif
+    uuid=$(uuidgen)
     
-    case $prot_opt in
-        1) prot="vmessws" ;;
-        2) prot="vlessws" ;;
-        3) prot="trojanws" ;;
-        *) return ;;
-    esac
+    exp_date=$(date -d "$masaaktif days" +"%Y-%m-%d")
+    exp_time=$(date -d "$masaaktif days" +"%H:%M:%S")
+    echo "$user $exp_date $exp_time" >> /usr/local/etc/xray/expiry.txt
 
-    call_api "trial-$prot" "POST" "{}"
+    jq '(.inbounds[] | select(.protocol=="trojan") | .settings.clients) += [{"password": "'$uuid'", "email": "'$user'"}]' /usr/local/etc/xray/config.json > /tmp/config.json
+    if [ -s /tmp/config.json ]; then mv /tmp/config.json /usr/local/etc/xray/config.json; fi
+    systemctl restart xray
+    
+    link_tls="trojan://${uuid}@${DOMAIN}:443?path=/trojanws&security=tls&host=${DOMAIN}&type=ws&sni=${DOMAIN}#${user}"
+    
+    msg_cli=$(echo -e "━━━━━━━━━━━━━━━━━━━━\n❖ XRAY/TROJAN WS ❖\n━━━━━━━━━━━━━━━━━━━━\nRemarks : ${user}\nIP Address : ${IP_ADD}\nDomain : ${DOMAIN}\nPort TLS : 443\nPassword : ${uuid}\nNetwork : Websocket\nWebsocket Path : /trojanws\n━━━━━━━━━━━━━━━━━━━━\nLINK WS TLS : ${link_tls}\n━━━━━━━━━━━━━━━━━━━━\nEXPIRED ON : ${exp_date} ${exp_time} WIB (${masaaktif} days)")
+    msg_tg=$(echo -e "━━━━━━━━━━━━━━━━━━━━\n❖ XRAY/TROJAN WS ❖\n━━━━━━━━━━━━━━━━━━━━\nRemarks : \`${user}\`\nIP Address : ${IP_ADD}\nDomain : ${DOMAIN}\nPort TLS : 443\nPassword : \`${uuid}\`\nNetwork : Websocket\nWebsocket Path : /trojanws\n━━━━━━━━━━━━━━━━━━━━\nLINK WS TLS : \`${link_tls}\`\n━━━━━━━━━━━━━━━━━━━━\nEXPIRED ON : ${exp_date} ${exp_time} WIB (${masaaktif} days)")
+    
+    clear; echo "$msg_cli"
+    send_telegram "$msg_tg"
+    pause
 }
 
-# ==========================================
-# MANAJEMEN AKUN
-# ==========================================
-delete_xray() {
-    print_user_table ""
-    echo " Pilih Protokol Akun yang Dihapus:"
-    echo " 1. VMess  2. VLess  3. Trojan"
-    read -p " Pilih [1-3]: " prot_opt
-    case $prot_opt in
-        1) prot="vmessws" ;; 2) prot="vlessws" ;; 3) prot="trojanws" ;; *) return ;;
-    esac
+add_trial() {
+    clear
+    echo "======================================"
+    echo "       CREATE TRIAL ACCOUNT (60M)     "
+    echo "======================================"
+    echo " 1. VMESS WS"
+    echo " 2. VLESS WS"
+    echo " 3. TROJAN WS"
+    echo " 0. Kembali"
+    echo "======================================"
+    read -p "Select Protocol [1-3 or 0]: " prot_opt
     
-    read -p "Username yang akan dihapus: " user
-    if [ -z "$user" ]; then return; fi
+    if [[ "$prot_opt" == "0" ]]; then return; fi
+    
+    user="trialsrp-$(date +%m%d%H%M)"
+    masaaktif="60 Minutes"
+    exp_date=$(date -d "+60 minutes" +"%Y-%m-%d")
+    exp_time=$(date -d "+60 minutes" +"%H:%M:%S")
+    uuid=$(uuidgen)
+    
+    if [[ "$prot_opt" == "1" ]]; then
+        prot="vmess"
+        jq '(.inbounds[] | select(.protocol=="vmess") | .settings.clients) += [{"id": "'$uuid'", "alterId": 0, "email": "'$user'"}]' /usr/local/etc/xray/config.json > /tmp/config.json
+    elif [[ "$prot_opt" == "2" ]]; then
+        prot="vless"
+        jq '(.inbounds[] | select(.protocol=="vless") | .settings.clients) += [{"id": "'$uuid'", "email": "'$user'"}]' /usr/local/etc/xray/config.json > /tmp/config.json
+    elif [[ "$prot_opt" == "3" ]]; then
+        prot="trojan"
+        jq '(.inbounds[] | select(.protocol=="trojan") | .settings.clients) += [{"password": "'$uuid'", "email": "'$user'"}]' /usr/local/etc/xray/config.json > /tmp/config.json
+    else
+        echo -e "\n=> Pilihan tidak valid!"; sleep 1; add_trial; return
+    fi
+    
+    if [ -s /tmp/config.json ]; then mv /tmp/config.json /usr/local/etc/xray/config.json; fi
+    echo "$user $exp_date $exp_time" >> /usr/local/etc/xray/expiry.txt
+    systemctl restart xray
+    
+    if [[ "$prot" == "vmess" ]]; then
+        tls_json="{\"v\":\"2\",\"ps\":\"${user}\",\"add\":\"${DOMAIN}\",\"port\":\"443\",\"id\":\"${uuid}\",\"aid\":\"0\",\"scy\":\"auto\",\"net\":\"ws\",\"type\":\"none\",\"host\":\"${DOMAIN}\",\"path\":\"/vmessws\",\"tls\":\"tls\",\"sni\":\"${DOMAIN}\"}"
+        none_tls_json="{\"v\":\"2\",\"ps\":\"${user}\",\"add\":\"${DOMAIN}\",\"port\":\"80\",\"id\":\"${uuid}\",\"aid\":\"0\",\"scy\":\"auto\",\"net\":\"ws\",\"type\":\"none\",\"host\":\"${DOMAIN}\",\"path\":\"/vmessws\",\"tls\":\"\",\"sni\":\"\"}"
+        link_tls="vmess://$(echo -n "$tls_json" | jq -c . | base64 -w 0)"
+        link_none_tls="vmess://$(echo -n "$none_tls_json" | jq -c . | base64 -w 0)"
+        port_none="80"
+        path="/vmessws"
+    elif [[ "$prot" == "vless" ]]; then
+        link_tls="vless://${uuid}@${DOMAIN}:443?path=/vlessws&security=tls&encryption=none&host=${DOMAIN}&type=ws&sni=${DOMAIN}#${user}"
+        link_none_tls="vless://${uuid}@${DOMAIN}:80?path=/vlessws&security=none&encryption=none&host=${DOMAIN}&type=ws#${user}"
+        port_none="80"
+        path="/vlessws"
+    elif [[ "$prot" == "trojan" ]]; then
+        link_tls="trojan://${uuid}@${DOMAIN}:443?path=/trojanws&security=tls&host=${DOMAIN}&type=ws&sni=${DOMAIN}#${user}"
+        link_none_tls="-"
+        port_none="-"
+        path="/trojanws"
+    fi
 
-    data="{\"user\":\"$user\"}"
-    call_api "del-$prot" "DELETE" "$data"
+    msg_str_cli="━━━━━━━━━━━━━━━━━━━━\n❖ XRAY/${prot^^} WS TRIAL ❖\n━━━━━━━━━━━━━━━━━━━━\nRemarks : ${user}\nIP Address : ${IP_ADD}\nDomain : ${DOMAIN}\nPort TLS : 443\nPort NONE-TLS : ${port_none}\nID/PW : ${uuid}\nNetwork : Websocket\nWebsocket Path : ${path}\n━━━━━━━━━━━━━━━━━━━━\nLINK WS TLS : ${link_tls}\n━━━━━━━━━━━━━━━━━━━━"
+    msg_str_tg="━━━━━━━━━━━━━━━━━━━━\n❖ XRAY/${prot^^} WS TRIAL ❖\n━━━━━━━━━━━━━━━━━━━━\nRemarks : \`${user}\`\nIP Address : ${IP_ADD}\nDomain : ${DOMAIN}\nPort TLS : 443\nPort NONE-TLS : ${port_none}\nID/PW : \`${uuid}\`\nNetwork : Websocket\nWebsocket Path : ${path}\n━━━━━━━━━━━━━━━━━━━━\nLINK WS TLS : \`${link_tls}\`\n━━━━━━━━━━━━━━━━━━━━"
+    
+    if [[ "$prot" != "trojan" ]]; then
+        msg_str_cli="${msg_str_cli}\nLINK WS NONE-TLS : ${link_none_tls}\n━━━━━━━━━━━━━━━━━━━━"
+        msg_str_tg="${msg_str_tg}\nLINK WS NONE-TLS : \`${link_none_tls}\`\n━━━━━━━━━━━━━━━━━━━━"
+    fi
+    msg_str_cli="${msg_str_cli}\nEXPIRED ON : ${exp_date} ${exp_time} WIB (${masaaktif})"
+    msg_str_tg="${msg_str_tg}\nEXPIRED ON : ${exp_date} ${exp_time} WIB (${masaaktif})"
+    
+    msg_cli=$(echo -e "$msg_str_cli")
+    msg_tg=$(echo -e "$msg_str_tg")
+    
+    clear; echo "$msg_cli"
+    send_telegram "$msg_tg"
+    pause
+}
+
+create_xray() {
+    clear
+    echo "╔════════════════════════════════════╗"
+    echo "║            CREATE XRAY             ║"
+    echo "╚════════════════════════════════════╝"
+    echo " 1. VMESS WS"
+    echo " 2. VLESS WS"
+    echo " 3. TROJAN WS"
+    echo " 4. TRIAL ACCOUNT (60 Minutes)"
+    echo "--------------------------------------"
+    echo " 0. Kembali"
+    echo "======================================"
+    read -p " Pilih opsi [0-4]: " opt
+    case $opt in
+        1) add_vmess_ws ;;
+        2) add_vless_ws ;;
+        3) add_trojan_ws ;;
+        4) add_trial ;;
+        0) return ;;
+        *) echo "Pilihan tidak valid!"; sleep 1; create_xray ;;
+    esac
+}
+
+delete_xray() {
+    clear
+    echo "======================================"
+    echo "         DELETE XRAY ACCOUNT          "
+    echo "======================================"
+    mapfile -t users < <(jq -r '.inbounds[] | select(.protocol=="vmess" or .protocol=="vless" or .protocol=="trojan") | .settings.clients[]?.email' /usr/local/etc/xray/config.json 2>/dev/null | sort -u)
+    
+    if [ ${#users[@]} -eq 0 ] || [ -z "${users[0]}" ] || [ "${users[0]}" == "null" ]; then
+        echo "Tidak ada akun untuk dihapus."
+        pause; return
+    fi
+
+    print_user_table "normal_back"
+    echo "======================================"
+    read -p "Pilih nomor akun untuk dihapus: " choice
+    
+    if [[ "$choice" == "0" ]]; then return; fi
+
+    if [[ "$choice" -gt 0 && "$choice" -le "${#users[@]}" ]]; then
+        user="${users[$((choice-1))]}"
+        
+        jq '(.inbounds[] | select(.protocol=="vmess" or .protocol=="vless" or .protocol=="trojan") | .settings.clients) |= map(select(.email != "'$user'"))' /usr/local/etc/xray/config.json > /tmp/config.json
+        
+        if [ -s /tmp/config.json ]; then
+            mv /tmp/config.json /usr/local/etc/xray/config.json
+            sed -i "/^$user /d" /usr/local/etc/xray/expiry.txt
+            sed -i "/^$user /d" /usr/local/etc/xray/limit.txt
+            systemctl restart xray
+            echo -e "\n\e[32m=> Akun '$user' berhasil dihapus!\e[0m"
+        else
+            echo -e "\n\e[31m[ERROR]\e[0m Gagal menghapus file JSON."
+            rm -f /tmp/config.json
+        fi
+        sleep 2
+    else
+        echo -e "\n=> Pilihan tidak valid!"; sleep 1; delete_xray
+    fi
 }
 
 renew_xray() {
-    print_user_table ""
-    echo " Pilih Protokol Akun yang Diperpanjang:"
-    echo " 1. VMess  2. VLess  3. Trojan"
-    read -p " Pilih [1-3]: " prot_opt
-    case $prot_opt in
-        1) prot="vmessws" ;; 2) prot="vlessws" ;; 3) prot="trojanws" ;; *) return ;;
-    esac
+    clear
+    echo "======================================"
+    echo "         RENEW XRAY ACCOUNT           "
+    echo "======================================"
+    mapfile -t users < <(jq -r '.inbounds[] | select(.protocol=="vmess" or .protocol=="vless" or .protocol=="trojan") | .settings.clients[]?.email' /usr/local/etc/xray/config.json 2>/dev/null | sort -u)
     
-    read -p "Username yang akan diperpanjang: " user
-    if [ -z "$user" ]; then return; fi
-    
-    read -p "Tambah Masa Aktif (Hari): " masaaktif
-    if [ -z "$masaaktif" ]; then return; fi
+    if [ ${#users[@]} -eq 0 ] || [ -z "${users[0]}" ] || [ "${users[0]}" == "null" ]; then
+        echo "Tidak ada akun untuk diperpanjang."
+        pause; return
+    fi
 
-    data="{\"user\":\"$user\", \"exp\":$masaaktif}"
-    call_api "renew-$prot" "POST" "$data"
+    print_user_table "normal_back"
+    echo "======================================"
+    read -p "Pilih nomor akun [1-${#users[@]}]: " choice
+    
+    if [[ "$choice" == "0" ]]; then return; fi
+
+    if [[ "$choice" -gt 0 && "$choice" -le "${#users[@]}" ]]; then
+        user="${users[$((choice-1))]}"
+        read -p "Tambah Masa Aktif (Hari): " masaaktif
+        
+        current_data=$(grep "^$user " /usr/local/etc/xray/expiry.txt)
+        current_date=$(echo "$current_data" | awk '{print $2}')
+        current_time=$(echo "$current_data" | awk '{print $3}')
+        
+        if [ -z "$current_date" ] || [ "$current_date" == "Lifetime" ]; then current_date=$(date +"%Y-%m-%d"); fi
+        if [ -z "$current_time" ]; then current_time=$(date +"%H:%M:%S"); fi
+        
+        current_sec=$(date -d "$current_date $current_time" +%s 2>/dev/null)
+        if [ -z "$current_sec" ]; then current_sec=$(date +%s); fi
+        
+        new_sec=$((current_sec + (masaaktif * 86400)))
+        new_exp_date=$(date -d "@$new_sec" +"%Y-%m-%d")
+        new_exp_time=$(date -d "@$new_sec" +"%H:%M:%S")
+        
+        sed -i "/^$user /d" /usr/local/etc/xray/expiry.txt
+        echo "$user $new_exp_date $new_exp_time" >> /usr/local/etc/xray/expiry.txt
+        
+        echo -e "\n\e[32m=> Akun '$user' diperpanjang $masaaktif Hari!\e[0m"
+        echo "=> Expired Baru: $new_exp_date $new_exp_time WIB"
+        sleep 2
+    else
+        echo -e "\n=> Pilihan tidak valid!"; sleep 1; renew_xray
+    fi
+}
+
+list_xray() {
+    clear
+    echo "======================================"
+    echo "          LIST XRAY ACCOUNTS          "
+    echo "======================================"
+    echo -e "\n\e[32m[ VMESS WS ]\e[0m"
+    mapfile -t users < <(jq -r '.inbounds[] | select(.protocol=="vmess") | .settings.clients[]?.email' /usr/local/etc/xray/config.json 2>/dev/null)
+    if [ ${#users[@]} -eq 0 ] || [ -z "${users[0]}" ] || [ "${users[0]}" == "null" ]; then echo "Tidak ada akun."; else print_user_table "hide_back"; fi
+    
+    echo -e "\n\e[32m[ VLESS WS ]\e[0m"
+    mapfile -t users < <(jq -r '.inbounds[] | select(.protocol=="vless") | .settings.clients[]?.email' /usr/local/etc/xray/config.json 2>/dev/null)
+    if [ ${#users[@]} -eq 0 ] || [ -z "${users[0]}" ] || [ "${users[0]}" == "null" ]; then echo "Tidak ada akun."; else print_user_table "hide_back"; fi
+    
+    echo -e "\n\e[32m[ TROJAN WS ]\e[0m"
+    mapfile -t users < <(jq -r '.inbounds[] | select(.protocol=="trojan") | .settings.clients[]?.email' /usr/local/etc/xray/config.json 2>/dev/null)
+    if [ ${#users[@]} -eq 0 ] || [ -z "${users[0]}" ] || [ "${users[0]}" == "null" ]; then echo "Tidak ada akun."; else print_user_table "hide_back"; fi
+    
+    echo -e "\n======================================"
+    pause
+}
+
+show_detail() {
+    prot=$1
+    user=$2
+    from_menu=$3
+    clear
+    echo "━━━━━━━━━━━━━━━━━━━━"
+    echo "❖ XRAY/${prot^^} WS ❖"
+    echo "━━━━━━━━━━━━━━━━━━━━"
+    echo "Remarks : ${user}"
+    echo "IP Address : ${IP_ADD}"
+    echo "Domain : ${DOMAIN}"
+    echo "Port TLS : 443"
+    
+    if [[ "$prot" == "vmess" ]]; then
+        uuid=$(jq -r '.inbounds[] | select(.protocol=="vmess") | .settings.clients[] | select(.email=="'$user'") | .id' /usr/local/etc/xray/config.json 2>/dev/null)
+        echo "Port NONE-TLS : 80"
+        echo "ID : ${uuid}"
+        echo "Network : Websocket"
+        echo "Websocket Path : /vmessws"
+        echo "━━━━━━━━━━━━━━━━━━━━"
+        tls_json="{\"v\":\"2\",\"ps\":\"${user}\",\"add\":\"${DOMAIN}\",\"port\":\"443\",\"id\":\"${uuid}\",\"aid\":\"0\",\"scy\":\"auto\",\"net\":\"ws\",\"type\":\"none\",\"host\":\"${DOMAIN}\",\"path\":\"/vmessws\",\"tls\":\"tls\",\"sni\":\"${DOMAIN}\"}"
+        none_tls_json="{\"v\":\"2\",\"ps\":\"${user}\",\"add\":\"${DOMAIN}\",\"port\":\"80\",\"id\":\"${uuid}\",\"aid\":\"0\",\"scy\":\"auto\",\"net\":\"ws\",\"type\":\"none\",\"host\":\"${DOMAIN}\",\"path\":\"/vmessws\",\"tls\":\"\",\"sni\":\"\"}"
+        echo "LINK WS TLS : vmess://$(echo -n "$tls_json" | jq -c . | base64 -w 0)"
+        echo "━━━━━━━━━━━━━━━━━━━━"
+        echo "LINK WS NONE-TLS : vmess://$(echo -n "$none_tls_json" | jq -c . | base64 -w 0)"
+    elif [[ "$prot" == "vless" ]]; then
+        uuid=$(jq -r '.inbounds[] | select(.protocol=="vless") | .settings.clients[] | select(.email=="'$user'") | .id' /usr/local/etc/xray/config.json 2>/dev/null)
+        echo "Port NONE-TLS : 80"
+        echo "ID : ${uuid}"
+        echo "Network : Websocket"
+        echo "Websocket Path : /vlessws"
+        echo "━━━━━━━━━━━━━━━━━━━━"
+        echo "LINK WS TLS : vless://${uuid}@${DOMAIN}:443?path=/vlessws&security=tls&encryption=none&host=${DOMAIN}&type=ws&sni=${DOMAIN}#${user}"
+        echo "━━━━━━━━━━━━━━━━━━━━"
+        echo "LINK WS NONE-TLS : vless://${uuid}@${DOMAIN}:80?path=/vlessws&security=none&encryption=none&host=${DOMAIN}&type=ws#${user}"
+    elif [[ "$prot" == "trojan" ]]; then
+        uuid=$(jq -r '.inbounds[] | select(.protocol=="trojan") | .settings.clients[] | select(.email=="'$user'") | .password' /usr/local/etc/xray/config.json 2>/dev/null)
+        echo "Password : ${uuid}"
+        echo "Network : Websocket"
+        echo "Websocket Path : /trojanws"
+        echo "━━━━━━━━━━━━━━━━━━━━"
+        echo "LINK WS TLS : trojan://${uuid}@${DOMAIN}:443?path=/trojanws&security=tls&host=${DOMAIN}&type=ws&sni=${DOMAIN}#${user}"
+    fi
+    echo "━━━━━━━━━━━━━━━━━━━━"
+    exp_date=$(grep "^$user " /usr/local/etc/xray/expiry.txt | cut -d' ' -f2-)
+    if [ -z "$exp_date" ]; then exp_date="Lifetime / No Exp"; else exp_date="$exp_date WIB"; fi
+    echo "Expired On : $exp_date"
+    echo ""
+    pause
+    if [ "$from_menu" == "change_uuid" ]; then
+        menu_change_uuid
+    else
+        detail_list "$prot"
+    fi
+}
+
+detail_list() {
+    prot=$1
+    clear
+    echo "======================================"
+    echo "        SELECT ${prot^^} ACCOUNT       "
+    echo "======================================"
+    mapfile -t users < <(jq -r '.inbounds[] | select(.protocol=="'$prot'") | .settings.clients[]?.email' /usr/local/etc/xray/config.json 2>/dev/null)
+    if [ ${#users[@]} -eq 0 ] || [ -z "${users[0]}" ] || [ "${users[0]}" == "null" ]; then
+        echo "Tidak ada akun di protokol ini."
+        echo "======================================"
+        pause
+        detail_xray
+        return
+    fi
+    
+    print_user_table "back_to_protocol"
+    echo "======================================"
+    read -p "Select Account [0-${#users[@]}]: " acc_opt
+    
+    if [[ "$acc_opt" == "0" ]]; then detail_xray; return
+    elif [[ "$acc_opt" -gt 0 && "$acc_opt" -le "${#users[@]}" ]]; then
+        selected_user="${users[$((acc_opt-1))]}"
+        show_detail "$prot" "$selected_user"
+    else
+        echo -e "\n=> Pilihan tidak valid!"; sleep 1; detail_list "$prot"
+    fi
 }
 
 detail_xray() {
-    print_user_table ""
-    echo " Pilih Protokol Akun untuk Cek Detail:"
-    echo " 1. VMess  2. VLess  3. Trojan"
-    read -p " Pilih [1-3]: " prot_opt
+    clear
+    echo "======================================"
+    echo "         DETAIL XRAY ACCOUNT          "
+    echo "======================================"
+    c_vm=$(jq '[.inbounds[] | select(.protocol=="vmess") | .settings.clients[]?.email] | length' /usr/local/etc/xray/config.json 2>/dev/null || echo 0)
+    c_vl=$(jq '[.inbounds[] | select(.protocol=="vless") | .settings.clients[]?.email] | length' /usr/local/etc/xray/config.json 2>/dev/null || echo 0)
+    c_tr=$(jq '[.inbounds[] | select(.protocol=="trojan") | .settings.clients[]?.email] | length' /usr/local/etc/xray/config.json 2>/dev/null || echo 0)
+
+    echo " 1. VMESS ($c_vm)"
+    echo " 2. VLESS ($c_vl)"
+    echo " 3. TROJAN ($c_tr)"
+    echo " 0. Back to XRAY Menu"
+    echo "======================================"
+    read -p " Select Protocol [0-3]: " prot_opt
     case $prot_opt in
-        1) prot="vmessws" ;; 2) prot="vlessws" ;; 3) prot="trojanws" ;; *) return ;;
+        1) detail_list "vmess" ;;
+        2) detail_list "vless" ;;
+        3) detail_list "trojan" ;;
+        0) return ;;
+        *) echo -e "\n=> Pilihan tidak valid!"; sleep 1; detail_xray ;;
     esac
-    
-    read -p "Username : " user
-    if [ -z "$user" ]; then return; fi
-    
-    data="{\"user\":\"$user\"}"
-    call_api "detail-$prot" "POST" "$data"
 }
 
-# ==========================================
-# GANTI UUID / PASSWORD
-# ==========================================
 change_protocol_uuid() {
-    local prot=$1
-    local db_prot="${prot}ws"
-    
-    print_user_table "$prot"
-    read -p "Username yang akan diganti UUID/Pass: " user
-    if [ -z "$user" ]; then return; fi
-    
-    # Ambil UUID lama dari Database
-    old_uuid=$(sqlite3 "$DB_PATH" "SELECT uuid_pass FROM vpn_accounts WHERE username='$user' AND protocol='$db_prot';" 2>/dev/null)
-    
-    if [ -z "$old_uuid" ]; then
-        echo -e "\n\e[31m[ERROR]\e[0m Username '$user' tidak ditemukan di database!"
-        sleep 2; return
+    prot=$1
+    clear
+    echo "======================================"
+    echo "     CHANGE UUID/PASS ${prot^^} WS    "
+    echo "======================================"
+    mapfile -t users < <(jq -r '.inbounds[] | select(.protocol=="'$prot'") | .settings.clients[]?.email' /usr/local/etc/xray/config.json 2>/dev/null)
+    if [ ${#users[@]} -eq 0 ] || [ -z "${users[0]}" ] || [ "${users[0]}" == "null" ]; then
+        echo "Tidak ada akun di protokol ini."
+        echo "======================================"
+        pause
+        menu_change_uuid
+        return
     fi
-
-    if [[ "$prot" == "trojan" ]]; then
-        read -p "Masukkan Password Baru (Kosong=Random): " new_uuid
-        if [ -z "$new_uuid" ]; then new_uuid=$(cat /proc/sys/kernel/random/uuid | cut -d- -f1); fi
+    
+    print_user_table "back_to_protocol"
+    echo "======================================"
+    read -p "Select Account [0-${#users[@]}]: " acc_opt
+    
+    if [[ "$acc_opt" == "0" ]]; then menu_change_uuid; return
+    elif [[ "$acc_opt" -gt 0 && "$acc_opt" -le "${#users[@]}" ]]; then
+        selected_user="${users[$((acc_opt-1))]}"
+        read -p "New UUID/Pass (Kosong = Auto): " new_uuid
+        if [ -z "$new_uuid" ]; then new_uuid=$(uuidgen); fi
+        
+        if [[ "$prot" == "vmess" || "$prot" == "vless" ]]; then
+            jq '(.inbounds[] | select(.protocol=="'$prot'") | .settings.clients[] | select(.email=="'$selected_user'") | .id) = "'$new_uuid'"' /usr/local/etc/xray/config.json > /tmp/config.json
+        elif [[ "$prot" == "trojan" ]]; then
+            jq '(.inbounds[] | select(.protocol=="'$prot'") | .settings.clients[] | select(.email=="'$selected_user'") | .password) = "'$new_uuid'"' /usr/local/etc/xray/config.json > /tmp/config.json
+        fi
+        
+        if [ -s /tmp/config.json ]; then
+            mv /tmp/config.json /usr/local/etc/xray/config.json
+            systemctl restart xray
+            echo -e "\n=> UUID/Pass '$selected_user' diganti!"
+            sleep 2
+            show_detail "$prot" "$selected_user" "change_uuid"
+        else
+            echo -e "\n\e[31m[ERROR]\e[0m Gagal memproses JSON."
+            rm -f /tmp/config.json
+            sleep 2
+        fi
     else
-        read -p "Masukkan UUID Baru (Kosong=Random): " new_uuid
-        if [ -z "$new_uuid" ]; then new_uuid=$(cat /proc/sys/kernel/random/uuid); fi
+        echo -e "\n=> Pilihan tidak valid!"; sleep 1; change_protocol_uuid "$prot"
     fi
-
-    data="{\"uuidold\":\"$old_uuid\", \"uuidnew\":\"$new_uuid\"}"
-    call_api "change-uuid" "POST" "$data"
 }
 
 menu_change_uuid() {
     clear
+    echo "╔════════════════════════════════════╗"
+    echo "║        CHANGE UUID OR PASS         ║"
+    echo "╚════════════════════════════════════╝"
+    echo " 1. CHANGE FOR VMESS WS"
+    echo " 2. CHANGE FOR VLESS WS"
+    echo " 3. CHANGE FOR TROJAN WS"
+    echo "--------------------------------------"
+    echo " 0. Kembali"
     echo "======================================"
-    echo "      CHANGE UUID / PASSWORD XRAY     "
-    echo "======================================"
-    echo " 1. VMess"
-    echo " 2. VLess"
-    echo " 3. Trojan"
-    echo "======================================"
-    read -p " Pilih Protokol [1-3 or 0] : " opt
+    read -p " Pilih Opsi [1-3 or 0] : " opt
     case $opt in
         1) change_protocol_uuid "vmess" ;;
         2) change_protocol_uuid "vless" ;;
@@ -242,40 +527,34 @@ menu_change_uuid() {
     esac
 }
 
-# ==========================================
-# MAIN ROUTER MENU XRAY
-# ==========================================
 menu_xray() {
     XRAY_VER=$(/usr/local/bin/xray version 2>/dev/null | head -n 1 | awk '{print $1" "$2}')
     if [[ -z "$XRAY_VER" ]]; then XRAY_VER="Xray 24.11.11"; fi
     while true; do
         clear
         echo "╔════════════════════════════════════╗"
-        echo "║         MENU XRAY (SQLITE)         ║"
+        echo "║              MENU XRAY             ║"
         echo "╚════════════════════════════════════╝"
         echo " Versi: ${XRAY_VER}"
         echo "======================================"
         echo " 1. Create XRAY Account"
-        echo " 2. Create Trial Account (60M)"
-        echo "--------------------------------------"
-        echo " 3. Delete XRAY Account"
-        echo " 4. Renew XRAY Account"
-        echo " 5. List XRAY Account"
-        echo " 6. Detail XRAY Account"
-        echo " 7. Change UUID / Password"
+        echo " 2. Delete XRAY Account"
+        echo " 3. Renew XRAY Account"
+        echo " 4. List XRAY Account"
+        echo " 5. Detail XRAY Account"
+        echo " 6. Change UUID / Password"
         echo "--------------------------------------"
         echo " 0. Kembali ke Menu Utama"
         echo "======================================"
-        read -p " Pilih opsi [0-7]: " opt
+        read -p " Pilih opsi [0-6]: " opt
         case $opt in
-            1) add_xray ;;
-            2) add_trial_xray ;;
-            3) delete_xray ;;
-            4) renew_xray ;;
-            5) print_user_table ""; pause ;;
-            6) detail_xray ;;
-            7) menu_change_uuid ;;
-            0|x|X) break ;;
+            1) create_xray ;; 
+            2) delete_xray ;; 
+            3) renew_xray ;; 
+            4) list_xray ;;
+            5) detail_xray ;;
+            6) menu_change_uuid ;;
+            0) break ;;
             *) echo -e "\n=> Pilihan tidak valid!"; sleep 1 ;;
         esac
     done
