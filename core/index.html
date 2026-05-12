@@ -334,7 +334,10 @@
                 }
             } catch (err) {
                 localStorage.removeItem('srpcom_api_key');
-                document.getElementById('login-error').classList.remove('hidden');
+                const errMsg = document.getElementById('login-error');
+                // PERBAIKAN: Berikan pesan jelas bahwa API sedang di-OFF-kan
+                errMsg.innerHTML = `<i class="fas fa-exclamation-circle mr-1"></i> Akses Ditolak: API sedang di-OFF-kan atau API Key salah.`;
+                errMsg.classList.remove('hidden');
                 btn.innerHTML = originalBtnHtml;
                 btn.disabled = false;
             }
