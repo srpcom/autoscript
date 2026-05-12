@@ -524,7 +524,9 @@
             btn.disabled = true;
             btn.classList.add('opacity-75');
 
-            printToTerminal(`\n> Executing [${act.toUpperCase()}] on protocol [${prot.toUpperCase()}]...`, 'info');
+            // PERBAIKAN: Bersihkan terminal sebelum eksekusi perintah baru
+            document.getElementById('terminal-output').innerHTML = '';
+            printToTerminal(`> Executing [${act.toUpperCase()}] on protocol [${prot.toUpperCase()}]...`, 'info');
             
             await fetchAPI(endpoint, method, (act === 'list-accounts') ? null : payload);
             
@@ -536,7 +538,9 @@
         }
 
         async function executeMonitor(endpoint, method) {
-            printToTerminal(`\n> Requesting sistem monitor [${endpoint}]...`, 'info');
+            // PERBAIKAN: Bersihkan terminal sebelum menampilkan data monitor
+            document.getElementById('terminal-output').innerHTML = '';
+            printToTerminal(`> Requesting sistem monitor [${endpoint}]...`, 'info');
             await fetchAPI(`/user_legend/${endpoint}`, method);
         }
 
