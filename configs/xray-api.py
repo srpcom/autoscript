@@ -11,6 +11,7 @@ import urllib.request
 app = Flask(__name__)
 
 API_KEY_FILE = '/usr/local/etc/xray/api_key.conf'
+API_AUTH_FILE = '/usr/local/etc/xray/api_auth.conf'
 XRAY_CONF = '/usr/local/etc/xray/config.json'
 EXP_FILE = '/usr/local/etc/xray/expiry.txt'
 LIMIT_FILE = '/usr/local/etc/xray/limit.txt'
@@ -42,6 +43,20 @@ def get_api_key():
     except: return "DEFAULT_KEY"
 
 def check_auth():
+    # Baca status ON/OFF
+    auth_status = "OFF"
+    try:
+        if os.path.exists(API_AUTH_FILE):
+            with open(API_AUTH_FILE, 'r') as f:
+                auth_status = f.read().strip()
+    except:
+        pass
+        
+    # Jika status OFF, loloskan semua request (bypass auth)
+    if auth_status == "OFF":
+        return True
+        
+    # Jika status ON, verifikasi header x-api-key
     return request.headers.get('x-api-key') == get_api_key()
 
 def is_license_active():
