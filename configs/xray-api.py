@@ -1,29 +1,29 @@
 #!/usr/bin/env python3
 # ==========================================
 # xray-api.py
-# MODULE: PYTHON API BACKEND (MULTI-NODE SUPPORT)
+# MODULE: PYTHON API BACKEND (SQLITE VERSION - FULL FEATURES)
+# Menggabungkan fitur Auto-Send Telegram, Lisensi, dan Locking.
 # ==========================================
 
 from flask import Flask, request, jsonify
-import json, os, subprocess, uuid, datetime, base64
-import urllib.request
+import sqlite3, json, os, subprocess, uuid, datetime, base64, urllib.request
 
 app = Flask(__name__)
 
-API_KEY_FILE = '/usr/local/etc/xray/api_key.conf'
-API_AUTH_FILE = '/usr/local/etc/xray/api_auth.conf'
+# --- KONFIGURASI PATH ---
+DB_PATH = '/usr/local/etc/srpcom/database.db'
 XRAY_CONF = '/usr/local/etc/xray/config.json'
-EXP_FILE = '/usr/local/etc/xray/expiry.txt'
-LIMIT_FILE = '/usr/local/etc/xray/limit.txt'
-LOCKED_FILE = '/usr/local/etc/xray/locked.json'
+CHAP_SECRETS = '/etc/ppp/chap-secrets'
 ENV_FILE = '/usr/local/etc/srpcom/env.conf'
-BOT_CONF = '/usr/local/etc/xray/bot_setting.conf'
 LICENSE_FILE = '/usr/local/etc/srpcom/license.info'
 
-SSH_EXP = '/usr/local/etc/srpcom/ssh_expiry.txt'
-SSH_LIMIT = '/usr/local/etc/srpcom/ssh_limit.txt'
-L2TP_EXP = '/usr/local/etc/srpcom/l2tp_expiry.txt'
-CHAP_SECRETS = '/etc/ppp/chap-secrets'
+# ==========================================
+# FUNGSI HELPER DATABASE & SISTEM
+# ==========================================
+def get_db():
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    return conn
 
 def get_env(key):
     try:
@@ -31,74 +31,52 @@ def get_env(key):
             for line in f:
                 if line.startswith(f"{key}="):
                     return line.split('=', 1)[1].strip().strip('"').strip("'")
-    except: return "UNKNOWN"
+    except: pass
     return "UNKNOWN"
 
 DOMAIN = get_env("DOMAIN")
 IP_ADD = get_env("IP_ADD")
 
-def get_api_key():
+def get_setting(key_name, default_val=""):
     try:
-        with open(API_KEY_FILE, 'r') as f: return f.read().strip()
-    except: return "DEFAULT_KEY"
+        conn = get_db()
+        c = conn.cursor()
+        c.execute("SELECT key_value FROM system_settings WHERE key_name=?", (key_name,))
+        row = c.fetchone()
+        if row: return row['key_value']
+    except: pass
+    return default_val
 
 def check_auth():
-    # Baca status ON/OFF
-    auth_status = "OFF"
-    try:
-        if os.path.exists(API_AUTH_FILE):
-            with open(API_AUTH_FILE, 'r') as f:
-                auth_status = f.read().strip()
-    except:
-        pass
-        
-    # Jika status OFF, loloskan semua request (bypass auth)
-    if auth_status == "OFF":
-        return True
-        
-    # Jika status ON, verifikasi header x-api-key
-    return request.headers.get('x-api-key') == get_api_key()
+    auth_status = get_setting('api_auth', 'OFF')
+    if auth_status == 'OFF': return True
+    api_key_header = request.headers.get('x-api-key')
+    real_key = get_setting('api_key', 'SANGATRAHASIA123')
+    return api_key_header == real_key
 
 def is_license_active():
     try:
         if os.path.exists(LICENSE_FILE):
             with open(LICENSE_FILE, 'r') as f:
-                content = f.read()
-                if 'STATUS="EXPIRED"' in content:
-                    return False
-    except:
-        pass
+                if 'STATUS="EXPIRED"' in f.read(): return False
+    except: pass
     return True
 
 @app.before_request
 def check_license_lock():
-    # Mencegat semua request yang merubah database (add, del, renew, trial, lock, change)
+    # Cegah eksekusi penambahan/perubahan jika lisensi mati (Sesuai fitur lama)
     if request.method in ['POST', 'DELETE']:
-        mutating_paths = ['/add-', '/del-', '/renew-', '/trial-', '/lock-', '/change-uuid']
+        mutating_paths = ['/add', '/del', '/renew', '/trial', '/lock', '/change-uuid']
         if any(p in request.path for p in mutating_paths):
             if not is_license_active():
                 return jsonify({"stdout": "❌ AKSES DITOLAK: Masa aktif Lisensi Autoscript untuk Node Server ini telah habis. Eksekusi dibatalkan."}), 403
 
-def load_json(p):
-    if not os.path.exists(p): return {}
-    with open(p, 'r') as f: return json.load(f)
-
-def save_json(p, d):
-    with open(p, 'w') as f: json.dump(d, f, indent=2)
-
-def restart_xray(): subprocess.run(['systemctl', 'restart', 'xray'])
-def restart_l2tp(): subprocess.run(['systemctl', 'restart', 'ipsec', 'xl2tpd'])
-
 def send_telegram(text):
+    """Mengirim notifikasi ke Telegram langsung dari API (Sesuai fitur lama)"""
     try:
-        bot_token, chat_id, autosend = "", "", "OFF"
-        if os.path.exists(BOT_CONF):
-            with open(BOT_CONF, 'r') as f:
-                for line in f:
-                    line = line.strip()
-                    if line.startswith('BOT_TOKEN='): bot_token = line.split('=', 1)[1].strip('"').strip("'")
-                    elif line.startswith('CHAT_ID='): chat_id = line.split('=', 1)[1].strip('"').strip("'")
-                    elif line.startswith('AUTOSEND_STATUS='): autosend = line.split('=', 1)[1].strip('"').strip("'")
+        bot_token = get_setting('bot_token')
+        chat_id = get_setting('admin_id')
+        autosend = get_setting('bot_autosend', 'OFF')
 
         if autosend == "ON" and bot_token and chat_id:
             url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
@@ -107,632 +85,258 @@ def send_telegram(text):
             urllib.request.urlopen(req, timeout=5)
     except: pass
 
-def remove_from_txt(filepath, user):
-    if not os.path.exists(filepath): return
-    with open(filepath, "r") as f: lines = f.readlines()
-    with open(filepath, "w") as f:
-        for line in lines:
-            if not line.startswith(user + " "): f.write(line)
-
 # ==========================================
-# REMOTE NODE FEATURES (MONITOR, LIST, BACKUP)
+# FUNGSI SINKRONISASI KE CONFIG OS
 # ==========================================
-@app.route('/user_legend/list-accounts/<protocol>', methods=['GET'])
-def list_accounts(protocol):
-    if not check_auth(): return jsonify({"stdout": "Unauthorized"}), 401
-    result = []
-    if protocol in ['vmess', 'vless', 'trojan']:
-        cfg = load_json(XRAY_CONF)
-        target_users = []
+def sync_xray_config():
+    if not os.path.exists(XRAY_CONF): return
+    try:
+        with open(XRAY_CONF, 'r') as f: cfg = json.load(f)
+        conn = get_db()
+        c = conn.cursor()
+        
         for ib in cfg.get('inbounds', []):
-            if ib.get('protocol') == protocol:
-                for c in ib['settings'].get('clients', []):
-                    email = c.get('email')
-                    if email: target_users.append(email)
-        exp_data = {}
-        if os.path.exists(EXP_FILE):
-            with open(EXP_FILE, 'r') as f:
-                for line in f:
-                    p = line.strip().split()
-                    if len(p) >= 2: exp_data[p[0]] = p[1]
-        for u in target_users:
-            exp = exp_data.get(u, "Lifetime")
-            result.append(f"• `{u}` (Exp: {exp})")
-    elif protocol == 'ssh' and os.path.exists(SSH_EXP):
-        with open(SSH_EXP, 'r') as f:
-            for line in f:
-                p = line.strip().split()
-                if len(p) >= 3: result.append(f"• `{p[0]}` (Exp: {p[2]})")
-    elif protocol == 'l2tp' and os.path.exists(L2TP_EXP):
-        with open(L2TP_EXP, 'r') as f:
-            for line in f:
-                p = line.strip().split()
-                if len(p) >= 3: result.append(f"• `{p[0]}` (Exp: {p[2]})")
+            if ib.get('protocol') in ['vmess', 'vless', 'trojan']:
+                ib['settings']['clients'] = []
+                prot_map = {'vmess': 'vmessws', 'vless': 'vlessws', 'trojan': 'trojanws'}
+                db_prot = prot_map.get(ib.get('protocol'))
+                
+                # Hanya sinkronisasi user yang aktif (yang locked diabaikan/dihapus dari config memori)
+                c.execute("SELECT username, uuid_pass FROM vpn_accounts WHERE protocol=? AND status='active'", (db_prot,))
+                users = c.fetchall()
+                
+                for u in users:
+                    if ib.get('protocol') in ['vmess', 'vless']:
+                        ib['settings']['clients'].append({"id": u['uuid_pass'], "email": u['username']})
+                    elif ib.get('protocol') == 'trojan':
+                        ib['settings']['clients'].append({"password": u['uuid_pass'], "email": u['username']})
+                        
+        with open(XRAY_CONF, 'w') as f: json.dump(cfg, f, indent=2)
+        subprocess.run(['systemctl', 'restart', 'xray'], capture_output=True)
+    except: pass
 
-    if not result:
-        return jsonify({"stdout": f"Belum ada akun aktif untuk protokol {protocol.upper()}."})
-    text = f"📋 *LIST ACCOUNT {protocol.upper()}*\n━━━━━━━━━━━━━━━━━━━━\n" + "\n".join(result)
-    return jsonify({"stdout": text})
-
-@app.route('/user_legend/monitor-xray', methods=['GET'])
-def monitor_xray():
-    if not check_auth(): return jsonify({"stdout": "Unauthorized"}), 401
+def sync_l2tp_config():
     try:
-        ip_data = {}
-        if os.path.exists('/var/log/xray/access.log'):
+        conn = get_db()
+        c = conn.cursor()
+        c.execute("SELECT username, uuid_pass FROM vpn_accounts WHERE protocol='l2tp' AND status='active'")
+        users = c.fetchall()
+        with open(CHAP_SECRETS, 'w') as f:
+            for u in users: f.write(f'"{u["username"]}" l2tpd "{u["uuid_pass"]}" *\n')
+        subprocess.run(['systemctl', 'restart', 'ipsec', 'xl2tpd'], capture_output=True)
+    except: pass
+
+def manage_ssh_os(username, password, exp_date_str, action='add'):
+    try:
+        if action == 'add':
+            exp_date = exp_date_str.split(' ')[0]
+            subprocess.run(['useradd', '-e', exp_date, '-s', '/bin/false', '-M', username])
+            proc = subprocess.Popen(['chpasswd'], stdin=subprocess.PIPE, text=True)
+            proc.communicate(f"{username}:{password}")
+        elif action == 'del':
+            subprocess.run(['userdel', '-f', username])
+        elif action == 'renew':
+            exp_date = exp_date_str.split(' ')[0]
+            subprocess.run(['chage', '-E', exp_date, username])
+    except: pass
+
+# ==========================================
+# ENDPOINTS API (ROUTING & LOGIC)
+# ==========================================
+
+@app.route('/user_legend/<action>-<protocol>', methods=['GET', 'POST', 'DELETE'])
+def handle_vpn_request(action, protocol):
+    if not check_auth(): return jsonify({"stdout": "❌ Unauthorized. API Key Invalid."}), 401
+    
+    data = request.json or {}
+    conn = get_db()
+    c = conn.cursor()
+    now = datetime.datetime.now()
+
+    try:
+        # ------------------------------------------------
+        # 1. CREATE ACCOUNT (ADD / TRIAL)
+        # ------------------------------------------------
+        if action in ['add', 'trial']:
+            username = data.get('user')
+            if action == 'trial':
+                username = f"trial-{now.strftime('%m%d%H%M')}"
+                exp_days = 0
+                exp_time = now + datetime.timedelta(hours=1)
+                limit_ip = 1
+                limit_quota = 1 if 'ws' in protocol else 0
+            else:
+                if not username: return jsonify({"stdout": "❌ Error: Username diperlukan."})
+                exp_days = int(data.get('exp', 30))
+                limit_ip = int(data.get('limit_ip', 0))
+                limit_quota = int(data.get('limit_quota', 0))
+                exp_time = now + datetime.timedelta(days=exp_days)
+            
+            exp_str = exp_time.strftime('%Y-%m-%d %H:%M:%S')
+            
+            if protocol in ['vmessws', 'vlessws']: uuid_pass = str(uuid.uuid4())
+            elif protocol == 'trojanws': uuid_pass = str(uuid.uuid4())[:8]
+            else: uuid_pass = data.get('password', '1') if action == 'trial' else data.get('password', 'rahasia')
+
             try:
-                out = subprocess.run(['tail', '-n', '3000', '/var/log/xray/access.log'], capture_output=True, text=True)
-                for line in out.stdout.splitlines():
-                    if 'accepted' in line and '127.0.0.1' not in line:
-                        parts = line.split()
-                        if len(parts) >= 7:
-                            user, ip = parts[6], parts[2].replace('tcp:', '').replace('udp:', '').split(':')[0]
-                            if user not in ip_data: ip_data[user] = set()
-                            ip_data[user].add(ip)
-            except: pass
+                c.execute('''INSERT INTO vpn_accounts (username, uuid_pass, protocol, expired_at, limit_ip, limit_quota)
+                             VALUES (?, ?, ?, ?, ?, ?)''', (username, uuid_pass, protocol, exp_str, limit_ip, limit_quota))
+                conn.commit()
+            except sqlite3.IntegrityError:
+                return jsonify({"stdout": f"❌ Error: Username '{username}' sudah ada di protokol {protocol.upper()}!"})
 
-        stats = {}
-        try:
-            out = subprocess.run(['/usr/local/bin/xray', 'api', 'statsquery', '--server=127.0.0.1:10085'], capture_output=True, text=True)
-            for item in json.loads(out.stdout).get('stat', []):
-                np = item['name'].split('>>>')
-                if len(np) >= 4 and np[0] == 'user':
-                    user, t_type = np[1], np[3]
-                    if user not in stats: stats[user] = {'downlink': 0, 'uplink': 0}
-                    stats[user][t_type] = item.get('value', 0)
-        except: pass
+            if protocol in ['vmessws', 'vlessws', 'trojanws']: sync_xray_config()
+            elif protocol == 'ssh': manage_ssh_os(username, uuid_pass, exp_str, 'add')
+            elif protocol == 'l2tp': sync_l2tp_config()
 
-        limits = {}
-        if os.path.exists(LIMIT_FILE):
-            with open(LIMIT_FILE, 'r') as f:
-                for line in f:
-                    p = line.strip().split()
-                    if len(p) >= 3: limits[p[0]] = {'ip': int(p[1]), 'quota': int(p[2])}
-
-        all_users = set(list(stats.keys()) + list(ip_data.keys()))
-        if not all_users: return jsonify({"stdout": "Belum ada data pemakaian Xray."})
-
-        res = "📈 *XRAY MONITORING*\n━━━━━━━━━━━━━━━━━━━━\n"
-        for u in sorted(all_users):
-            active_ips = len(ip_data.get(u, set()))
-            lim_ip = limits.get(u, {}).get('ip', 0)
-            lim_ip_str = str(lim_ip) if lim_ip > 0 else 'Unli'
+            # Format Pesan Output & Telegram (Sesuai fitur lama)
+            trial_txt = " TRIAL" if action == 'trial' else ""
+            lim_ip_str = f"{limit_ip} IP" if limit_ip > 0 else "Unlimited"
+            lim_q_str = f"{limit_quota} GB" if limit_quota > 0 else "Unlimited"
             
-            tot_gb = ((stats.get(u, {}).get('downlink', 0) + stats.get(u, {}).get('uplink', 0)) / 1048576) / 1024
-            lim_q = limits.get(u, {}).get('quota', 0)
-            lim_q_str = f"{lim_q} GB" if lim_q > 0 else 'Unli'
+            if protocol == 'vmessws':
+                tls_dict = {"v":"2","ps":username,"add":DOMAIN,"port":"443","id":uuid_pass,"aid":"0","net":"ws","type":"none","host":DOMAIN,"path":"/vmessws","tls":"tls","sni":DOMAIN}
+                none_tls_dict = {"v":"2","ps":username,"add":DOMAIN,"port":"80","id":uuid_pass,"aid":"0","net":"ws","type":"none","host":DOMAIN,"path":"/vmessws","tls":"","sni":""}
+                link_tls = "vmess://" + base64.b64encode(json.dumps(tls_dict, separators=(',', ':')).encode('utf-8')).decode('utf-8')
+                link_none = "vmess://" + base64.b64encode(json.dumps(none_tls_dict, separators=(',', ':')).encode('utf-8')).decode('utf-8')
+                msg_tg = f"━━━━━━━━━━━━━━━━━━━━\n❖ XRAY/VMESS WS{trial_txt} ❖\n━━━━━━━━━━━━━━━━━━━━\nRemarks : `{username}`\nIP Address : {IP_ADD}\nDomain : {DOMAIN}\nPort TLS : 443\nPort NONE-TLS : 80\nID : `{uuid_pass}`\nNetwork : Websocket\nWebsocket Path : /vmessws\n━━━━━━━━━━━━━━━━━━━━\nLimit IP : {lim_ip_str}\nLimit Kuota : {lim_q_str}\n━━━━━━━━━━━━━━━━━━━━\nLINK WS TLS : `{link_tls}`\n━━━━━━━━━━━━━━━━━━━━\nLINK WS NONE-TLS : `{link_none}`\n━━━━━━━━━━━━━━━━━━━━\nExpired On : {exp_str} WIB"
             
-            res += f"👤 *{u}*\n├ IP Aktif : {active_ips} / {lim_ip_str}\n└ Kuota : {tot_gb:.2f} GB / {lim_q_str}\n\n"
-        return jsonify({"stdout": res})
-    except Exception as e: return jsonify({"stdout": f"Error: {e}"})
+            elif protocol == 'vlessws':
+                link_tls = f"vless://{uuid_pass}@{DOMAIN}:443?path=/vlessws&security=tls&encryption=none&host={DOMAIN}&type=ws&sni={DOMAIN}#{username}"
+                link_none = f"vless://{uuid_pass}@{DOMAIN}:80?path=/vlessws&security=none&encryption=none&host={DOMAIN}&type=ws#{username}"
+                msg_tg = f"━━━━━━━━━━━━━━━━━━━━\n❖ XRAY/VLESS WS{trial_txt} ❖\n━━━━━━━━━━━━━━━━━━━━\nRemarks : `{username}`\nIP Address : {IP_ADD}\nDomain : {DOMAIN}\nPort TLS : 443\nPort NONE-TLS : 80\nID : `{uuid_pass}`\nNetwork : Websocket\nWebsocket Path : /vlessws\n━━━━━━━━━━━━━━━━━━━━\nLimit IP : {lim_ip_str}\nLimit Kuota : {lim_q_str}\n━━━━━━━━━━━━━━━━━━━━\nLINK WS TLS : `{link_tls}`\n━━━━━━━━━━━━━━━━━━━━\nLINK WS NONE-TLS : `{link_none}`\n━━━━━━━━━━━━━━━━━━━━\nExpired On : {exp_str} WIB"
+            
+            elif protocol == 'trojanws':
+                link_tls = f"trojan://{uuid_pass}@{DOMAIN}:443?path=/trojanws&security=tls&host={DOMAIN}&type=ws&sni={DOMAIN}#{username}"
+                msg_tg = f"━━━━━━━━━━━━━━━━━━━━\n❖ XRAY/TROJAN WS{trial_txt} ❖\n━━━━━━━━━━━━━━━━━━━━\nRemarks : `{username}`\nIP Address : {IP_ADD}\nDomain : {DOMAIN}\nPort TLS : 443\nPassword : `{uuid_pass}`\nNetwork : Websocket\nWebsocket Path : /trojanws\n━━━━━━━━━━━━━━━━━━━━\nLimit IP : {lim_ip_str}\nLimit Kuota : {lim_q_str}\n━━━━━━━━━━━━━━━━━━━━\nLINK WS TLS : `{link_tls}`\n━━━━━━━━━━━━━━━━━━━━\nExpired On : {exp_str} WIB"
+            
+            elif protocol == 'ssh':
+                msg_tg = f"━━━━━━━━━━━━━━━━━━━━\n❖ SSH & OVPN ACCOUNT{trial_txt} ❖\n━━━━━━━━━━━━━━━━━━━━\nRemarks : `{username}`\nIP Address : {IP_ADD}\nDomain : {DOMAIN}\nUsername : `{username}`\nPassword : `{uuid_pass}`\n━━━━━━━━━━━━━━━━━━━━\nPort OpenSSH : 22\nPort Dropbear : 109, 143\nPort SSH-WS TLS : 443\nPort SSH-WS NTLS : 80\nPort OVPN UDP : 2200\nPort OVPN TCP : 1194\n━━━━━━━━━━━━━━━━━━━━\nLimit IP : {lim_ip_str}\n━━━━━━━━━━━━━━━━━━━━\nLINK OVPN UDP : `http://{DOMAIN}/ovpn/udp.ovpn`\nLINK OVPN TCP : `http://{DOMAIN}/ovpn/tcp.ovpn`\n━━━━━━━━━━━━━━━━━━━━\nExpired On : {exp_str} WIB"
+            
+            elif protocol == 'l2tp':
+                msg_tg = f"━━━━━━━━━━━━━━━━━━━━\n❖ L2TP / IPsec VPN{trial_txt} ❖\n━━━━━━━━━━━━━━━━━━━━\nRemarks : `{username}`\nIP Address : {IP_ADD}\nDomain : {DOMAIN}\nIPsec PSK : `srpcom_vpn`\nUsername : `{username}`\nPassword : `{uuid_pass}`\n━━━━━━━━━━━━━━━━━━━━\nExpired On : {exp_str} WIB"
 
-@app.route('/user_legend/monitor-ssh', methods=['GET'])
-def monitor_ssh():
+            out = msg_tg.replace('`', '') # Versi tanpa backtick untuk terminal
+            send_telegram(msg_tg)
+            return jsonify({"stdout": out, "stdout_tg": msg_tg})
+
+        # ------------------------------------------------
+        # 2. DELETE ACCOUNT (DEL)
+        # ------------------------------------------------
+        elif action == 'del':
+            username = data.get('user')
+            if not username: return jsonify({"stdout": "❌ Error: Username diperlukan."})
+            
+            c.execute("DELETE FROM vpn_accounts WHERE username=? AND protocol=?", (username, protocol))
+            if c.rowcount == 0: return jsonify({"stdout": f"❌ Error: Username '{username}' tidak ditemukan!"})
+            conn.commit()
+            
+            if protocol in ['vmessws', 'vlessws', 'trojanws']: sync_xray_config()
+            elif protocol == 'ssh': manage_ssh_os(username, '', '', 'del')
+            elif protocol == 'l2tp': sync_l2tp_config()
+            
+            return jsonify({"stdout": f"✅ Akun {username} berhasil dihapus dari {protocol.upper()}!"})
+
+        # ------------------------------------------------
+        # 3. RENEW ACCOUNT
+        # ------------------------------------------------
+        elif action == 'renew':
+            username = data.get('user')
+            add_days = int(data.get('exp', 30))
+            
+            c.execute("SELECT expired_at, status FROM vpn_accounts WHERE username=? AND protocol=?", (username, protocol))
+            row = c.fetchone()
+            if not row: return jsonify({"stdout": f"❌ Error: Username '{username}' tidak ditemukan!"})
+            
+            curr_exp = row['expired_at']
+            curr_dt = now if curr_exp == "Lifetime" else datetime.datetime.strptime(curr_exp, '%Y-%m-%d %H:%M:%S')
+            new_exp_str = (curr_dt + datetime.timedelta(days=add_days)).strftime('%Y-%m-%d %H:%M:%S')
+            
+            # Renew juga akan otomatis membuka Lock
+            c.execute("UPDATE vpn_accounts SET expired_at=?, status='active' WHERE username=? AND protocol=?", (new_exp_str, username, protocol))
+            conn.commit()
+            
+            if protocol == 'ssh':
+                manage_ssh_os(username, '', new_exp_str, 'renew')
+                subprocess.run(['usermod', '-U', username], capture_output=True) # Unlock user OS
+            elif protocol in ['vmessws', 'vlessws', 'trojanws', 'l2tp']:
+                if row['status'] == 'locked': # Jika sebelumnya dikunci, maka restart core agar masuk lagi
+                    if 'ws' in protocol: sync_xray_config()
+                    else: sync_l2tp_config()
+            
+            return jsonify({"stdout": f"✅ Akun {username} diperpanjang {add_days} hari (Status: ACTIVE).\nExpired Baru: {new_exp_str} WIB"})
+
+        # ------------------------------------------------
+        # 4. DETAIL ACCOUNT
+        # ------------------------------------------------
+        elif action == 'detail':
+            username = data.get('user')
+            c.execute("SELECT * FROM vpn_accounts WHERE username=? AND protocol=?", (username, protocol))
+            row = c.fetchone()
+            if not row: return jsonify({"stdout": f"❌ Error: Username '{username}' tidak ditemukan!"})
+            
+            out = f"━━━━━━━━━━━━━━━━━━━━\n🔍 DETAIL AKUN {protocol.upper()}\n━━━━━━━━━━━━━━━━━━━━\n"
+            out += f"Domain    : {DOMAIN}\nUsername  : {row['username']}\nPassword  : {row['uuid_pass']}\n"
+            out += f"Status    : {row['status'].upper()}\nExpired   : {row['expired_at']} WIB\n━━━━━━━━━━━━━━━━━━━━\n"
+            return jsonify({"stdout": out})
+
+    except Exception as e:
+        return jsonify({"stdout": f"❌ Terjadi Kesalahan Internal: {str(e)}"})
+
+# ==========================================
+# ENDPOINTS SISTEM, MONITORING & KONTROL LAMA
+# ==========================================
+
+@app.route('/user_legend/list-accounts', methods=['GET'])
+def list_accounts():
     if not check_auth(): return jsonify({"stdout": "Unauthorized"}), 401
-    try:
-        res = "💻 *SSH MONITORING*\n━━━━━━━━━━━━━━━━━━━━\n"
-        out = subprocess.run('netstat -tnpa', shell=True, capture_output=True, text=True)
-        active_users = []
-        for line in out.stdout.splitlines():
-            if 'ESTABLISHED' in line and ('dropbear' in line or 'sshd' in line):
-                parts = line.split()
-                if len(parts) >= 7:
-                    pid = parts[6].split('/')[0]
-                    ip = parts[4].split(':')[0]
-                    try:
-                        u_out = subprocess.run(['ps', '-o', 'user=', '-p', pid], capture_output=True, text=True)
-                        user = u_out.stdout.strip()
-                        if user and user != 'root': active_users.append(f"👤 `{user}` | 🌐 {ip}")
-                    except: pass
-        if not active_users: return jsonify({"stdout": res + "Belum ada user aktif."})
-        return jsonify({"stdout": res + "\n".join(active_users)})
-    except Exception as e: return jsonify({"stdout": f"Error: {e}"})
+    conn = get_db()
+    c = conn.cursor()
+    c.execute("SELECT username, protocol, expired_at, status FROM vpn_accounts ORDER BY protocol ASC")
+    rows = c.fetchall()
+    if not rows: return jsonify({"stdout": "📋 Database kosong. Belum ada akun."})
+    
+    out = "📋 DAFTAR SEMUA AKUN VPN\n━━━━━━━━━━━━━━━━━━━━\n"
+    for r in rows: out += f"- [{r['protocol'].upper()}] {r['username']} (Exp: {r['expired_at'].split(' ')[0]}) [{r['status'].upper()}]\n"
+    return jsonify({"stdout": out})
+
+@app.route('/user_legend/cek-xray', methods=['GET'])
+def cek_status():
+    if not check_auth(): return jsonify({"stdout": "Unauthorized"}), 401
+    out = subprocess.run(['systemctl', 'is-active', 'xray'], capture_output=True, text=True).stdout.strip()
+    return jsonify({"stdout": f"✅ Status Layanan Aktif\nXray Core: {out.upper()}\nDomain: {DOMAIN}"})
 
 @app.route('/user_legend/sys-backup', methods=['GET'])
 def sys_backup():
     if not check_auth(): return jsonify({"stdout": "Unauthorized"}), 401
-    now_str = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-    backup_file = f"/tmp/srpcom-backup-{now_str}.tar.gz"
-    files = [XRAY_CONF, EXP_FILE, LIMIT_FILE, L2TP_EXP, SSH_EXP, SSH_LIMIT, CHAP_SECRETS]
-    valid = [f for f in files if os.path.exists(f)]
-    if valid:
-        subprocess.run(['tar', '-czf', backup_file, '-C', '/'] + [f.lstrip('/') for f in valid])
-        with open(backup_file, 'rb') as doc:
-            encoded = base64.b64encode(doc.read()).decode('utf-8')
-        os.remove(backup_file)
-        return jsonify({"filename": f"srpcom-backup-{now_str}.tar.gz", "data": encoded})
-    return jsonify({"stdout": "Tidak ada data untuk dibackup."})
+    try:
+        with open(DB_PATH, "rb") as f: encoded = base64.b64encode(f.read()).decode('utf-8')
+        return jsonify({"stdout": "✅ Proses kompresi database.db berhasil.", "data": encoded, "filename": f"srpcom-db-{datetime.datetime.now().strftime('%m%d')}.sqlite"})
+    except Exception as e:
+         return jsonify({"stdout": f"❌ Gagal membackup: {e}"})
 
-# ==========================================
-# XRAY ENDPOINTS
-# ==========================================
-def generate_account_detail(protocol, user, uid, exp_date_str, is_trial=False, limit_ip=0, limit_quota=0):
-    trial_txt = " TRIAL" if is_trial else ""
-    lim_ip_str = f"{limit_ip} IP" if limit_ip > 0 else "Unlimited"
-    lim_q_str = f"{limit_quota} GB" if limit_quota > 0 else "Unlimited"
-    
-    if protocol == 'vmess':
-        tls_dict = {"v":"2","ps":user,"add":DOMAIN,"port":"443","id":uid,"aid":"0","net":"ws","type":"none","host":DOMAIN,"path":"/vmessws","tls":"tls","sni":DOMAIN}
-        none_tls_dict = {"v":"2","ps":user,"add":DOMAIN,"port":"80","id":uid,"aid":"0","net":"ws","type":"none","host":DOMAIN,"path":"/vmessws","tls":"","sni":""}
-        link_tls = "vmess://" + base64.b64encode(json.dumps(tls_dict, separators=(',', ':')).encode('utf-8')).decode('utf-8')
-        link_none = "vmess://" + base64.b64encode(json.dumps(none_tls_dict, separators=(',', ':')).encode('utf-8')).decode('utf-8')
-    elif protocol == 'vless':
-        link_tls = f"vless://{uid}@{DOMAIN}:443?path=/vlessws&security=tls&encryption=none&host={DOMAIN}&type=ws&sni={DOMAIN}#{user}"
-        link_none = f"vless://{uid}@{DOMAIN}:80?path=/vlessws&security=none&encryption=none&host={DOMAIN}&type=ws#{user}"
-    elif protocol == 'trojan':
-        link_tls = f"trojan://{uid}@{DOMAIN}:443?path=/trojanws&security=tls&host={DOMAIN}&type=ws&sni={DOMAIN}#{user}"
-        link_none = ""
-
-    msg_cli = (
-        f"━━━━━━━━━━━━━━━━━━━━\n❖ XRAY/{protocol.upper()} WS{trial_txt} ❖\n━━━━━━━━━━━━━━━━━━━━\n"
-        f"Remarks : {user}\nIP Address : {IP_ADD}\nDomain : {DOMAIN}\n"
-        f"Port TLS : 443\nPort NONE-TLS : 80\n{'Password' if protocol == 'trojan' else 'ID'} : {uid}\n"
-        f"Network : Websocket\nWebsocket Path : /{protocol}ws\n━━━━━━━━━━━━━━━━━━━━\n"
-        f"Limit IP : {lim_ip_str}\nLimit Kuota : {lim_q_str}\n━━━━━━━━━━━━━━━━━━━━\n"
-        f"LINK WS TLS : {link_tls}\n{'━━━━━━━━━━━━━━━━━━━━' if protocol != 'trojan' else ''}\n"
-        f"{'LINK WS NONE-TLS : ' + link_none if protocol != 'trojan' else ''}\n"
-        f"━━━━━━━━━━━━━━━━━━━━\nExpired On : {exp_date_str} WIB"
-    )
-
-    msg_tg = (
-        f"━━━━━━━━━━━━━━━━━━━━\n❖ XRAY/{protocol.upper()} WS{trial_txt} ❖\n━━━━━━━━━━━━━━━━━━━━\n"
-        f"Remarks : `{user}`\nIP Address : {IP_ADD}\nDomain : {DOMAIN}\n"
-        f"Port TLS : 443\nPort NONE-TLS : 80\n{'Password' if protocol == 'trojan' else 'ID'} : `{uid}`\n"
-        f"Network : Websocket\nWebsocket Path : /{protocol}ws\n━━━━━━━━━━━━━━━━━━━━\n"
-        f"Limit IP : {lim_ip_str}\nLimit Kuota : {lim_q_str}\n━━━━━━━━━━━━━━━━━━━━\n"
-        f"LINK WS TLS : `{link_tls}`\n{'━━━━━━━━━━━━━━━━━━━━' if protocol != 'trojan' else ''}\n"
-        f"{'LINK WS NONE-TLS : `' + link_none + '`' if protocol != 'trojan' else ''}\n"
-        f"━━━━━━━━━━━━━━━━━━━━\nExpired On : {exp_date_str} WIB"
-    )
-    
-    return msg_cli, msg_tg
-
-@app.route('/user_legend/add-<protocol>ws', methods=['POST'])
-def add_user(protocol):
+# MENGEMBALIKAN FITUR LOCK (AUTOKILL) YANG HILANG
+@app.route('/user_legend/lock-<protocol>', methods=['POST', 'GET'])
+def lock_account(protocol):
     if not check_auth(): return jsonify({"stdout": "Unauthorized"}), 401
-    data = request.json or {}
-    user, exp = data.get('user'), int(data.get('exp', 30))
-    limit_ip, limit_quota = int(data.get('limit_ip', 0)), int(data.get('limit_quota', 0))
-    if not user: return jsonify({"stdout": "Error: User required"}), 400
-    uid = str(uuid.uuid4())
-    dt = datetime.datetime.now() + datetime.timedelta(days=exp)
-    cfg = load_json(XRAY_CONF)
-    for ib in cfg.get('inbounds', []):
-        if ib.get('protocol') == protocol:
-            cls = ib['settings']['clients']
-            if protocol == 'trojan': cls.append({'password': uid, 'email': user})
-            else:
-                c = {'id': uid, 'email': user}
-                if protocol == 'vmess': c['alterId'] = 0
-                cls.append(c)
-    save_json(XRAY_CONF, cfg)
-    dt_str = dt.strftime('%Y-%m-%d %H:%M:%S')
-    with open(EXP_FILE, 'a') as f: f.write(f"{user} {dt_str}\n")
-    with open(LIMIT_FILE, 'a') as f: f.write(f"{user} {limit_ip} {limit_quota}\n")
-    restart_xray()
-    
-    msg_cli, msg_tg = generate_account_detail(protocol, user, uid, dt_str, False, limit_ip, limit_quota)
-    send_telegram(msg_tg)
-    return jsonify({"stdout": msg_cli, "stdout_tg": msg_tg})
-
-@app.route('/user_legend/trial-<protocol>ws', methods=['POST'])
-def trial_user(protocol):
-    if not check_auth(): return jsonify({"stdout": "Unauthorized"}), 401
-    data = request.json or {}
-    
-    # PERBAIKAN: Mengabaikan nilai exp dari request, dan memaksanya menjadi 60 menit untuk semua trial
-    exp_min = 60 
-    limit_ip = int(data.get('limit_ip', 1))
-    
-    user = f"trialsrp-{datetime.datetime.now().strftime('%m%d%H%M')}"
-    uid = str(uuid.uuid4())
-    dt = datetime.datetime.now() + datetime.timedelta(minutes=exp_min)
-    cfg = load_json(XRAY_CONF)
-    for ib in cfg.get('inbounds', []):
-        if ib.get('protocol') == protocol:
-            cls = ib['settings']['clients']
-            if protocol == 'trojan': cls.append({'password': uid, 'email': user})
-            else:
-                c = {'id': uid, 'email': user}
-                if protocol == 'vmess': c['alterId'] = 0
-                cls.append(c)
-    save_json(XRAY_CONF, cfg)
-    dt_str = dt.strftime('%Y-%m-%d %H:%M:%S')
-    with open(EXP_FILE, 'a') as f: f.write(f"{user} {dt_str}\n")
-    with open(LIMIT_FILE, 'a') as f: f.write(f"{user} {limit_ip} 1\n")
-    restart_xray()
-    
-    msg_cli, msg_tg = generate_account_detail(protocol, user, uid, dt_str, True, limit_ip, 1)
-    send_telegram(msg_tg)
-    return jsonify({"stdout": msg_cli, "stdout_tg": msg_tg})
-
-@app.route('/user_legend/detail-<protocol>ws', methods=['GET', 'POST'])
-def detail_user(protocol):
-    if not check_auth(): return jsonify({"stdout": "Unauthorized"}), 401
-    user = (request.json or {}).get('user')
-    cfg = load_json(XRAY_CONF)
-    uid = None
-    for ib in cfg.get('inbounds', []):
-        if ib.get('protocol') == protocol:
-            for c in ib['settings']['clients']:
-                if c.get('email') == user:
-                    uid = c.get('id') if protocol != 'trojan' else c.get('password')
-                    break
-    if uid:
-        exp_date_str, limit_ip, limit_q = "Lifetime", 0, 0
-        if os.path.exists(EXP_FILE):
-            with open(EXP_FILE, 'r') as f:
-                for line in f:
-                    if line.startswith(user + ' '): exp_date_str = line.strip().split(' ', 1)[1]; break
-        if os.path.exists(LIMIT_FILE):
-            with open(LIMIT_FILE, 'r') as f:
-                for line in f:
-                    if line.startswith(user + ' '):
-                        p = line.strip().split()
-                        if len(p) >= 3: limit_ip, limit_q = int(p[1]), int(p[2]); break
-                        
-        msg_cli, msg_tg = generate_account_detail(protocol, user, uid, exp_date_str, False, limit_ip, limit_q)
-        return jsonify({"stdout": msg_cli, "stdout_tg": msg_tg})
-    return jsonify({"stdout": f"Error: User {user} tidak ditemukan!"})
-
-@app.route('/user_legend/del-<protocol>ws', methods=['DELETE', 'POST'])
-def del_user(protocol):
-    if not check_auth(): return jsonify({"stdout": "Unauthorized"}), 401
-    user = (request.json or {}).get('user')
-    if not user: return jsonify({"stdout": "Error: User required"}), 400
-    cfg = load_json(XRAY_CONF)
-    found = False
-    for ib in cfg.get('inbounds', []):
-        if ib.get('protocol') == protocol:
-            cls = ib['settings'].get('clients', [])
-            ib['settings']['clients'] = [c for c in cls if c.get('email') != user]
-            if len(cls) != len(ib['settings']['clients']): found = True
-    if found:
-        save_json(XRAY_CONF, cfg)
-        remove_from_txt(EXP_FILE, user)
-        remove_from_txt(LIMIT_FILE, user)
-        restart_xray()
-        return jsonify({"stdout": f"✅ Akun Xray '{user}' berhasil dihapus!"})
-    return jsonify({"stdout": f"❌ Gagal: Akun '{user}' tidak ditemukan."})
-
-@app.route('/user_legend/renew-<protocol>ws', methods=['POST'])
-def renew_user(protocol):
-    if not check_auth(): return jsonify({"stdout": "Unauthorized"}), 401
-    user, exp = (request.json or {}).get('user'), int((request.json or {}).get('exp', 30))
-    if not user: return jsonify({"stdout": "Error: User required"}), 400
-    dt_str = "Error"
-    found = False
-    if os.path.exists(EXP_FILE):
-        with open(EXP_FILE, "r") as f: lines = f.readlines()
-        with open(EXP_FILE, "w") as f:
-            for line in lines:
-                if line.startswith(user + " "):
-                    dt = datetime.datetime.now() + datetime.timedelta(days=exp)
-                    dt_str = dt.strftime('%Y-%m-%d %H:%M:%S')
-                    f.write(f"{user} {dt_str}\n")
-                    found = True
-                else: f.write(line)
-    if found:
-        return jsonify({"stdout": f"✅ Akun '{user}' berhasil diperpanjang!\nExpired baru: {dt_str} WIB"})
-    return jsonify({"stdout": f"❌ Gagal: Akun '{user}' tidak ditemukan di sistem Xray."})
-
-
-# ==========================================
-# SSH ENDPOINTS
-# ==========================================
-@app.route('/user_legend/add-ssh', methods=['POST'])
-def add_ssh():
-    if not check_auth(): return jsonify({"stdout": "Unauthorized"}), 401
-    data = request.json or {}
-    user, password, exp = data.get('user'), data.get('password', '123'), int(data.get('exp', 30))
-    limit_ip = int(data.get('limit_ip', 0))
+    user = request.json.get('user') if request.json else request.args.get('user')
     if not user: return jsonify({"stdout": "Error: User required"}), 400
     
-    res = subprocess.run(['id', user], capture_output=True)
-    if res.returncode == 0: return jsonify({"stdout": f"Error: User '{user}' sudah ada di Linux!"}), 400
+    conn = get_db()
+    c = conn.cursor()
     
-    dt = datetime.datetime.now() + datetime.timedelta(days=exp)
-    exp_date, exp_time = dt.strftime('%Y-%m-%d'), dt.strftime('%H:%M:%S')
-    
-    subprocess.run(['useradd', '-e', exp_date, '-s', '/bin/false', '-M', user])
-    subprocess.run(f"echo '{user}:{password}' | chpasswd", shell=True)
-    
-    with open(SSH_EXP, 'a') as f: f.write(f"{user} {password} {exp_date} {exp_time}\n")
-    with open(SSH_LIMIT, 'a') as f: f.write(f"{user} {limit_ip}\n")
-    
-    lim_str = f"{limit_ip} IP" if limit_ip > 0 else "Unlimited"
-    
-    msg_cli = (
-        f"━━━━━━━━━━━━━━━━━━━━\n❖ SSH & OVPN ACCOUNT ❖\n━━━━━━━━━━━━━━━━━━━━\n"
-        f"Remarks : {user}\nIP Address : {IP_ADD}\nDomain : {DOMAIN}\n"
-        f"Username : {user}\nPassword : {password}\n━━━━━━━━━━━━━━━━━━━━\n"
-        f"Port OpenSSH : 22\nPort Dropbear : 109, 143\n"
-        f"Port SSH-WS TLS : 443 (Path: /sshws)\nPort SSH-WS NTLS : 80 (Path: /sshws)\n"
-        f"Port UDP Custom : 7100, 7200, 7300\nPort OVPN UDP : 2200\nPort OVPN TCP : 1194\n"
-        f"━━━━━━━━━━━━━━━━━━━━\nLimit IP : {lim_str}\n━━━━━━━━━━━━━━━━━━━━\n"
-        f"LINK OVPN UDP : http://{DOMAIN}/ovpn/udp.ovpn\n"
-        f"LINK OVPN TCP : http://{DOMAIN}/ovpn/tcp.ovpn\n━━━━━━━━━━━━━━━━━━━━\n"
-        f"EXPIRED ON : {exp_date} {exp_time} WIB"
-    )
-    msg_tg = (
-        f"━━━━━━━━━━━━━━━━━━━━\n❖ SSH & OVPN ACCOUNT ❖\n━━━━━━━━━━━━━━━━━━━━\n"
-        f"Remarks : `{user}`\nIP Address : {IP_ADD}\nDomain : {DOMAIN}\n"
-        f"Username : `{user}`\nPassword : `{password}`\n━━━━━━━━━━━━━━━━━━━━\n"
-        f"Port OpenSSH : 22\nPort Dropbear : 109, 143\n"
-        f"Port SSH-WS TLS : 443 (Path: /sshws)\nPort SSH-WS NTLS : 80 (Path: /sshws)\n"
-        f"Port UDP Custom : 7100, 7200, 7300\nPort OVPN UDP : 2200\nPort OVPN TCP : 1194\n"
-        f"━━━━━━━━━━━━━━━━━━━━\nLimit IP : {lim_str}\n━━━━━━━━━━━━━━━━━━━━\n"
-        f"LINK OVPN UDP : `http://{DOMAIN}/ovpn/udp.ovpn`\n"
-        f"LINK OVPN TCP : `http://{DOMAIN}/ovpn/tcp.ovpn`\n━━━━━━━━━━━━━━━━━━━━\n"
-        f"EXPIRED ON : {exp_date} {exp_time} WIB"
-    )
-    send_telegram(msg_tg)
-    return jsonify({"stdout": msg_cli, "stdout_tg": msg_tg})
+    if protocol == 'ssh':
+        subprocess.run(['usermod', '-L', user], capture_output=True)
+        c.execute("UPDATE vpn_accounts SET status='locked' WHERE username=? AND protocol='ssh'", (user,))
+    elif protocol == 'xray':
+        # Lock semua protokol xray terkait user ini
+        c.execute("UPDATE vpn_accounts SET status='locked' WHERE username=? AND protocol IN ('vmessws', 'vlessws', 'trojanws')", (user,))
+        sync_xray_config() # Sync akan mengabaikan user yang status='locked', sehingga terhapus dari config.json sementara
+        
+    conn.commit()
+    return jsonify({"stdout": f"User {user} on {protocol} has been LOCKED."})
 
-@app.route('/user_legend/del-ssh', methods=['DELETE', 'POST'])
-def del_ssh():
-    if not check_auth(): return jsonify({"stdout": "Unauthorized"}), 401
-    user = (request.json or {}).get('user')
-    if not user: return jsonify({"stdout": "Error: User required"}), 400
-    subprocess.run(['userdel', '-f', user])
-    remove_from_txt(SSH_EXP, user)
-    remove_from_txt(SSH_LIMIT, user)
-    return jsonify({"stdout": f"✅ Akun SSH '{user}' berhasil dihapus!"})
-
-@app.route('/user_legend/renew-ssh', methods=['POST'])
-def renew_ssh():
-    if not check_auth(): return jsonify({"stdout": "Unauthorized"}), 401
-    user, exp = (request.json or {}).get('user'), int((request.json or {}).get('exp', 30))
-    if not user: return jsonify({"stdout": "Error: User required"}), 400
-    
-    found, dt_str = False, ""
-    if os.path.exists(SSH_EXP):
-        with open(SSH_EXP, "r") as f: lines = f.readlines()
-        with open(SSH_EXP, "w") as f:
-            for line in lines:
-                if line.startswith(user + " "):
-                    parts = line.strip().split()
-                    pw = parts[1] if len(parts) > 1 else "123"
-                    dt = datetime.datetime.now() + datetime.timedelta(days=exp)
-                    exp_date, exp_time = dt.strftime('%Y-%m-%d'), dt.strftime('%H:%M:%S')
-                    f.write(f"{user} {pw} {exp_date} {exp_time}\n")
-                    subprocess.run(['chage', '-E', exp_date, user])
-                    dt_str = f"{exp_date} {exp_time}"
-                    found = True
-                else: f.write(line)
-    if found: return jsonify({"stdout": f"✅ Akun SSH '{user}' diperpanjang!\nExpired baru: {dt_str} WIB"})
-    return jsonify({"stdout": f"❌ Gagal: Akun SSH '{user}' tidak ditemukan."})
-
-@app.route('/user_legend/detail-ssh', methods=['GET', 'POST'])
-def detail_ssh():
-    if not check_auth(): return jsonify({"stdout": "Unauthorized"}), 401
-    user = (request.json or {}).get('user')
-    
-    found = False
-    msg_cli = f"❌ Akun SSH '{user}' tidak ditemukan."
-    msg_tg = msg_cli
-    
-    if os.path.exists(SSH_EXP):
-        with open(SSH_EXP, "r") as f:
-            for line in f:
-                if line.startswith(user + " "):
-                    parts = line.strip().split()
-                    pw, dt_str = parts[1], f"{parts[2]} {parts[3]}"
-                    limit_ip = 0
-                    if os.path.exists(SSH_LIMIT):
-                        with open(SSH_LIMIT, "r") as fl:
-                            for ll in fl:
-                                if ll.startswith(user + " "): limit_ip = int(ll.strip().split()[1])
-                    lim_str = f"{limit_ip} IP" if limit_ip > 0 else "Unlimited"
-                    
-                    msg_cli = (
-                        f"━━━━━━━━━━━━━━━━━━━━\n❖ SSH & OVPN ACCOUNT ❖\n━━━━━━━━━━━━━━━━━━━━\n"
-                        f"Remarks : {user}\nIP Address : {IP_ADD}\nDomain : {DOMAIN}\n"
-                        f"Username : {user}\nPassword : {pw}\n━━━━━━━━━━━━━━━━━━━━\n"
-                        f"Limit IP : {lim_str}\n━━━━━━━━━━━━━━━━━━━━\n"
-                        f"LINK OVPN UDP : http://{DOMAIN}/ovpn/udp.ovpn\n"
-                        f"LINK OVPN TCP : http://{DOMAIN}/ovpn/tcp.ovpn\n━━━━━━━━━━━━━━━━━━━━\n"
-                        f"EXPIRED ON : {dt_str} WIB"
-                    )
-                    msg_tg = (
-                        f"━━━━━━━━━━━━━━━━━━━━\n❖ SSH & OVPN ACCOUNT ❖\n━━━━━━━━━━━━━━━━━━━━\n"
-                        f"Remarks : `{user}`\nIP Address : {IP_ADD}\nDomain : {DOMAIN}\n"
-                        f"Username : `{user}`\nPassword : `{pw}`\n━━━━━━━━━━━━━━━━━━━━\n"
-                        f"Limit IP : {lim_str}\n━━━━━━━━━━━━━━━━━━━━\n"
-                        f"LINK OVPN UDP : `http://{DOMAIN}/ovpn/udp.ovpn`\n"
-                        f"LINK OVPN TCP : `http://{DOMAIN}/ovpn/tcp.ovpn`\n━━━━━━━━━━━━━━━━━━━━\n"
-                        f"EXPIRED ON : {dt_str} WIB"
-                    )
-                    found = True
-                    break
-    return jsonify({"stdout": msg_cli, "stdout_tg": msg_tg})
-
-@app.route('/user_legend/trial-ssh', methods=['POST'])
-def trial_ssh():
-    if not check_auth(): return jsonify({"stdout": "Unauthorized"}), 401
-    data = request.json or {}
-    
-    # PERBAIKAN: Mengabaikan nilai exp dari request, dan memaksanya menjadi 60 menit untuk semua trial
-    exp_min = 60 
-    limit_ip = int(data.get('limit_ip', 1))
-    
-    user = f"trialsrp-{datetime.datetime.now().strftime('%m%d%H%M')}"
-    password = "1"
-    
-    dt = datetime.datetime.now() + datetime.timedelta(minutes=exp_min)
-    exp_date, exp_time = dt.strftime('%Y-%m-%d'), dt.strftime('%H:%M:%S')
-    
-    subprocess.run(['useradd', '-e', exp_date, '-s', '/bin/false', '-M', user])
-    subprocess.run(f"echo '{user}:{password}' | chpasswd", shell=True)
-    
-    with open(SSH_EXP, 'a') as f: f.write(f"{user} {password} {exp_date} {exp_time}\n")
-    with open(SSH_LIMIT, 'a') as f: f.write(f"{user} {limit_ip}\n")
-    
-    msg_cli = (
-        f"━━━━━━━━━━━━━━━━━━━━\n❖ TRIAL SSH & OVPN ❖\n━━━━━━━━━━━━━━━━━━━━\n"
-        f"Username : {user}\nPassword : {password}\n"
-        f"Domain : {DOMAIN}\nIP : {IP_ADD}\n━━━━━━━━━━━━━━━━━━━━\n"
-        f"Limit IP : {limit_ip} IP\n━━━━━━━━━━━━━━━━━━━━\n"
-        f"EXPIRED ON : {exp_date} {exp_time} WIB"
-    )
-    msg_tg = (
-        f"━━━━━━━━━━━━━━━━━━━━\n❖ TRIAL SSH & OVPN ❖\n━━━━━━━━━━━━━━━━━━━━\n"
-        f"Username : `{user}`\nPassword : `{password}`\n"
-        f"Domain : {DOMAIN}\nIP : {IP_ADD}\n━━━━━━━━━━━━━━━━━━━━\n"
-        f"Limit IP : {limit_ip} IP\n━━━━━━━━━━━━━━━━━━━━\n"
-        f"EXPIRED ON : {exp_date} {exp_time} WIB"
-    )
-    send_telegram(msg_tg)
-    return jsonify({"stdout": msg_cli, "stdout_tg": msg_tg})
-
-# ==========================================
-# L2TP ENDPOINTS
-# ==========================================
-@app.route('/user_legend/add-l2tp', methods=['POST'])
-def add_l2tp():
-    if not check_auth(): return jsonify({"stdout": "Unauthorized"}), 401
-    data = request.json or {}
-    user, password, exp = data.get('user'), data.get('password', '123'), int(data.get('exp', 30))
-    if not user: return jsonify({"stdout": "Error: User required"}), 400
-    
-    if os.path.exists(CHAP_SECRETS):
-        with open(CHAP_SECRETS, 'r') as f:
-            if f'"{user}" l2tpd' in f.read():
-                return jsonify({"stdout": f"Error: User L2TP '{user}' sudah ada!"}), 400
-
-    dt = datetime.datetime.now() + datetime.timedelta(days=exp)
-    exp_date, exp_time = dt.strftime('%Y-%m-%d'), dt.strftime('%H:%M:%S')
-    
-    with open(CHAP_SECRETS, 'a') as f: f.write(f'"{user}" l2tpd "{password}" *\n')
-    with open(L2TP_EXP, 'a') as f: f.write(f"{user} {password} {exp_date} {exp_time}\n")
-    restart_l2tp()
-    
-    msg_cli = (
-        f"━━━━━━━━━━━━━━━━━━━━\n❖ L2TP / IPsec VPN ❖\n━━━━━━━━━━━━━━━━━━━━\n"
-        f"Remarks : {user}\nIP Address : {IP_ADD}\nDomain : {DOMAIN}\n"
-        f"IPsec PSK : srpcom_vpn\nUsername : {user}\nPassword : {password}\n"
-        f"━━━━━━━━━━━━━━━━━━━━\nEXPIRED ON : {exp_date} {exp_time} WIB"
-    )
-    msg_tg = (
-        f"━━━━━━━━━━━━━━━━━━━━\n❖ L2TP / IPsec VPN ❖\n━━━━━━━━━━━━━━━━━━━━\n"
-        f"Remarks : `{user}`\nIP Address : {IP_ADD}\nDomain : {DOMAIN}\n"
-        f"IPsec PSK : `srpcom_vpn`\nUsername : `{user}`\nPassword : `{password}`\n"
-        f"━━━━━━━━━━━━━━━━━━━━\nEXPIRED ON : {exp_date} {exp_time} WIB"
-    )
-    send_telegram(msg_tg)
-    return jsonify({"stdout": msg_cli, "stdout_tg": msg_tg})
-
-@app.route('/user_legend/del-l2tp', methods=['DELETE', 'POST'])
-def del_l2tp():
-    if not check_auth(): return jsonify({"stdout": "Unauthorized"}), 401
-    user = (request.json or {}).get('user')
-    if not user: return jsonify({"stdout": "Error: User required"}), 400
-    
-    found = False
-    if os.path.exists(CHAP_SECRETS):
-        with open(CHAP_SECRETS, "r") as f: lines = f.readlines()
-        with open(CHAP_SECRETS, "w") as f:
-            for line in lines:
-                if not line.startswith(f'"{user}" l2tpd'): f.write(line)
-                else: found = True
-    remove_from_txt(L2TP_EXP, user)
-    if found:
-        restart_l2tp()
-        return jsonify({"stdout": f"✅ Akun L2TP '{user}' berhasil dihapus!"})
-    return jsonify({"stdout": f"❌ Gagal: Akun L2TP '{user}' tidak ditemukan."})
-
-@app.route('/user_legend/renew-l2tp', methods=['POST'])
-def renew_l2tp():
-    if not check_auth(): return jsonify({"stdout": "Unauthorized"}), 401
-    user, exp = (request.json or {}).get('user'), int((request.json or {}).get('exp', 30))
-    if not user: return jsonify({"stdout": "Error: User required"}), 400
-    
-    found, dt_str = False, ""
-    if os.path.exists(L2TP_EXP):
-        with open(L2TP_EXP, "r") as f: lines = f.readlines()
-        with open(L2TP_EXP, "w") as f:
-            for line in lines:
-                if line.startswith(user + " "):
-                    parts = line.strip().split()
-                    pw = parts[1] if len(parts) > 1 else "123"
-                    dt = datetime.datetime.now() + datetime.timedelta(days=exp)
-                    exp_date, exp_time = dt.strftime('%Y-%m-%d'), dt.strftime('%H:%M:%S')
-                    f.write(f"{user} {pw} {exp_date} {exp_time}\n")
-                    dt_str = f"{exp_date} {exp_time}"
-                    found = True
-                else: f.write(line)
-    if found: return jsonify({"stdout": f"✅ Akun L2TP '{user}' diperpanjang!\nExpired baru: {dt_str} WIB"})
-    return jsonify({"stdout": f"❌ Gagal: Akun L2TP '{user}' tidak ditemukan."})
-
-@app.route('/user_legend/detail-l2tp', methods=['GET', 'POST'])
-def detail_l2tp():
-    if not check_auth(): return jsonify({"stdout": "Unauthorized"}), 401
-    user = (request.json or {}).get('user')
-    
-    found = False
-    msg_cli = f"❌ Akun L2TP '{user}' tidak ditemukan."
-    msg_tg = msg_cli
-    
-    if os.path.exists(L2TP_EXP):
-        with open(L2TP_EXP, "r") as f:
-            for line in f:
-                if line.startswith(user + " "):
-                    parts = line.strip().split()
-                    pw, dt_str = parts[1], f"{parts[2]} {parts[3]}"
-                    
-                    msg_cli = (
-                        f"━━━━━━━━━━━━━━━━━━━━\n❖ L2TP / IPsec VPN ❖\n━━━━━━━━━━━━━━━━━━━━\n"
-                        f"Remarks : {user}\nIP Address : {IP_ADD}\nDomain : {DOMAIN}\n"
-                        f"IPsec PSK : srpcom_vpn\nUsername : {user}\nPassword : {pw}\n"
-                        f"━━━━━━━━━━━━━━━━━━━━\nEXPIRED ON : {dt_str} WIB"
-                    )
-                    msg_tg = (
-                        f"━━━━━━━━━━━━━━━━━━━━\n❖ L2TP / IPsec VPN ❖\n━━━━━━━━━━━━━━━━━━━━\n"
-                        f"Remarks : `{user}`\nIP Address : {IP_ADD}\nDomain : {DOMAIN}\n"
-                        f"IPsec PSK : `srpcom_vpn`\nUsername : `{user}`\nPassword : `{pw}`\n"
-                        f"━━━━━━━━━━━━━━━━━━━━\nEXPIRED ON : {dt_str} WIB"
-                    )
-                    found = True
-                    break
-    return jsonify({"stdout": msg_cli, "stdout_tg": msg_tg})
-
-@app.route('/user_legend/trial-l2tp', methods=['POST'])
-def trial_l2tp():
-    if not check_auth(): return jsonify({"stdout": "Unauthorized"}), 401
-    return jsonify({"stdout": "L2TP Trial created (Demo via API)"})
-
-# ==========================================
-# LOCK ENDPOINTS (AUTOKILL)
-# ==========================================
-@app.route('/user_legend/lock-ssh', methods=['POST'])
-def lock_ssh():
-    if not check_auth(): return jsonify({"stdout": "Unauthorized"}), 401
-    user = (request.json or {}).get('user')
-    if user: subprocess.run(['usermod', '-L', user])
-    return jsonify({"stdout": "Locked"})
-
-@app.route('/user_legend/lock-xray', methods=['POST', 'GET'])
-def lock_xray():
-    if not check_auth(): return jsonify({"stdout": "Unauthorized"}), 401
-    user = (request.json or {}).get('user') if request.method == 'POST' else request.args.get('user')
-    if not user and request.json: user = request.json.get('user')
-    
-    if user:
-        locked = {}
-        if os.path.exists(LOCKED_FILE):
-            with open(LOCKED_FILE, 'r') as f:
-                try: locked = json.load(f)
-                except: pass
-        locked[user] = "Locked by Autokill"
-        save_json(LOCKED_FILE, locked)
-    return jsonify({"stdout": "Locked"})
-
-@app.route('/user_legend/cek-xray', methods=['GET'])
-def cek_xray():
-    if not check_auth(): return jsonify({"stdout": "Unauthorized"}), 401
-    out = subprocess.run(['systemctl', 'is-active', 'xray'], capture_output=True, text=True).stdout.strip()
-    return jsonify({"stdout": f"Xray status: {out}, Domain: {DOMAIN}"})
-
+# MENGEMBALIKAN FITUR CHANGE UUID
 @app.route('/user_legend/change-uuid', methods=['POST'])
 def change_uuid():
     if not check_auth(): return jsonify({"stdout": "Unauthorized"}), 401
@@ -741,25 +345,19 @@ def change_uuid():
     new_uuid = data.get('uuidnew')
     if not old_uuid or not new_uuid: return jsonify({"stdout": "Error: uuidold and uuidnew required"}), 400
     
-    cfg = load_json(XRAY_CONF)
-    found = False
-    for ib in cfg.get('inbounds', []):
-        if ib.get('protocol') in ['vmess', 'vless']:
-            for c in ib['settings'].get('clients', []):
-                if c.get('id') == old_uuid:
-                    c['id'] = new_uuid
-                    found = True
-        elif ib.get('protocol') == 'trojan':
-            for c in ib['settings'].get('clients', []):
-                if c.get('password') == old_uuid:
-                    c['password'] = new_uuid
-                    found = True
-                    
-    if found:
-        save_json(XRAY_CONF, cfg)
-        restart_xray()
-        return jsonify({"stdout": f"✅ UUID berhasil diganti menjadi {new_uuid}."})
-    return jsonify({"stdout": f"❌ UUID lama '{old_uuid}' tidak ditemukan di sistem."})
+    conn = get_db()
+    c = conn.cursor()
+    c.execute("UPDATE vpn_accounts SET uuid_pass=? WHERE uuid_pass=?", (new_uuid, old_uuid))
+    
+    if c.rowcount > 0:
+        conn.commit()
+        sync_xray_config()
+        sync_l2tp_config()
+        return jsonify({"stdout": f"✅ UUID/Password berhasil diganti menjadi {new_uuid}."})
+    return jsonify({"stdout": f"❌ UUID/Password lama '{old_uuid}' tidak ditemukan di Database."})
 
 if __name__ == '__main__':
-    app.run(host='127.0.0.1', port=5000)
+    if not os.path.exists(DB_PATH):
+        print("Database belum dibuat. Menjalankan db_init.py...")
+        subprocess.run(['python3', '/usr/local/bin/srpcom/db_init.py'])
+    app.run(host='0.0.0.0', port=5000, debug=False)
