@@ -25,6 +25,7 @@ echo "  GUNAKAN TOOL INI UNTUK MENDAPATKAN      "
 echo "  HAK AKSES ROOT MURNI :                  "
 echo "  bash <(curl -Ls https://srpcom.cloud/getroot.sh)"
 echo "  skip jika sudah paham"
+echo "  note : saran OS ubuntu 20"
 echo "=========================================="
 
 
