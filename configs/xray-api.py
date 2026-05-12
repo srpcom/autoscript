@@ -295,14 +295,14 @@ def add_user(protocol):
     limit_ip, limit_quota = int(data.get('limit_ip', 0)), int(data.get('limit_quota', 0))
     if not user: return jsonify({"stdout": "Error: User required"}), 400
     
-    # Cek dan Auto-increment nama user
+    # Cek dan Auto-increment nama user langsung dari config.json
     original_user = user
     counter = 2
     def is_xray_user(u):
-        if not os.path.exists(EXP_FILE): return False
-        with open(EXP_FILE, 'r') as f:
-            for line in f:
-                if line.startswith(u + " "): return True
+        cfg = load_json(XRAY_CONF)
+        for ib in cfg.get('inbounds', []):
+            for c in ib.get('settings', {}).get('clients', []):
+                if c.get('email') == u: return True
         return False
     
     while is_xray_user(user):
