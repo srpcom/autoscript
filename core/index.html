@@ -488,7 +488,14 @@
             const limit_ip = document.getElementById('inp-ip').value;
             const limit_quota = document.getElementById('inp-quota').value;
 
+            // PERBAIKAN: Penyesuaian Endpoint URL khusus untuk list-accounts
             let endpoint = `/user_legend/${act}-${prot}`;
+            if (act === 'list-accounts') {
+                // Menghapus 'ws' dari nama protokol agar sesuai dengan backend Python (contoh: vmessws menjadi vmess)
+                const cleanProt = prot.replace('ws', '');
+                endpoint = `/user_legend/list-accounts/${cleanProt}`;
+            }
+
             let method = (act === 'list-accounts' || act === 'detail') ? 'GET' : 'POST';
             if (act === 'del') method = 'DELETE';
 
@@ -548,7 +555,17 @@
                 }
 
                 const res = await fetch(endpoint, options);
-                const data = await res.json();
+                
+                // PERBAIKAN: Tangkap respon text murni sebelum di parse ke JSON 
+                // Ini untuk mencegah error (Unexpected token '<') saat server mengembalikan HTML Error Page (seperti 404/500)
+                const textResp = await res.text();
+                let data;
+                try {
+                    data = JSON.parse(textResp);
+                } catch (err) {
+                    // Jika parsing JSON gagal, lemparkan error dengan cuplikan respon HTML/Teks
+                    throw new Error(`Invalid response format dari server (HTTP ${res.status}). Detail: ${textResp.substring(0, 80)}...`);
+                }
                 
                 if (res.status === 401 || res.status === 403) {
                     printToTerminal(`[ERROR] Akses Ditolak (HTTP ${res.status}).\nAlasan: ${data.stdout || 'API Key tidak valid atau Lisensi Habis.'}`, 'error');
@@ -570,8 +587,8 @@
                     printToTerminal(`[WARNING] Response format tidak dikenali:\n${JSON.stringify(data, null, 2)}`, 'warning');
                 }
             } catch (err) {
-                printToTerminal(`[FATAL] Gagal terhubung ke Node Server API.\nDetail: ${err.message}`, 'error');
-                showToast('Koneksi Gagal', 'error');
+                printToTerminal(`[FATAL] Gagal mengeksekusi API Node Server.\nDetail: ${err.message}`, 'error');
+                showToast('Koneksi/Eksekusi Gagal', 'error');
             }
         }
 
