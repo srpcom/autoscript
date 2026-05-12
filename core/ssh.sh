@@ -15,10 +15,16 @@ add_ssh() {
     read -p "Username (x = Batal) : " user
     if [[ "$user" == "x" || "$user" == "X" ]]; then return; fi
     
-    # Cek apakah user sudah ada di OS
-    if id "$user" &>/dev/null; then
-        echo -e "\n\e[31m[ERROR]\e[0m Username '$user' sudah digunakan!"
-        sleep 2; return
+    # Cek apakah user sudah ada di OS, jika ada tambahkan angka berurutan
+    original_user="$user"
+    counter=2
+    while id "$user" &>/dev/null; do
+        user="${original_user}${counter}"
+        ((counter++))
+    done
+    
+    if [[ "$original_user" != "$user" ]]; then
+        echo -e "\n\e[33m[INFO]\e[0m Username '$original_user' sudah digunakan. Akun akan dibuat dengan nama: $user"
     fi
     
     read -p "Password       : " password
