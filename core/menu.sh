@@ -22,31 +22,27 @@ GITHUB_RAW="https://raw.githubusercontent.com/srpcom/autoscript/main"
 # FUNGSI VALIDASI LISENSI GLOBAL (CEGAH BYPASS)
 # ==========================================
 validate_license_cli() {
-    # 1. Cek jika klien ini pengguna lawas yang belum punya VPS_NAME
     if [ -z "$VPS_NAME" ]; then
         clear
-        echo "========================================================="
-        echo "          UPDATE SISTEM: REGISTRASI NAMA VPS             "
-        echo "========================================================="
-        echo "Sistem mendeteksi bahwa Nama VPS Anda belum tersimpan."
-        echo "Data ini wajib ada untuk Sinkronisasi Lisensi Script."
-        echo "========================================================="
-        read -p "Masukkan Nama VPS Anda (Sesuai web): " input_name
+        echo "======================================"
+        echo " UPDATE SISTEM: REGISTRASI NAMA VPS   "
+        echo "======================================"
+        echo "Sistem mendeteksi Nama VPS kosong."
+        echo "Data ini wajib untuk Lisensi."
+        echo "======================================"
+        read -p "Masukkan Nama (Sesuai web): " input_name
         if [ -n "$input_name" ]; then
             echo "VPS_NAME=\"$input_name\"" >> /usr/local/etc/srpcom/env.conf
             VPS_NAME="$input_name"
-            echo "=> Berhasil disimpan! Memuat menu..."
+            echo "=> Tersimpan! Memuat menu..."
             sleep 1
         else
-            echo "Batal. Anda akan keluar dari menu."
-            exit 0
+            echo "Batal."; exit 0
         fi
     fi
 
-    # 2. Cek Cache Lisensi
     source /usr/local/etc/srpcom/license.info 2>/dev/null
     
-    # Toleransi: Jika expired di cache, tembak API 1 kali (Dengan Cooldown 60 Detik)
     if [ "$STATUS" == "EXPIRED" ]; then
         CURRENT_TIME=$(date +%s)
         LAST_CHECK=0
@@ -72,36 +68,24 @@ validate_license_cli() {
         fi
     fi
 
-    # 3. BLOKIR EKSEKUSI JIKA HABIS
     if [ "$STATUS" == "EXPIRED" ]; then
         clear
-        echo -e "\e[31m╔════════════════════════════════════════════════════════╗\e[0m"
-        echo -e "\e[31m║                  AKSES MENU DITOLAK                    ║\e[0m"
-        echo -e "\e[31m╚════════════════════════════════════════════════════════╝\e[0m"
-        echo -e "\e[33m Masa aktif lisensi Autoscript untuk VPS ini telah HABIS.\e[0m"
-        echo -e " Nama VPS   : $VPS_NAME"
-        echo -e " IP Address : $IP_ADD"
+        echo -e "\e[31m╔════════════════════════════════════╗\e[0m"
+        echo -e "\e[31m║         AKSES MENU DITOLAK         ║\e[0m"
+        echo -e "\e[31m╚════════════════════════════════════╝\e[0m"
+        echo -e "\e[33m Lisensi VPS ini telah HABIS.\e[0m"
+        echo -e " Nama: $VPS_NAME"
+        echo -e " IP  : $IP_ADD"
         echo -e ""
-        echo -e " Jangan khawatir, seluruh layanan VPN klien Anda tetap"
-        echo -e " berjalan normal. Namun, akses ke panel manajemen ini"
-        echo -e " (CLI) dikunci sementara."
-        echo -e ""
-        echo -e " Silakan perpanjang lisensi Anda di:"
+        echo -e " Perpanjang lisensi Anda di:"
         echo -e " \e[36mhttps://tuban.store/lisensi\e[0m"
-        echo -e ""
-        echo -e " Jika sudah membayar, ketik ulang perintah \e[32mmenu\e[0m"
-        echo -e "\e[31m==========================================================\e[0m"
+        echo -e "======================================"
         exit 0
     fi
 }
 
-# ==========================================
-# FUNGSI PEMBANGUNAN SHORTCUT GLOBAL (WRAPPER)
-# ==========================================
 rebuild_shortcuts() {
-    echo -e "\n=> Membangun Shortcut Commands (Wrapper)..."
-    
-    # Fungsi pembantu: Menyuntikkan validate_license_cli() pada setiap eksekusi
+    echo -e "\n=> Membangun Shortcuts (Wrapper)..."
     build_sc() {
         cat > /usr/bin/$1 << EOFSC
 #!/bin/bash
@@ -120,7 +104,6 @@ EOFSC
         chmod +x /usr/bin/$1
     }
     
-    # KATEGORI XRAY
     build_sc "add-vmess" "add_vmess_ws"
     build_sc "add-vless" "add_vless_ws"
     build_sc "add-trojan" "add_trojan_ws"
@@ -130,29 +113,21 @@ EOFSC
     build_sc "cek-xray" "detail_xray"
     build_sc "list-xray" "list_xray"
     build_sc "uuid-xray" "menu_change_uuid"
-    
-    # KATEGORI SSH & OVPN
     build_sc "add-ssh" "add_ssh"
     build_sc "trial-ssh" "add_trial_ssh"
     build_sc "del-ssh" "delete_ssh"
     build_sc "renew-ssh" "renew_ssh"
     build_sc "cek-ssh" "detail_ssh"
     build_sc "list-ssh" "list_ssh"
-    
-    # KATEGORI L2TP
     build_sc "add-l2tp" "add_l2tp"
     build_sc "del-l2tp" "delete_l2tp"
     build_sc "renew-l2tp" "renew_l2tp"
     build_sc "cek-l2tp" "detail_l2tp"
     build_sc "list-l2tp" "list_l2tp"
-    
-    # KATEGORI MONITOR & SISTEM
     build_sc "mon-xray" "monitor_xray"
     build_sc "mon-ssh" "monitor_ssh"
     build_sc "backup" "manual_backup_telegram"
     build_sc "restore" "restore_data"
-    
-    # KATEGORI SETTINGS
     build_sc "set-domain" "change_domain"
     build_sc "set-sni" "menu_extra_domain"
     build_sc "set-apikey" "menu_api_key"
@@ -162,67 +137,61 @@ EOFSC
     build_sc "set-autoexp" "menu_auto_expired"
     build_sc "set-autobackup" "menu_autobackup"
     build_sc "set-autosend" "menu_autosend"
-    
-    # MEMBANGUN MENU UTAMA
     build_sc "menu" "main_menu"
     
-    # MEMBANGUN PERINTAH 'srpcom' (TAMPILAN HELP / CHEAT SHEET)
     cat > /usr/bin/srpcom << 'EOFSC'
 #!/bin/bash
 clear
-echo "========================================================="
-echo -e "\e[36m              SRPCOM SHORTCUT COMMANDS                   \e[0m"
-echo "========================================================="
+echo "======================================"
+echo -e "\e[36m       SRPCOM SHORTCUT COMMANDS       \e[0m"
+echo "======================================"
 echo -e "\e[32m[ XRAY COMMANDS ]\e[0m"
-echo " add-vmess   : Buat akun VMess WS"
-echo " add-vless   : Buat akun VLess WS"
-echo " add-trojan  : Buat akun Trojan WS"
-echo " trial-xray  : Buat akun Trial Xray (60 Menit)"
+echo " add-vmess   : Buat VMess WS"
+echo " add-vless   : Buat VLess WS"
+echo " add-trojan  : Buat Trojan WS"
+echo " trial-xray  : Buat Trial Xray"
 echo " del-xray    : Hapus akun Xray"
-echo " renew-xray  : Perpanjang masa aktif Xray"
-echo " cek-xray    : Cek detail & Link akun Xray"
-echo " list-xray   : Tampilkan semua akun Xray"
-echo " uuid-xray   : Ganti UUID / Password Xray"
+echo " renew-xray  : Perpanjang Xray"
+echo " cek-xray    : Detail & Link Xray"
+echo " list-xray   : List akun Xray"
+echo " uuid-xray   : Ganti UUID/Pass"
 echo ""
 echo -e "\e[32m[ SSH & OVPN COMMANDS ]\e[0m"
-echo " add-ssh     : Buat akun SSH & OpenVPN"
-echo " trial-ssh   : Buat akun Trial SSH (60 Menit)"
+echo " add-ssh     : Buat SSH & OVPN"
+echo " trial-ssh   : Buat Trial SSH"
 echo " del-ssh     : Hapus akun SSH"
-echo " renew-ssh   : Perpanjang masa aktif SSH"
-echo " cek-ssh     : Cek detail akun SSH"
-echo " list-ssh    : Tampilkan semua akun SSH"
+echo " renew-ssh   : Perpanjang SSH"
+echo " cek-ssh     : Cek akun SSH"
+echo " list-ssh    : List akun SSH"
 echo ""
 echo -e "\e[32m[ L2TP IPSEC COMMANDS ]\e[0m"
 echo " add-l2tp    : Buat akun L2TP"
 echo " del-l2tp    : Hapus akun L2TP"
-echo " renew-l2tp  : Perpanjang masa aktif L2TP"
-echo " cek-l2tp    : Cek detail akun L2TP"
-echo " list-l2tp   : Tampilkan semua akun L2TP"
+echo " renew-l2tp  : Perpanjang L2TP"
+echo " cek-l2tp    : Cek akun L2TP"
+echo " list-l2tp   : List akun L2TP"
 echo ""
 echo -e "\e[32m[ MONITORING & SYSTEM ]\e[0m"
-echo " mon-xray    : Monitor kuota & IP aktif Xray"
-echo " mon-ssh     : Monitor user SSH yang login"
-echo " backup      : Kirim backup manual ke Telegram"
-echo " restore     : Restore data VPS dari file backup"
+echo " mon-xray    : Monitor Xray"
+echo " mon-ssh     : Monitor SSH"
+echo " backup      : Kirim backup"
+echo " restore     : Restore data VPS"
 echo ""
 echo -e "\e[32m[ SETTINGS COMMANDS ]\e[0m"
 echo " set-domain  : Ganti domain VPS"
-echo " set-sni     : Manajemen Bug/SNI (Extra Domain)"
-echo " set-apikey  : Ganti API Key Node Server"
-echo " set-node    : Manajemen Remote Node (Bot Master)"
-echo " set-bot     : Pengaturan Telegram Admin Bot"
-echo " set-autokill: Pengaturan Daemon Auto-Kill"
-echo " set-autoexp : Pengaturan Daemon Auto-Expired"
-echo "========================================================="
-echo -e " Ketik \e[33mmenu\e[0m untuk masuk ke antarmuka utama."
-echo "========================================================="
+echo " set-sni     : Manajemen Bug/SNI"
+echo " set-apikey  : Ganti API Key Node"
+echo " set-node    : Manajemen Bot Master"
+echo " set-bot     : Setting Telegram Bot"
+echo " set-autokill: Daemon Auto-Kill"
+echo " set-autoexp : Daemon Auto-Expired"
+echo "======================================"
+echo -e " Ketik \e[33mmenu\e[0m untuk antarmuka utama."
+echo "======================================"
 EOFSC
     chmod +x /usr/bin/srpcom
 }
 
-# ==========================================
-# FUNGSI PEMBANGUNAN ULANG CADDYFILE
-# ==========================================
 rebuild_caddyfile() {
     local main_domain="$DOMAIN"
     local main_str="http://$main_domain, https://$main_domain, http://support.zoom.us.$main_domain, https://support.zoom.us.$main_domain"
@@ -292,24 +261,24 @@ EOF
 menu_update() {
     while true; do
         clear
-        echo "╔════════════════════════════════════════════════════════╗"
-        echo "║               UPDATE SCRIPT (LIVE UPDATE)              ║"
-        echo "╚════════════════════════════════════════════════════════╝"
-        echo " Versi Sistem Saat Ini : $SCRIPT_VERSION"
-        echo "---------------------------------------------------------"
-        echo " [1]  Update Modul Utama (menu.sh & Shortcuts)"
-        echo " [2]  Update Modul Utilitas (utils.sh)"
-        echo " [3]  Update Modul Xray (xray.sh)"
-        echo " [4]  Update Modul SSH & OVPN (ssh.sh)"
-        echo " [5]  Update Modul L2TP (l2tp.sh)"
-        echo " [6]  Update Modul Monitoring (monitor.sh)"
-        echo " [7]  Update Fitur Auto (autokill.sh & auto_expired.sh)"
-        echo " [8]  Update API Backend & Bot Telegram (configs/*.py)"
-        echo " [9]  Update Modul Notifikasi (telegram.sh)"
-        echo " [10] Update SEMUA Modul (ALL IN ONE)"
-        echo "---------------------------------------------------------"
-        echo " [0/x] Kembali ke Menu Utama"
-        echo "========================================================="
+        echo "╔════════════════════════════════════╗"
+        echo "║            UPDATE SCRIPT           ║"
+        echo "╚════════════════════════════════════╝"
+        echo " Versi: $SCRIPT_VERSION"
+        echo "--------------------------------------"
+        echo " 1. Update Modul Utama (menu.sh)"
+        echo " 2. Update Modul Utilitas"
+        echo " 3. Update Modul Xray"
+        echo " 4. Update Modul SSH & OVPN"
+        echo " 5. Update Modul L2TP"
+        echo " 6. Update Modul Monitor"
+        echo " 7. Update Auto Kill & Expired"
+        echo " 8. Update API Backend & Bot"
+        echo " 9. Update Modul Notifikasi"
+        echo " 10. Update SEMUA Modul"
+        echo "--------------------------------------"
+        echo " 0/x. Kembali ke Menu Utama"
+        echo "======================================"
         read -p " Pilih opsi [0-10 or x]: " opt
         
         case $opt in
@@ -317,14 +286,9 @@ menu_update() {
                 echo -e "\n=> Mengunduh menu.sh..."
                 wget -q -O /usr/local/bin/srpcom/menu.sh "$GITHUB_RAW/core/menu.sh"
                 chmod +x /usr/local/bin/srpcom/menu.sh
-                
-                # Regenerasi Shortcut jika ada penambahan perintah baru dari GitHub
                 source /usr/local/bin/srpcom/menu.sh
                 rebuild_shortcuts
-                
-                echo -e "\e[32m[SUCCESS]\e[0m Modul Utama & Shortcuts diperbarui!"
-                echo -e "=> Versi Terinstal : $SCRIPT_VERSION"
-                sleep 1.5; exec menu ;;
+                echo -e "\e[32m[SUCCESS]\e[0m Modul Utama diperbarui!"; sleep 1.5; exec menu ;;
             2) 
                 echo -e "\n=> Mengunduh utils.sh..."
                 wget -q -O /usr/local/bin/srpcom/utils.sh "$GITHUB_RAW/core/utils.sh"
@@ -349,9 +313,9 @@ menu_update() {
                 echo -e "\n=> Mengunduh monitor.sh..."
                 wget -q -O /usr/local/bin/srpcom/monitor.sh "$GITHUB_RAW/core/monitor.sh"
                 chmod +x /usr/local/bin/srpcom/monitor.sh
-                echo -e "\e[32m[SUCCESS]\e[0m Modul Monitoring diperbarui!"; sleep 1.5 ;;
+                echo -e "\e[32m[SUCCESS]\e[0m Modul Monitor diperbarui!"; sleep 1.5 ;;
             7) 
-                echo -e "\n=> Mengunduh autokill.sh & auto_expired.sh..."
+                echo -e "\n=> Mengunduh daemon otomatis..."
                 wget -q -O /usr/local/bin/srpcom/autokill.sh "$GITHUB_RAW/core/autokill.sh"
                 wget -q -O /usr/local/bin/srpcom/auto_expired.sh "$GITHUB_RAW/core/auto_expired.sh"
                 chmod +x /usr/local/bin/srpcom/autokill.sh /usr/local/bin/srpcom/auto_expired.sh
@@ -363,12 +327,12 @@ menu_update() {
                 chmod +x /usr/local/bin/xray-api.py /usr/local/bin/bot-admin.py
                 systemctl daemon-reload
                 systemctl restart xray-api srpcom-bot
-                echo -e "\e[32m[SUCCESS]\e[0m API & Bot diperbarui dan di-restart!"; sleep 1.5 ;;
+                echo -e "\e[32m[SUCCESS]\e[0m API & Bot diperbarui!"; sleep 1.5 ;;
             9) 
                 echo -e "\n=> Mengunduh telegram.sh..."
                 wget -q -O /usr/local/bin/srpcom/telegram.sh "$GITHUB_RAW/core/telegram.sh"
                 chmod +x /usr/local/bin/srpcom/telegram.sh
-                echo -e "\e[32m[SUCCESS]\e[0m Modul Notifikasi (telegram.sh) diperbarui!"; sleep 1.5 ;;
+                echo -e "\e[32m[SUCCESS]\e[0m Modul Notifikasi diperbarui!"; sleep 1.5 ;;
             10) 
                 echo -e "\n=> Mengunduh SEMUA modul sistem..."
                 wget -q -O /usr/local/bin/srpcom/utils.sh "$GITHUB_RAW/core/utils.sh"
@@ -384,16 +348,11 @@ menu_update() {
                 chmod +x /usr/local/bin/srpcom/*.sh /usr/local/bin/xray-api.py /usr/local/bin/bot-admin.py
                 systemctl daemon-reload
                 systemctl restart xray-api srpcom-bot
-                
                 wget -q -O /usr/local/bin/srpcom/menu.sh "$GITHUB_RAW/core/menu.sh"
                 chmod +x /usr/local/bin/srpcom/menu.sh
-                
-                # Regenerasi Shortcut Semua
                 source /usr/local/bin/srpcom/menu.sh
                 rebuild_shortcuts
-                
-                echo -e "\e[32m[SUCCESS]\e[0m Seluruh sistem & Shortcuts berhasil diperbarui dari GitHub!"
-                echo -e "=> Versi Terinstal : $SCRIPT_VERSION"
+                echo -e "\e[32m[SUCCESS]\e[0m Seluruh sistem berhasil diperbarui!"
                 sleep 2; exec menu ;;
             0|x|X) exec menu ;;
             *) echo -e "\n=> Pilihan tidak valid!"; sleep 1 ;;
@@ -405,29 +364,27 @@ menu_bot_admin() {
     while true; do
         clear
         echo "======================================"
-        echo "     SETTING TELEGRAM ADMIN BOT       "
+        echo "      SETTING TELEGRAM BOT ADMIN      "
         echo "======================================"
         bot_token=$(grep "^BOT_TOKEN=" /usr/local/etc/xray/bot_admin.conf 2>/dev/null | cut -d'=' -f2 | tr -d '"')
         admin_id=$(grep "^ADMIN_ID=" /usr/local/etc/xray/bot_admin.conf 2>/dev/null | cut -d'=' -f2 | tr -d '"')
         
         echo "Status Service :"
         if systemctl is-active --quiet srpcom-bot; then echo -e "\e[32m[ RUNNING ]\e[0m"; else echo -e "\e[31m[ OFF / STANDBY ]\e[0m"; fi
-        echo "Current BOT_TOKEN : ${bot_token:-Belum disetting}"
-        echo "Current ADMIN_ID  : ${admin_id:-Belum disetting}"
+        echo "--------------------------------------"
+        echo " 1. Mulai / Restart Bot Admin"
+        echo " 2. Ubah Token & ID Bot"
+        echo " 3. Hentikan Bot (Disable)"
+        echo " 0. Kembali"
         echo "======================================"
-        echo "1. Mulai / Restart Bot Admin"
-        echo "2. Ubah Token & ID Bot"
-        echo "3. Hentikan Bot (Disable)"
-        echo "0/x. Kembali ke Settings"
-        echo "======================================"
-        read -p "Pilih opsi [0-3 or x]: " opt
+        read -p " Pilih opsi [0-3]: " opt
         case $opt in
             1)
                 if [[ -n "$bot_token" && -n "$admin_id" ]]; then
                     systemctl restart srpcom-bot
                     echo -e "\n\e[32m=> Bot Admin berhasil dijalankan!\e[0m"; sleep 2
                 else
-                    echo -e "\n\e[31m=> Token atau ID belum disetting! Pilih opsi 2.\e[0m"; sleep 2
+                    echo -e "\n\e[31m=> Token/ID kosong! Pilih opsi 2.\e[0m"; sleep 2
                 fi
                 ;;
             2)
@@ -439,17 +396,13 @@ BOT_TOKEN="$new_token"
 ADMIN_ID="$new_id"
 EOF
                     systemctl restart srpcom-bot
-                    echo -e "\n\e[32m=> Bot Admin berhasil disetting dan dijalankan!\e[0m"; sleep 2
+                    echo -e "\n\e[32m=> Bot berhasil disetting!\e[0m"; sleep 2
                 else
-                    echo -e "\n=> Token atau ID tidak boleh kosong!"; sleep 2
+                    echo -e "\n=> Token/ID tidak boleh kosong!"; sleep 2
                 fi
                 ;;
-            3)
-                systemctl stop srpcom-bot
-                echo -e "\n=> Bot Admin berhasil dihentikan!"; sleep 2
-                ;;
-            0) break ;;
-            x|X) exec menu ;;
+            3) systemctl stop srpcom-bot; echo -e "\n=> Bot dihentikan!"; sleep 2 ;;
+            0|x|X) break ;;
             *) echo -e "\n=> Pilihan tidak valid!"; sleep 1 ;;
         esac
     done
@@ -462,32 +415,25 @@ menu_autokill() {
         if [ -n "$status_cron" ]; then st="\e[32m[ ON ]\e[0m"; else st="\e[31m[ OFF ]\e[0m"; fi
         
         echo "======================================"
-        echo "    AUTO KILL & LIMIT SETTINGS        "
+        echo "      AUTO KILL & LIMIT SETTINGS      "
         echo "======================================"
         echo -e "Status Daemon (3 Menit) : $st"
         echo "======================================"
-        echo "Fitur ini akan mengecek log Xray dan"
-        echo "SSH secara otomatis di background."
-        echo "Jika ada akun melebihi Limit IP atau"
-        echo "Kuota, akun akan dikunci (Locked) dan"
-        echo "Bot Telegram akan mengirim notifikasi."
+        echo " 1. Turn ON Auto Kill Daemon"
+        echo " 2. Turn OFF Auto Kill Daemon"
+        echo " 0. Kembali"
         echo "======================================"
-        echo "1. Turn ON Auto Kill Daemon"
-        echo "2. Turn OFF Auto Kill Daemon"
-        echo "0/x. Back to Settings"
-        echo "======================================"
-        read -p "Select Option [0-2 or x]: " opt
+        read -p " Pilih opsi [0-2]: " opt
         case $opt in
             1) 
                 echo "*/3 * * * * root /usr/local/bin/srpcom/autokill.sh run_kill >/dev/null 2>&1" > /etc/cron.d/srpcom_autokill
                 systemctl restart cron
-                echo -e "\n=> Auto Kill Daemon BERHASIL DIAKTIFKAN!"; sleep 2 ;;
+                echo -e "\n=> Auto Kill DIAKTIFKAN!"; sleep 2 ;;
             2) 
                 rm -f /etc/cron.d/srpcom_autokill
                 systemctl restart cron
-                echo -e "\n=> Auto Kill Daemon DIMATIKAN!"; sleep 2 ;;
-            0) break ;;
-            x|X) exec menu ;;
+                echo -e "\n=> Auto Kill DIMATIKAN!"; sleep 2 ;;
+            0|x|X) break ;;
             *) echo -e "\n=> Pilihan tidak valid!"; sleep 1 ;;
         esac
     done
@@ -500,30 +446,25 @@ menu_auto_expired() {
         if [ -n "$status_cron" ]; then st="\e[32m[ ON ]\e[0m"; else st="\e[31m[ OFF ]\e[0m"; fi
         
         echo "======================================"
-        echo "      AUTO EXPIRED SETTINGS           "
+        echo "         AUTO EXPIRED SETTINGS        "
         echo "======================================"
         echo -e "Status Daemon (Tiap 1 Jam) : $st"
         echo "======================================"
-        echo "Fitur ini akan mengecek dan menghapus"
-        echo "akun VPN yang masa aktifnya sudah habis"
-        echo "secara otomatis setiap jam."
+        echo " 1. Turn ON Auto Expired Daemon"
+        echo " 2. Turn OFF Auto Expired Daemon"
+        echo " 0. Kembali"
         echo "======================================"
-        echo "1. Turn ON Auto Expired Daemon"
-        echo "2. Turn OFF Auto Expired Daemon"
-        echo "0/x. Back to Settings"
-        echo "======================================"
-        read -p "Select Option [0-2 or x]: " opt
+        read -p " Pilih opsi [0-2]: " opt
         case $opt in
             1) 
                 echo "0 * * * * root /usr/local/bin/srpcom/auto_expired.sh >/dev/null 2>&1" > /etc/cron.d/auto_expired
                 systemctl restart cron
-                echo -e "\n=> Auto Expired Daemon BERHASIL DIAKTIFKAN!"; sleep 2 ;;
+                echo -e "\n=> Auto Expired DIAKTIFKAN!"; sleep 2 ;;
             2) 
                 rm -f /etc/cron.d/auto_expired
                 systemctl restart cron
-                echo -e "\n=> Auto Expired Daemon DIMATIKAN!"; sleep 2 ;;
-            0) break ;;
-            x|X) exec menu ;;
+                echo -e "\n=> Auto Expired DIMATIKAN!"; sleep 2 ;;
+            0|x|X) break ;;
             *) echo -e "\n=> Pilihan tidak valid!"; sleep 1 ;;
         esac
     done
@@ -537,31 +478,21 @@ change_domain() {
     echo "Domain saat ini : $DOMAIN"
     echo "IP VPS          : $IP_ADD"
     echo "======================================"
-    echo "PENTING: Pastikan A Record DNS domain baru"
-    echo "sudah mengarah ke IP VPS ini (DNS Only)!"
-    echo "======================================"
-    read -p "Masukkan Domain Baru (tekan 'x' untuk batal): " new_domain
+    read -p "Masukkan Domain Baru (x=Batal): " new_domain
     
-    if [[ "$new_domain" == "x" || "$new_domain" == "X" || -z "$new_domain" ]]; then
-        return
-    fi
+    if [[ "$new_domain" == "x" || "$new_domain" == "X" || -z "$new_domain" ]]; then return; fi
 
-    echo -e "\nMemeriksa resolusi DNS untuk $new_domain..."
+    echo -e "\nMemeriksa resolusi DNS..."
     domain_ip=$(getent ahostsv4 "$new_domain" | awk '{ print $1 }' | head -n 1)
     
     if [[ "$domain_ip" != "$IP_ADD" ]]; then
-        echo -e "\n\e[31m[ERROR]\e[0m Domain $new_domain belum mengarah ke IP $IP_ADD!"
-        echo "IP dari DNS saat ini: ${domain_ip:-Kosong/Tidak Ditemukan}"
-        echo "Silakan update DNS Anda (Matikan Proxy/Cloudflare Orange Cloud)"
-        echo "lalu tunggu 1-2 menit dan coba lagi."
-        sleep 4
-        return
+        echo -e "\n\e[31m[ERROR]\e[0m Domain belum mengarah ke $IP_ADD!"
+        sleep 4; return
     fi
 
-    echo -e "\n=> Memperbarui konfigurasi domain..."
+    echo -e "\n=> Memperbarui konfigurasi..."
     sed -i "s/^DOMAIN=.*/DOMAIN=\"$new_domain\"/g" /usr/local/etc/srpcom/env.conf
     source /usr/local/etc/srpcom/env.conf
-
     rebuild_caddyfile
 
     CA_CERT=$(cat /etc/openvpn/server/keys/ca.crt 2>/dev/null)
@@ -609,10 +540,8 @@ $TA_CERT
 </tls-auth>
 EOF
 
-    echo "=> Restarting API..."
     systemctl restart xray-api
-    
-    echo -e "\n\e[32m[SUCCESS]\e[0m Domain berhasil diganti menjadi $DOMAIN!"
+    echo -e "\n\e[32m[SUCCESS]\e[0m Domain diganti menjadi $DOMAIN!"
     sleep 2
 }
 
@@ -621,59 +550,41 @@ add_extra_domain() {
     echo "======================================"
     echo "      TAMBAH SUBDOMAIN (BUG) BARU     "
     echo "======================================"
-    echo "Domain Utama : $DOMAIN"
-    echo "======================================"
-    echo "Cukup masukkan subdomain depannya saja."
-    echo "Contoh: jika Anda memasukkan 'bug.wa',"
-    echo "maka akan menjadi: bug.wa.$DOMAIN"
-    echo "======================================"
-    read -p "Masukkan Subdomain (tekan 'x' untuk batal): " input_bug
+    read -p "Subdomain (contoh: bug.wa): " input_bug
     
     if [[ "$input_bug" == "x" || "$input_bug" == "X" || -z "$input_bug" ]]; then return; fi
     
     input_bug=${input_bug%.$DOMAIN}
     full_domain="${input_bug}.${DOMAIN}"
     
-    echo -e "\nMemeriksa resolusi DNS untuk $full_domain..."
+    echo -e "\nMemeriksa resolusi DNS..."
     domain_ip=$(getent ahostsv4 "$full_domain" | awk '{ print $1 }' | head -n 1)
     
     if [[ "$domain_ip" != "$IP_ADD" ]]; then
-        echo -e "\n\e[31m[ERROR]\e[0m Domain $full_domain belum mengarah ke IP $IP_ADD!"
-        echo "IP DNS saat ini: ${domain_ip:-Kosong}"
-        echo "Pastikan A Record DNS sudah mengarah ke VPS (DNS Only)."
-        sleep 4
-        return
+        echo -e "\n\e[31m[ERROR]\e[0m Resolusi DNS Gagal!"
+        sleep 4; return
     fi
     
     if grep -q "^$full_domain$" /usr/local/etc/srpcom/extra_domains.txt 2>/dev/null; then
-        echo -e "\n\e[33m[INFO]\e[0m Domain $full_domain sudah ada dalam daftar."
-        sleep 2
-        return
+        echo -e "\n\e[33m[INFO]\e[0m Domain sudah ada."
+        sleep 2; return
     fi
     
     echo "$full_domain" >> /usr/local/etc/srpcom/extra_domains.txt
-    
-    echo -e "\n=> Mengonfigurasi ulang Caddy Server..."
     rebuild_caddyfile
-    
-    echo -e "\n\e[32m[SUCCESS]\e[0m Bug $full_domain berhasil ditambahkan dan diamankan!"
+    echo -e "\n\e[32m[SUCCESS]\e[0m Bug $full_domain ditambahkan!"
     sleep 2
 }
 
 del_extra_domain() {
     clear
     echo "======================================"
-    echo "         HAPUS EXTRA DOMAIN / SNI     "
+    echo "         HAPUS EXTRA DOMAIN           "
     echo "======================================"
-    if [ ! -s "/usr/local/etc/srpcom/extra_domains.txt" ]; then
-        echo "Belum ada domain tambahan yang terdaftar."
-        pause; return
-    fi
-    
     mapfile -t domains < /usr/local/etc/srpcom/extra_domains.txt
     
     if [ ${#domains[@]} -eq 0 ]; then
-        echo "Belum ada domain tambahan yang terdaftar."
+        echo "Belum ada domain tambahan."
         pause; return
     fi
 
@@ -682,19 +593,15 @@ del_extra_domain() {
     done
     echo "0. Kembali"
     echo "======================================"
-    read -p "Pilih nomor domain yang dihapus [1-${#domains[@]} or 0]: " choice
+    read -p "Pilih nomor domain [1-${#domains[@]} or 0]: " choice
     
     if [[ "$choice" == "0" ]]; then return; fi
 
     if [[ "$choice" -gt 0 && "$choice" -le "${#domains[@]}" ]]; then
         selected_domain="${domains[$((choice-1))]}"
-        
         sed -i "/^${selected_domain}$/d" /usr/local/etc/srpcom/extra_domains.txt
-        
-        echo -e "\n=> Mengonfigurasi ulang Caddy Server..."
         rebuild_caddyfile
-        
-        echo -e "\n\e[32m[SUCCESS]\e[0m Domain $selected_domain berhasil dihapus dari sistem!"
+        echo -e "\n\e[32m[SUCCESS]\e[0m Domain $selected_domain dihapus!"
         sleep 2
     else
         echo -e "\n=> Pilihan tidak valid!"; sleep 1; del_extra_domain
@@ -707,7 +614,7 @@ list_extra_domain() {
     echo "        DAFTAR EXTRA DOMAIN / SNI     "
     echo "======================================"
     if [ ! -s "/usr/local/etc/srpcom/extra_domains.txt" ]; then
-        echo "Belum ada domain tambahan yang terdaftar."
+        echo "Belum ada domain tambahan."
     else
         awk '{print "- " $1}' /usr/local/etc/srpcom/extra_domains.txt
     fi
@@ -724,38 +631,24 @@ import_github_domain() {
     
     wget -q -O /tmp/new_domains.txt "$GITHUB_RAW/core/extra_domains.txt"
     if [ ! -s /tmp/new_domains.txt ]; then
-        echo -e "\e[31m[ERROR]\e[0m Gagal mengambil data atau daftar di GitHub kosong!"
-        rm -f /tmp/new_domains.txt
-        sleep 2; return
+        echo -e "\e[31m[ERROR]\e[0m Gagal mengambil data!"
+        rm -f /tmp/new_domains.txt; sleep 2; return
     fi
     
     touch /usr/local/etc/srpcom/extra_domains.txt
-
     echo -e "\n\e[36m[ DAFTAR DOMAIN DI GITHUB ]\e[0m"
     awk '{print "- " $1}' /tmp/new_domains.txt
-    
-    echo -e "\n\e[36m[ DAFTAR DOMAIN DI SISTEM SAAT INI ]\e[0m"
-    if [ ! -s "/usr/local/etc/srpcom/extra_domains.txt" ]; then
-        echo "- (Kosong)"
-    else
-        awk '{print "- " $1}' /usr/local/etc/srpcom/extra_domains.txt
-    fi
-    
     echo "======================================"
-    read -p "Apakah Anda yakin ingin mengimpor data di atas? (y/n): " confirm
+    read -p "Import data di atas? (y/n): " confirm
     if [[ "$confirm" != "y" && "$confirm" != "Y" ]]; then
-        echo "=> Dibatalkan."; rm -f /tmp/new_domains.txt; sleep 1; return
+        echo "Batal."; rm -f /tmp/new_domains.txt; sleep 1; return
     fi
 
     echo -e "\n=> Memproses import..."
     local has_new=false
     while read -r domain; do
         if [ -z "$domain" ]; then continue; fi
-        
-        if grep -q "^${domain}$" /usr/local/etc/srpcom/extra_domains.txt 2>/dev/null; then
-            echo -e " - $domain \e[33m(Sudah ada, dilewati)\e[0m"
-        else
-            echo -e " + $domain \e[32m(Ditambahkan)\e[0m"
+        if ! grep -q "^${domain}$" /usr/local/etc/srpcom/extra_domains.txt 2>/dev/null; then
             echo "$domain" >> /usr/local/etc/srpcom/extra_domains.txt
             has_new=true
         fi
@@ -764,32 +657,28 @@ import_github_domain() {
     rm -f /tmp/new_domains.txt
 
     if [ "$has_new" = true ]; then
-        echo -e "\n\e[32m[SUCCESS]\e[0m Data baru berhasil digabungkan!"
-        echo "=> Mengonfigurasi ulang Caddy Server..."
         rebuild_caddyfile
-        sleep 2
+        echo -e "\n\e[32m[SUCCESS]\e[0m Domain ditambahkan!"
     else
-        echo -e "\n\e[33m[INFO]\e[0m Tidak ada perubahan (semua domain dari GitHub sudah ada di sistem)."
-        sleep 3
+        echo -e "\n\e[33m[INFO]\e[0m Tidak ada data baru."
     fi
+    sleep 2
 }
 
 menu_extra_domain() {
     while true; do
         clear
+        echo "╔════════════════════════════════════╗"
+        echo "║        MANAJEMEN BUG / SNI         ║"
+        echo "╚════════════════════════════════════╝"
+        echo " 1. Tambah Subdomain Baru"
+        echo " 2. Hapus Subdomain"
+        echo " 3. Lihat Daftar Subdomain"
+        echo " 4. Import dari GitHub"
+        echo "--------------------------------------"
+        echo " 0/x. Kembali"
         echo "======================================"
-        echo "     MANAJEMEN EXTRA DOMAIN / SNI     "
-        echo "======================================"
-        echo "Domain Utama : $DOMAIN"
-        echo "Default SSL  : support.zoom.us.$DOMAIN"
-        echo "======================================"
-        echo "1. Tambah Subdomain (Bug) Baru"
-        echo "2. Hapus Subdomain (Bug)"
-        echo "3. Lihat Daftar Subdomain"
-        echo "4. Import Daftar Subdomain dari GitHub"
-        echo "0/x. Kembali ke Settings"
-        echo "======================================"
-        read -p "Pilih opsi [0-4 or x]: " opt
+        read -p " Pilih opsi [0-4 or x]: " opt
         case $opt in
             1) add_extra_domain ;;
             2) del_extra_domain ;;
@@ -815,9 +704,9 @@ restore_data() {
         sleep 2; return
     fi
 
-    echo -e "\nMetode Restore (Hanya memproses Akun VPN, Sistem diabaikan):"
-    echo "1. Replace (Hapus user saat ini, ganti total dengan backup)"
-    echo "2. Merge   (Tambahkan user dari backup ke data saat ini)"
+    echo -e "\nMetode Restore (VPN Saja):"
+    echo "1. Replace (Ganti total)"
+    echo "2. Merge (Tambahkan data lama)"
     read -p "Pilih Metode [1-2]: " restore_mode
 
     if [[ "$restore_mode" != "1" && "$restore_mode" != "2" ]]; then
@@ -863,7 +752,7 @@ restore_data() {
     done
     
     if [ -f "/usr/local/etc/srpcom/ssh_expiry.txt" ]; then
-        echo "=> Membangun ulang OS User SSH..."
+        echo "=> Membangun OS User SSH..."
         while read -r user pass exp_date exp_time; do
             if [ -n "$user" ] && ! id "$user" &>/dev/null; then
                 useradd -e "$exp_date" -s /bin/false -M "$user"
@@ -874,7 +763,7 @@ restore_data() {
 
     rm -rf /tmp/restore_temp
     systemctl restart xray caddy xray-api ipsec xl2tpd dropbear ssh-ws srpcom-bot
-    echo -e "\n\e[32m[SUCCESS]\e[0m Restore Data Akun VPN Berhasil!"
+    echo -e "\n\e[32m[SUCCESS]\e[0m Restore Berhasil!"
     pause
 }
 
@@ -884,72 +773,62 @@ menu_api_key() {
     echo "       SETTING API KEY WEBSITE        "
     echo "======================================"
     current_key=$(cat /usr/local/etc/xray/api_key.conf 2>/dev/null)
-    echo "Current API Key: ${current_key}"
+    echo "Current Key: ${current_key}"
     echo "======================================"
-    read -p "Input New API Key (tekan 'x' untuk batal): " new_key
+    read -p "Input New Key (x=batal): " new_key
     if [[ "$new_key" != "x" && "$new_key" != "X" && -n "$new_key" ]]; then
         echo "$new_key" > /usr/local/etc/xray/api_key.conf
         systemctl restart xray-api
-        echo -e "\n\e[32m[SUCCESS]\e[0m API Key berhasil diubah dan sistem direstart!"
+        echo -e "\n\e[32m[SUCCESS]\e[0m Berhasil disimpan!"
         sleep 2
     fi
 }
 
 menu_node_server() {
     local srv_file="/usr/local/etc/xray/servers.json"
-    if [ ! -f "$srv_file" ]; then
-        echo '{"nodes": []}' > "$srv_file"
-    fi
+    if [ ! -f "$srv_file" ]; then echo '{"nodes": []}' > "$srv_file"; fi
 
     while true; do
         clear
-        echo "======================================"
-        echo "      MANAJEMEN NODE SERVER (BOT)     "
-        echo "======================================"
-        echo "Daftar Server yang diremote oleh Bot:"
-        echo "--------------------------------------"
+        echo "╔════════════════════════════════════╗"
+        echo "║        MANAJEMEN NODE SERVER       ║"
+        echo "╚════════════════════════════════════╝"
+        echo "Daftar Remote Server:"
         local count=$(jq '.nodes | length' "$srv_file" 2>/dev/null || echo 0)
         if [[ "$count" -eq 0 ]]; then
-            echo " (Belum ada node server tambahan)"
+            echo " - Kosong"
         else
-            jq -r '.nodes | to_entries | .[] | "\(.key+1). \(.value.name) (\(.value.domain))"' "$srv_file"
+            jq -r '.nodes | to_entries | .[] | " \(.key+1). \(.value.name)"' "$srv_file"
         fi
         echo "--------------------------------------"
-        echo "1. Tambah Node Server"
-        echo "2. Hapus Node Server"
-        echo "0/x. Kembali ke Settings"
+        echo " 1. Tambah Node Server"
+        echo " 2. Hapus Node Server"
+        echo " 0. Kembali"
         echo "======================================"
-        read -p "Pilih opsi [0-2 or x]: " opt
+        read -p " Pilih opsi [0-2]: " opt
         case $opt in
             1)
                 echo ""
-                read -p "Masukkan Nama Server (contoh: SG 1): " n_name
-                read -p "Masukkan Domain Server (tanpa http/https): " n_dom
-                read -p "Masukkan API Key Server tersebut: " n_key
+                read -p "Nama Server (misal SG 1): " n_name
+                read -p "Domain Server: " n_dom
+                read -p "API Key Server: " n_key
                 if [[ -n "$n_name" && -n "$n_dom" && -n "$n_key" ]]; then
                     jq --arg name "$n_name" --arg dom "$n_dom" --arg key "$n_key" \
                        '.nodes += [{"name": $name, "domain": $dom, "api_key": $key}]' "$srv_file" > /tmp/srv.json
                     mv /tmp/srv.json "$srv_file"
-                    echo -e "\n=> Server '$n_name' berhasil ditambahkan!"
                     systemctl restart srpcom-bot
-                    sleep 2
-                else
-                    echo -e "\n=> Input tidak boleh kosong!"; sleep 2
+                    echo -e "\n=> Berhasil ditambahkan!"; sleep 2
                 fi
                 ;;
             2)
                 echo ""
-                read -p "Masukkan nomor server yang akan dihapus: " del_id
+                read -p "Pilih nomor yang dihapus: " del_id
                 if [[ "$del_id" =~ ^[0-9]+$ ]] && [[ "$del_id" -gt 0 ]] && [[ "$del_id" -le "$count" ]]; then
                     local idx=$((del_id-1))
-                    local del_name=$(jq -r ".nodes[$idx].name" "$srv_file")
                     jq "del(.nodes[$idx])" "$srv_file" > /tmp/srv.json
                     mv /tmp/srv.json "$srv_file"
-                    echo -e "\n=> Server '$del_name' berhasil dihapus!"
                     systemctl restart srpcom-bot
-                    sleep 2
-                else
-                    echo -e "\n=> Nomor tidak valid!"; sleep 2
+                    echo -e "\n=> Berhasil dihapus!"; sleep 2
                 fi
                 ;;
             0|x|X) break ;;
@@ -961,24 +840,24 @@ menu_node_server() {
 menu_settings() {
     while true; do
         clear
-        echo "╔════════════════════════════════════════════════════════╗"
-        echo "║               BACKUP & RESTORE / SETTINGS              ║"
-        echo "╚════════════════════════════════════════════════════════╝"
-        echo " [1] AUTOBACKUP VIA BOT TELEGRAM"
-        echo " [2] AUTOSEND CREATED VPN VIA BOT"
-        echo " [3] BACKUP VIA BOT TELEGRAM (MANUAL)"
-        echo " [4] RESTORE DATA via VPS"
-        echo " [5] SETTING API KEY FOR WEBSITE"
-        echo " [6] GANTI DOMAIN VPS"
-        echo " [7] SETTING AUTO-KILL MULTI LOGIN"
-        echo " [8] SETTING AUTO-DELETE EXPIRED"
-        echo " [9] SETTING TELEGRAM ADMIN BOT"
-        echo " [10] MANAJEMEN DOMAIN BUG / SNI"
-        echo " [11] MANAJEMEN NODE SERVER (MULTI-VPS)"
-        echo "---------------------------------------------------------"
-        echo " [0/x] Back to Main Menu"
-        echo "========================================================="
-        read -p " Select option [0-11 or x]: " opt
+        echo "╔════════════════════════════════════╗"
+        echo "║        SETTINGS & BACKUP           ║"
+        echo "╚════════════════════════════════════╝"
+        echo " 1. Autobackup via Bot Telegram"
+        echo " 2. Autosend Created VPN via Bot"
+        echo " 3. Backup Manual via Bot"
+        echo " 4. Restore Data VPS"
+        echo " 5. Setting API Key Web"
+        echo " 6. Ganti Domain VPS"
+        echo " 7. Setting Auto-Kill"
+        echo " 8. Setting Auto-Expired"
+        echo " 9. Setting Telegram Admin Bot"
+        echo " 10. Manajemen Bug / SNI"
+        echo " 11. Manajemen Node Server"
+        echo "--------------------------------------"
+        echo " 0/x. Kembali ke Menu Utama"
+        echo "======================================"
+        read -p " Pilih opsi [0-11 or x]: " opt
         case $opt in
             1) menu_autobackup ;;
             2) menu_autosend ;;
@@ -1001,17 +880,17 @@ main_menu() {
     while true; do
         print_header
         
-        echo "1. MENU XRAY (Vmess, Vless, Trojan)"
-        echo "2. MENU SSH & OVPN"
-        echo "3. MENU L2TP"
-        echo "4. MONITORING PANEL"
-        echo "5. SETTINGS (Backup/Autokill/Bot)"
-        echo "6. RESTART SERVICES (All)"
-        echo "7. CEK STATUS SERVICES"
-        echo "8. UPDATE SCRIPT"
-        echo "0/x. Exit CLI"
+        echo " 1. MENU XRAY (Vmess, Vless, Trojan)"
+        echo " 2. MENU SSH & OVPN"
+        echo " 3. MENU L2TP"
+        echo " 4. MONITORING PANEL"
+        echo " 5. SETTINGS (Backup/Autokill/Bot)"
+        echo " 6. RESTART SERVICES (All)"
+        echo " 7. CEK STATUS SERVICES"
+        echo " 8. UPDATE SCRIPT"
+        echo " 0/x. Exit CLI"
         echo ""
-        read -p "Pilih opsi [0-8 or x]: " opt
+        read -p " Pilih opsi [0-8 or x]: " opt
         case $opt in
             1) menu_xray ;;
             2) menu_ssh ;;
@@ -1022,7 +901,7 @@ main_menu() {
                 echo -e "\n=> Restarting Services..."
                 systemctl reload caddy 2>/dev/null
                 systemctl restart xray cron xray-api ipsec xl2tpd srpcom-bot 2>/dev/null
-                echo -e "=> Done! (Dropbear & SSH-WS di-skip agar tidak ter-logout)"
+                echo -e "=> Selesai!"
                 sleep 2 ;;
             7)
                 clear
