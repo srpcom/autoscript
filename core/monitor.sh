@@ -114,6 +114,27 @@ monitor_system() {
     htop
 }
 
+run_speedtest() {
+    clear
+    echo "======================================"
+    echo "          SPEEDTEST SERVER            "
+    echo "======================================"
+    # Memeriksa apakah speedtest terinstal, jika belum akan memberitahu
+    if ! command -v speedtest &> /dev/null; then
+        echo -e "\e[31m[ERROR]\e[0m Speedtest CLI belum terpasang."
+        echo "Sedang mencoba menginstal..."
+        curl -s https://packagecloud.io/install/repositories/ookla/speedtest-cli/script.deb.sh | bash
+        apt install speedtest -y
+    fi
+    
+    echo "Sedang menjalankan pengujian... Mohon tunggu."
+    echo "--------------------------------------"
+    # Menjalankan speedtest dengan otomatis menerima license
+    speedtest --accept-license --accept-gdpr
+    echo "======================================"
+    pause
+}
+
 menu_monitor() {
     while true; do
         clear
@@ -128,10 +149,11 @@ menu_monitor() {
         echo " 6. OpenVPN Log (Live Debug)"
         echo " 7. Caddy Proxy Log (Live Debug)"
         echo " 8. System Resource (CPU & RAM)"
+        echo " 9. Speedtest Server"
         echo "--------------------------------------"
         echo " 0/x. Kembali ke Menu Utama"
         echo "======================================"
-        read -p " Pilih Opsi [0-8 or x]: " opt
+        read -p " Pilih Opsi [0-9 or x]: " opt
         case $opt in
             1) monitor_ssh ;;
             2) monitor_xray ;;
@@ -157,6 +179,8 @@ menu_monitor() {
                 sleep 2; journalctl -u caddy -f ;;
             8)
                 monitor_system ;;
+            9)
+                run_speedtest ;;
             0|x|X) break ;;
             *) echo -e "\n=> Pilihan tidak valid!"; sleep 1 ;;
         esac
