@@ -67,10 +67,10 @@ add_vmess_ws() {
     read -p "Username (x = Batal) : " user
     if [[ "$user" == "x" || "$user" == "X" ]]; then return; fi
     
-    # Cek apakah user sudah ada, jika ada tambahkan angka berurutan
+    # Cek apakah user sudah ada di config.json, jika ada tambahkan angka berurutan
     original_user="$user"
     counter=2
-    while grep -q "^$user " /usr/local/etc/xray/expiry.txt 2>/dev/null; do
+    while grep -q "\"email\": \"$user\"" /usr/local/etc/xray/config.json; do
         user="${original_user}${counter}"
         ((counter++))
     done
@@ -110,10 +110,10 @@ add_vless_ws() {
     read -p "Username (x = Batal) : " user
     if [[ "$user" == "x" || "$user" == "X" ]]; then return; fi
     
-    # Cek apakah user sudah ada, jika ada tambahkan angka berurutan
+    # Cek apakah user sudah ada di config.json, jika ada tambahkan angka berurutan
     original_user="$user"
     counter=2
-    while grep -q "^$user " /usr/local/etc/xray/expiry.txt 2>/dev/null; do
+    while grep -q "\"email\": \"$user\"" /usr/local/etc/xray/config.json; do
         user="${original_user}${counter}"
         ((counter++))
     done
@@ -151,10 +151,10 @@ add_trojan_ws() {
     read -p "Username (x = Batal) : " user
     if [[ "$user" == "x" || "$user" == "X" ]]; then return; fi
     
-    # Cek apakah user sudah ada, jika ada tambahkan angka berurutan
+    # Cek apakah user sudah ada di config.json, jika ada tambahkan angka berurutan
     original_user="$user"
     counter=2
-    while grep -q "^$user " /usr/local/etc/xray/expiry.txt 2>/dev/null; do
+    while grep -q "\"email\": \"$user\"" /usr/local/etc/xray/config.json; do
         user="${original_user}${counter}"
         ((counter++))
     done
