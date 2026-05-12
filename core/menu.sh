@@ -305,11 +305,12 @@ menu_update() {
         echo " [6]  Update Modul Monitoring (monitor.sh)"
         echo " [7]  Update Fitur Auto (autokill.sh & auto_expired.sh)"
         echo " [8]  Update API Backend & Bot Telegram (configs/*.py)"
-        echo " [9]  Update SEMUA Modul (ALL IN ONE)"
+        echo " [9]  Update Modul Notifikasi (telegram.sh)"
+        echo " [10] Update SEMUA Modul (ALL IN ONE)"
         echo "---------------------------------------------------------"
         echo " [0/x] Kembali ke Menu Utama"
         echo "========================================================="
-        read -p " Pilih opsi [0-9 or x]: " opt
+        read -p " Pilih opsi [0-10 or x]: " opt
         
         case $opt in
             1) 
@@ -364,6 +365,11 @@ menu_update() {
                 systemctl restart xray-api srpcom-bot
                 echo -e "\e[32m[SUCCESS]\e[0m API & Bot diperbarui dan di-restart!"; sleep 1.5 ;;
             9) 
+                echo -e "\n=> Mengunduh telegram.sh..."
+                wget -q -O /usr/local/bin/srpcom/telegram.sh "$GITHUB_RAW/core/telegram.sh"
+                chmod +x /usr/local/bin/srpcom/telegram.sh
+                echo -e "\e[32m[SUCCESS]\e[0m Modul Notifikasi (telegram.sh) diperbarui!"; sleep 1.5 ;;
+            10) 
                 echo -e "\n=> Mengunduh SEMUA modul sistem..."
                 wget -q -O /usr/local/bin/srpcom/utils.sh "$GITHUB_RAW/core/utils.sh"
                 wget -q -O /usr/local/bin/srpcom/telegram.sh "$GITHUB_RAW/core/telegram.sh"
