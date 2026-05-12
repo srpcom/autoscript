@@ -294,6 +294,21 @@ def add_user(protocol):
     user, exp = data.get('user'), int(data.get('exp', 30))
     limit_ip, limit_quota = int(data.get('limit_ip', 0)), int(data.get('limit_quota', 0))
     if not user: return jsonify({"stdout": "Error: User required"}), 400
+    
+    # Cek dan Auto-increment nama user
+    original_user = user
+    counter = 2
+    def is_xray_user(u):
+        if not os.path.exists(EXP_FILE): return False
+        with open(EXP_FILE, 'r') as f:
+            for line in f:
+                if line.startswith(u + " "): return True
+        return False
+    
+    while is_xray_user(user):
+        user = f"{original_user}{counter}"
+        counter += 1
+        
     uid = str(uuid.uuid4())
     dt = datetime.datetime.now() + datetime.timedelta(days=exp)
     cfg = load_json(XRAY_CONF)
@@ -430,8 +445,12 @@ def add_ssh():
     limit_ip = int(data.get('limit_ip', 0))
     if not user: return jsonify({"stdout": "Error: User required"}), 400
     
-    res = subprocess.run(['id', user], capture_output=True)
-    if res.returncode == 0: return jsonify({"stdout": f"Error: User '{user}' sudah ada di Linux!"}), 400
+    # Cek dan Auto-increment nama user
+    original_user = user
+    counter = 2
+    while subprocess.run(['id', user], capture_output=True).returncode == 0:
+        user = f"{original_user}{counter}"
+        counter += 1
     
     dt = datetime.datetime.now() + datetime.timedelta(days=exp)
     exp_date, exp_time = dt.strftime('%Y-%m-%d'), dt.strftime('%H:%M:%S')
@@ -599,10 +618,17 @@ def add_l2tp():
     user, password, exp = data.get('user'), data.get('password', '123'), int(data.get('exp', 30))
     if not user: return jsonify({"stdout": "Error: User required"}), 400
     
-    if os.path.exists(CHAP_SECRETS):
+    # Cek dan Auto-increment nama user
+    original_user = user
+    counter = 2
+    def is_l2tp_user(u):
+        if not os.path.exists(CHAP_SECRETS): return False
         with open(CHAP_SECRETS, 'r') as f:
-            if f'"{user}" l2tpd' in f.read():
-                return jsonify({"stdout": f"Error: User L2TP '{user}' sudah ada!"}), 400
+            return f'"{u}" l2tpd' in f.read()
+            
+    while is_l2tp_user(user):
+        user = f"{original_user}{counter}"
+        counter += 1
 
     dt = datetime.datetime.now() + datetime.timedelta(days=exp)
     exp_date, exp_time = dt.strftime('%Y-%m-%d'), dt.strftime('%H:%M:%S')
