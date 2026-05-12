@@ -496,7 +496,7 @@
                 endpoint = `/user_legend/list-accounts/${cleanProt}`;
             }
 
-            let method = (act === 'list-accounts' || act === 'detail') ? 'GET' : 'POST';
+            let method = (act === 'list-accounts') ? 'GET' : 'POST';
             if (act === 'del') method = 'DELETE';
 
             let payload = {};
@@ -526,7 +526,7 @@
 
             printToTerminal(`\n> Executing [${act.toUpperCase()}] on protocol [${prot.toUpperCase()}]...`, 'info');
             
-            await fetchAPI(endpoint, method, method === 'GET' ? null : payload);
+            await fetchAPI(endpoint, method, (act === 'list-accounts') ? null : payload);
             
             btn.innerHTML = originalBtnHtml;
             btn.disabled = false;
