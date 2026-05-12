@@ -1,8 +1,8 @@
 #!/bin/bash
 # ==========================================
 # monitor.sh
-# MODULE: LIVE MONITORING
-# Memantau aktivitas login user SSH dan Log Xray
+# MODULE: LIVE MONITORING & DEBUGGING
+# Memantau aktivitas login user dan System Logs
 # ==========================================
 
 source /usr/local/etc/srpcom/env.conf
@@ -36,7 +36,6 @@ monitor_xray() {
             ul=${ul:-0}
             total_bytes=$((dl + ul))
             
-            # Format Data lebih ringkas untuk HP
             if [ "$total_bytes" -ge 1073741824 ]; then
                 total_gb=$(awk "BEGIN {printf \"%.2fGB\", $total_bytes/1073741824}")
             elif [ "$total_bytes" -ge 1048576 ]; then
@@ -97,6 +96,24 @@ monitor_ssh() {
     pause
 }
 
+monitor_system() {
+    clear
+    echo -e "\n\e[33m[INFO]\e[0m Membuka System Resource Monitor..."
+    echo -e "\e[31m=> Tekan tombol 'q' atau 'F10' untuk keluar dari monitor.\e[0m\n"
+    sleep 2
+    
+    # Cek dan instal htop jika belum ada
+    if ! command -v htop &> /dev/null; then
+        echo "=> Menginstal komponen htop..."
+        export DEBIAN_FRONTEND=noninteractive
+        apt-get update -y > /dev/null 2>&1
+        apt-get install htop -y > /dev/null 2>&1
+    fi
+    
+    # Menjalankan htop
+    htop
+}
+
 menu_monitor() {
     while true; do
         clear
@@ -107,10 +124,14 @@ menu_monitor() {
         echo " 2. Monitor Xray & Kuota (Tabel)"
         echo " 3. Xray Access Log (Live Tail)"
         echo " 4. Xray Error Log (Live Tail)"
+        echo " 5. L2TP & IPsec Log (Live Debug)"
+        echo " 6. OpenVPN Log (Live Debug)"
+        echo " 7. Caddy Proxy Log (Live Debug)"
+        echo " 8. System Resource (CPU & RAM)"
         echo "--------------------------------------"
         echo " 0/x. Kembali ke Menu Utama"
         echo "======================================"
-        read -p " Pilih Opsi [0-4 or x]: " opt
+        read -p " Pilih Opsi [0-8 or x]: " opt
         case $opt in
             1) monitor_ssh ;;
             2) monitor_xray ;;
@@ -122,6 +143,20 @@ menu_monitor() {
                 echo -e "\n\e[33m[INFO]\e[0m Membuka log error Xray..."
                 echo -e "\e[31m=> Tekan Ctrl+C untuk keluar.\e[0m\n"
                 sleep 2; tail -f /var/log/xray/error.log ;;
+            5)
+                echo -e "\n\e[33m[INFO]\e[0m Membuka live log L2TP & IPsec..."
+                echo -e "\e[31m=> Tekan Ctrl+C untuk keluar.\e[0m\n"
+                sleep 2; journalctl -u xl2tpd -u ipsec -f ;;
+            6)
+                echo -e "\n\e[33m[INFO]\e[0m Membuka live log OpenVPN TCP & UDP..."
+                echo -e "\e[31m=> Tekan Ctrl+C untuk keluar.\e[0m\n"
+                sleep 2; journalctl -u openvpn-server@server-udp -u openvpn-server@server-tcp -f ;;
+            7)
+                echo -e "\n\e[33m[INFO]\e[0m Membuka live log Caddy Server..."
+                echo -e "\e[31m=> Tekan Ctrl+C untuk keluar.\e[0m\n"
+                sleep 2; journalctl -u caddy -f ;;
+            8)
+                monitor_system ;;
             0|x|X) break ;;
             *) echo -e "\n=> Pilihan tidak valid!"; sleep 1 ;;
         esac
