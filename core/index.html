@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SRPCOM V5 - Web Panel</title>
+    <title>SRPCOM V5.1 - Web Panel</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <script>
@@ -19,62 +19,89 @@
             }
         }
     </script>
+    <style>
+        /* Custom Scrollbar for Terminal */
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #0f1419; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #475569; }
+        .toast-enter { animation: slideInRight 0.3s forwards; }
+        .toast-leave { animation: fadeOut 0.3s forwards; }
+        @keyframes slideInRight {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+        @keyframes fadeOut {
+            from { opacity: 1; }
+            to { opacity: 0; }
+        }
+    </style>
 </head>
 <body class="bg-slate-900 text-slate-200 font-sans antialiased overflow-hidden h-screen" onload="initApp()">
 
+    <!-- Toast Notification Container -->
+    <div id="toast-container" class="fixed top-5 right-5 z-[100] flex flex-col gap-3 pointer-events-none"></div>
+
     <!-- Login Overlay -->
-    <div id="login-overlay" class="absolute inset-0 bg-slate-900 z-50 flex items-center justify-center transition-opacity duration-300">
-        <div class="bg-slate-800 p-8 rounded-2xl shadow-2xl border border-slate-700 max-w-md w-full mx-4">
+    <div id="login-overlay" class="absolute inset-0 bg-slate-900 z-50 flex items-center justify-center transition-opacity duration-500">
+        <div class="bg-slate-800 p-8 rounded-2xl shadow-2xl border border-slate-700 max-w-md w-full mx-4 transform transition-all">
             <div class="text-center mb-8">
-                <div class="w-16 h-16 bg-blue-500/20 text-blue-400 rounded-full flex items-center justify-center text-3xl mx-auto mb-4">
+                <div class="w-16 h-16 bg-blue-500/20 text-blue-400 rounded-full flex items-center justify-center text-3xl mx-auto mb-4 ring-4 ring-blue-500/10">
                     <i class="fas fa-shield-alt"></i>
                 </div>
-                <h2 class="text-2xl font-bold text-white">SRPCOM Panel</h2>
-                <p class="text-slate-400 text-sm mt-2">Masukkan API Key Node Server Anda</p>
+                <h2 class="text-2xl font-bold text-white tracking-wide">SRPCOM Panel</h2>
+                <p class="text-slate-400 text-sm mt-2">Node Server Authentication</p>
             </div>
             
-            <div class="space-y-4">
-                <div>
-                    <input type="password" id="inp-apikey" class="w-full bg-slate-900 border border-slate-600 text-slate-200 rounded-lg py-3 px-4 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-center tracking-widest placeholder:tracking-normal" placeholder="API Key / Password">
+            <div class="space-y-5">
+                <div class="relative">
+                    <i class="fas fa-key absolute left-4 top-3.5 text-slate-500"></i>
+                    <input type="password" id="inp-apikey" class="w-full bg-slate-900 border border-slate-600 text-slate-200 rounded-lg py-3 pl-10 pr-4 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/50 transition-all font-mono placeholder:font-sans placeholder:tracking-normal tracking-widest" placeholder="Masukkan API Key">
                 </div>
-                <button onclick="performLogin()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-lg transition duration-200 shadow-lg shadow-blue-900/20">
-                    Masuk ke Panel
+                <button onclick="performLogin()" id="btn-login" class="w-full bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 text-white font-bold py-3 rounded-lg transition duration-200 shadow-lg shadow-blue-900/40 flex items-center justify-center">
+                    <span>Akses Sistem</span> <i class="fas fa-arrow-right ml-2 text-sm"></i>
                 </button>
             </div>
-            <p id="login-error" class="text-red-400 text-sm text-center mt-4 hidden">API Key salah atau server tidak merespons.</p>
+            <p id="login-error" class="text-red-400 text-sm text-center mt-4 hidden bg-red-500/10 py-2 rounded-lg border border-red-500/20"><i class="fas fa-exclamation-circle mr-1"></i> API Key tidak valid / Server Down.</p>
         </div>
     </div>
 
     <!-- App Container -->
-    <div id="app-container" class="flex h-full w-full hidden opacity-0 transition-opacity duration-300">
-        <!-- Sidebar -->
+    <div id="app-container" class="flex h-full w-full hidden opacity-0 transition-opacity duration-500">
+        <!-- Sidebar Desktop -->
         <aside class="w-64 bg-slate-800 border-r border-slate-700 flex-col hidden md:flex z-20 shadow-xl">
-            <div class="h-16 flex items-center justify-center border-b border-slate-700 bg-slate-850">
-                <h1 class="text-xl font-bold text-blue-400 tracking-wide"><i class="fas fa-server mr-2"></i>SRPCOM</h1>
+            <div class="h-16 flex items-center px-6 border-b border-slate-700 bg-slate-850">
+                <div class="w-8 h-8 bg-blue-500/20 rounded-lg flex items-center justify-center text-blue-400 mr-3">
+                    <i class="fas fa-server"></i>
+                </div>
+                <h1 class="text-lg font-bold text-white tracking-wide">SRPCOM <span class="text-blue-500">V5</span></h1>
             </div>
-            <nav class="flex-1 overflow-y-auto py-4 px-3 space-y-1">
-                <p class="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 mt-4 px-3">Layanan VPN</p>
-                <a href="#" onclick="setMode('xray')" id="nav-xray" class="nav-btn flex items-center px-3 py-2.5 text-slate-300 hover:bg-slate-700 hover:text-white rounded-lg transition">
-                    <i class="fas fa-bolt w-6 text-yellow-400"></i> Xray (WS/TLS)
-                </a>
-                <a href="#" onclick="setMode('ssh')" id="nav-ssh" class="nav-btn flex items-center px-3 py-2.5 text-slate-300 hover:bg-slate-700 hover:text-white rounded-lg transition">
-                    <i class="fas fa-shield-alt w-6 text-green-400"></i> SSH & OpenVPN
-                </a>
-                <a href="#" onclick="setMode('l2tp')" id="nav-l2tp" class="nav-btn flex items-center px-3 py-2.5 text-slate-300 hover:bg-slate-700 hover:text-white rounded-lg transition">
-                    <i class="fas fa-network-wired w-6 text-purple-400"></i> L2TP IPsec
-                </a>
+            <nav class="flex-1 overflow-y-auto py-6 px-4 space-y-1">
+                <p class="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-3 px-2">Layanan VPN</p>
+                <button onclick="setMode('xray')" id="nav-xray" class="nav-btn w-full flex items-center px-3 py-2.5 text-slate-300 hover:bg-slate-700 hover:text-white rounded-lg transition group">
+                    <i class="fas fa-bolt w-6 text-slate-400 group-hover:text-yellow-400 transition-colors"></i> Xray Core
+                </button>
+                <button onclick="setMode('ssh')" id="nav-ssh" class="nav-btn w-full flex items-center px-3 py-2.5 text-slate-300 hover:bg-slate-700 hover:text-white rounded-lg transition group">
+                    <i class="fas fa-shield-alt w-6 text-slate-400 group-hover:text-green-400 transition-colors"></i> SSH & OVPN
+                </button>
+                <button onclick="setMode('l2tp')" id="nav-l2tp" class="nav-btn w-full flex items-center px-3 py-2.5 text-slate-300 hover:bg-slate-700 hover:text-white rounded-lg transition group">
+                    <i class="fas fa-network-wired w-6 text-slate-400 group-hover:text-purple-400 transition-colors"></i> L2TP IPsec
+                </button>
                 
-                <p class="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 mt-6 px-3">Sistem & Utility</p>
-                <a href="#" onclick="executeMonitor('monitor-xray', 'GET')" class="flex items-center px-3 py-2.5 text-slate-300 hover:bg-slate-700 hover:text-white rounded-lg transition">
-                    <i class="fas fa-chart-line w-6 text-blue-400"></i> Usage Monitor
-                </a>
-                <a href="#" onclick="executeMonitor('sys-backup', 'GET')" class="flex items-center px-3 py-2.5 text-slate-300 hover:bg-slate-700 hover:text-white rounded-lg transition">
-                    <i class="fas fa-download w-6 text-orange-400"></i> Request Backup
-                </a>
+                <p class="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-3 mt-8 px-2">Sistem & Utility</p>
+                <button onclick="executeMonitor('cek-xray', 'GET')" class="w-full flex items-center px-3 py-2.5 text-slate-300 hover:bg-slate-700 hover:text-white rounded-lg transition group">
+                    <i class="fas fa-heartbeat w-6 text-slate-400 group-hover:text-pink-400 transition-colors"></i> Status Server
+                </button>
+                <button onclick="executeMonitor('monitor-xray', 'GET')" class="w-full flex items-center px-3 py-2.5 text-slate-300 hover:bg-slate-700 hover:text-white rounded-lg transition group">
+                    <i class="fas fa-chart-pie w-6 text-slate-400 group-hover:text-blue-400 transition-colors"></i> Usage Monitor
+                </button>
+                <button onclick="executeMonitor('sys-backup', 'GET')" class="w-full flex items-center px-3 py-2.5 text-slate-300 hover:bg-slate-700 hover:text-white rounded-lg transition group">
+                    <i class="fas fa-cloud-download-alt w-6 text-slate-400 group-hover:text-orange-400 transition-colors"></i> Request Backup
+                </button>
             </nav>
             <div class="p-4 border-t border-slate-700 bg-slate-850">
-                <button onclick="performLogout()" class="flex items-center justify-center w-full bg-slate-700 hover:bg-red-600/90 text-white py-2.5 rounded-lg transition font-medium">
-                    <i class="fas fa-sign-out-alt mr-2"></i> Logout
+                <button onclick="performLogout()" class="flex items-center justify-center w-full bg-slate-700/50 hover:bg-red-500/20 text-slate-300 hover:text-red-400 border border-slate-600 hover:border-red-500/50 py-2.5 rounded-lg transition font-medium">
+                    <i class="fas fa-sign-out-alt mr-2"></i> Akhiri Sesi
                 </button>
             </div>
         </aside>
@@ -82,143 +109,191 @@
         <!-- Main Content -->
         <main class="flex-1 flex flex-col h-full bg-slate-900 overflow-hidden relative">
             <!-- Header Mobile -->
-            <header class="h-16 bg-slate-800 border-b border-slate-700 flex items-center justify-between px-6 md:hidden z-20">
-                <h1 class="text-lg font-bold text-blue-400"><i class="fas fa-server mr-2"></i>SRPCOM</h1>
-                <button onclick="performLogout()" class="text-slate-400 hover:text-red-400 transition"><i class="fas fa-sign-out-alt text-xl"></i></button>
+            <header class="h-16 bg-slate-800 border-b border-slate-700 flex items-center justify-between px-6 md:hidden z-20 shadow-md">
+                <div class="flex items-center">
+                    <div class="w-8 h-8 bg-blue-500/20 rounded-lg flex items-center justify-center text-blue-400 mr-3">
+                        <i class="fas fa-server"></i>
+                    </div>
+                    <h1 class="text-lg font-bold text-white">SRPCOM <span class="text-blue-500">V5</span></h1>
+                </div>
+                <button onclick="performLogout()" class="text-slate-400 hover:text-red-400 transition bg-slate-700/50 p-2 rounded-lg"><i class="fas fa-sign-out-alt"></i></button>
             </header>
 
             <div class="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8">
-                <div class="max-w-4xl mx-auto flex flex-col gap-6 h-full pb-20 md:pb-0">
+                <div class="max-w-5xl mx-auto flex flex-col gap-6 h-full pb-24 md:pb-0">
                     
                     <!-- Status Bar -->
-                    <div class="bg-slate-800/80 backdrop-blur-sm rounded-xl p-5 border border-slate-700/50 shadow-lg flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                        <div>
-                            <h2 class="text-xl md:text-2xl font-bold text-white mb-1" id="mode-title">Server Terhubung</h2>
-                            <p class="text-slate-400 text-sm">Pilih layanan di menu untuk mengelola akun Anda.</p>
+                    <div class="bg-gradient-to-r from-slate-800 to-slate-850 rounded-2xl p-6 border border-slate-700 shadow-xl flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 relative overflow-hidden">
+                        <div class="absolute top-0 right-0 -mt-4 -mr-4 w-24 h-24 bg-blue-500/10 rounded-full blur-2xl"></div>
+                        <div class="relative z-10">
+                            <h2 class="text-2xl md:text-3xl font-bold text-white mb-1 tracking-tight" id="mode-title">Selamat Datang</h2>
+                            <p class="text-slate-400 text-sm" id="mode-desc">Pilih layanan di menu navigasi untuk memulai manajemen akun.</p>
                         </div>
-                        <div class="bg-slate-900/50 px-4 py-2 rounded-lg border border-slate-700">
-                            <p class="text-xs text-slate-500 uppercase font-semibold mb-1 tracking-wider">Host Server</p>
-                            <p class="font-mono text-blue-400 text-sm font-medium flex items-center" id="display-domain">
-                                <span class="w-2 h-2 rounded-full bg-green-500 mr-2 animate-pulse"></span>
-                                Memuat...
-                            </p>
+                        <div class="relative z-10 bg-slate-900/80 backdrop-blur-sm px-5 py-3 rounded-xl border border-slate-600/50 shadow-inner flex items-center gap-4">
+                            <div>
+                                <p class="text-[10px] text-slate-500 uppercase font-bold tracking-widest mb-0.5">Host Domain</p>
+                                <p class="font-mono text-blue-400 text-sm font-medium" id="display-domain">Memuat...</p>
+                            </div>
+                            <div class="h-8 w-px bg-slate-700"></div>
+                            <div class="flex items-center justify-center w-8 h-8 rounded-full bg-green-500/10 border border-green-500/20" title="Server Online">
+                                <span class="w-2.5 h-2.5 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.8)] animate-pulse"></span>
+                            </div>
                         </div>
                     </div>
 
-                    <!-- Form Builder -->
-                    <div id="form-container" class="bg-slate-800 rounded-xl p-6 border border-slate-700 shadow-lg hidden transition-all duration-300">
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-5 mb-5">
-                            <div>
-                                <label class="block text-sm font-medium text-slate-300 mb-2">Aksi (Action)</label>
-                                <div class="relative">
-                                    <select id="action-type" class="w-full bg-slate-900 border border-slate-600 text-slate-200 rounded-lg py-2.5 px-4 appearance-none focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
-                                        <option value="add">➕ Create Account</option>
-                                        <option value="trial">⏱️ Trial Account (60m)</option>
-                                        <option value="renew">🔄 Renew Account</option>
-                                        <option value="detail">🔍 Cek Detail Akun</option>
-                                        <option value="del">❌ Delete Account</option>
-                                        <option value="list-accounts" id="opt-list">📋 List Semua Akun</option>
-                                    </select>
-                                    <i class="fas fa-chevron-down absolute right-4 top-3.5 text-slate-500 pointer-events-none"></i>
-                                </div>
+                    <!-- Layout Grid untuk Form & Terminal -->
+                    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 flex-1 min-h-0">
+                        
+                        <!-- Form Builder (Kiri) -->
+                        <div id="form-container" class="lg:col-span-5 bg-slate-800 rounded-2xl p-6 border border-slate-700 shadow-xl flex flex-col hidden opacity-0 transition-opacity duration-300">
+                            <div class="flex items-center justify-between mb-5 pb-4 border-b border-slate-700">
+                                <h3 class="text-lg font-bold text-white"><i class="fas fa-sliders-h text-blue-400 mr-2"></i> Parameter Kontrol</h3>
                             </div>
-                            <div>
-                                <label class="block text-sm font-medium text-slate-300 mb-2">Protokol</label>
-                                <div class="relative">
-                                    <select id="protocol-type" class="w-full bg-slate-900 border border-slate-600 text-slate-200 rounded-lg py-2.5 px-4 appearance-none focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
-                                        <!-- Diisi oleh JS -->
-                                    </select>
-                                    <i class="fas fa-chevron-down absolute right-4 top-3.5 text-slate-500 pointer-events-none"></i>
-                                </div>
-                            </div>
-                        </div>
 
-                        <div id="input-fields" class="space-y-5 bg-slate-900/30 p-4 rounded-lg border border-slate-700/50">
-                            <div>
-                                <label class="block text-sm font-medium text-slate-300 mb-2">Username / Remarks</label>
-                                <input type="text" id="inp-user" placeholder="Misal: client_01" class="w-full bg-slate-900 border border-slate-600 text-slate-200 rounded-lg py-2.5 px-4 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
-                            </div>
-                            <div id="field-pass" class="hidden">
-                                <label class="block text-sm font-medium text-slate-300 mb-2">Password Login</label>
-                                <input type="text" id="inp-pass" placeholder="Misal: rahasia123" class="w-full bg-slate-900 border border-slate-600 text-slate-200 rounded-lg py-2.5 px-4 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
-                            </div>
-                            <div class="grid grid-cols-2 gap-5" id="field-limits">
+                            <div class="space-y-5 flex-1 overflow-y-auto pr-2 custom-scrollbar">
                                 <div>
-                                    <label class="block text-sm font-medium text-slate-300 mb-2">Masa Aktif (Hari)</label>
-                                    <input type="number" id="inp-exp" value="30" class="w-full bg-slate-900 border border-slate-600 text-slate-200 rounded-lg py-2.5 px-4 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
+                                    <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Aksi Eksekusi</label>
+                                    <div class="relative">
+                                        <select id="action-type" onchange="updateFormVisibility()" class="w-full bg-slate-900 border border-slate-600 text-white rounded-lg py-3 px-4 appearance-none focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 cursor-pointer font-medium">
+                                            <option value="add">➕ Create New Account</option>
+                                            <option value="trial">⏱️ Create Trial (60m)</option>
+                                            <option value="renew">🔄 Renew Account</option>
+                                            <option value="detail">🔍 Check Detail</option>
+                                            <option value="del">❌ Delete Account</option>
+                                            <option value="list-accounts" id="opt-list">📋 List All Accounts</option>
+                                        </select>
+                                        <i class="fas fa-chevron-down absolute right-4 top-4 text-slate-500 pointer-events-none"></i>
+                                    </div>
                                 </div>
+
                                 <div>
-                                    <label class="block text-sm font-medium text-slate-300 mb-2">Limit IP (0 = Unli)</label>
-                                    <input type="number" id="inp-ip" value="0" class="w-full bg-slate-900 border border-slate-600 text-slate-200 rounded-lg py-2.5 px-4 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
+                                    <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Pilih Protokol</label>
+                                    <div class="relative">
+                                        <select id="protocol-type" class="w-full bg-slate-900 border border-slate-600 text-white rounded-lg py-3 px-4 appearance-none focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 cursor-pointer">
+                                            <!-- Diisi oleh JS -->
+                                        </select>
+                                        <i class="fas fa-chevron-down absolute right-4 top-4 text-slate-500 pointer-events-none"></i>
+                                    </div>
+                                </div>
+
+                                <div id="input-fields" class="space-y-5 pt-2">
+                                    <div id="field-user">
+                                        <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Username / Remarks</label>
+                                        <input type="text" id="inp-user" placeholder="Ketik username..." class="w-full bg-slate-900 border border-slate-600 text-white rounded-lg py-3 px-4 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 placeholder-slate-500">
+                                    </div>
+                                    
+                                    <div id="field-pass" class="hidden">
+                                        <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Password Login</label>
+                                        <input type="text" id="inp-pass" placeholder="Ketik password..." class="w-full bg-slate-900 border border-slate-600 text-white rounded-lg py-3 px-4 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 placeholder-slate-500">
+                                    </div>
+                                    
+                                    <div class="grid grid-cols-2 gap-4" id="field-limits">
+                                        <div id="field-exp">
+                                            <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Masa Aktif (Hari)</label>
+                                            <input type="number" id="inp-exp" value="30" min="1" class="w-full bg-slate-900 border border-slate-600 text-white rounded-lg py-3 px-4 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-center font-mono text-lg">
+                                        </div>
+                                        <div id="field-ip">
+                                            <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Limit IP (0=Unli)</label>
+                                            <input type="number" id="inp-ip" value="0" min="0" class="w-full bg-slate-900 border border-slate-600 text-white rounded-lg py-3 px-4 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-center font-mono text-lg">
+                                        </div>
+                                        <div id="field-quota" class="hidden col-span-2">
+                                            <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Limit Kuota GB (0=Unli)</label>
+                                            <input type="number" id="inp-quota" value="0" min="0" class="w-full bg-slate-900 border border-slate-600 text-white rounded-lg py-3 px-4 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-center font-mono text-lg">
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
-                        </div>
 
-                        <button onclick="submitAction()" id="btn-submit" class="mt-6 w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3.5 px-4 rounded-lg shadow-lg transition duration-200 flex items-center justify-center">
-                            <i class="fas fa-paper-plane mr-2"></i> <span>Eksekusi Perintah</span>
-                        </button>
-                    </div>
-
-                    <!-- Terminal Output Window -->
-                    <div class="bg-[#0f1419] rounded-xl border border-slate-700 shadow-2xl flex flex-col flex-1 min-h-[300px]">
-                        <div class="bg-slate-800 px-4 py-2.5 border-b border-slate-700 flex justify-between items-center">
-                            <div class="flex items-center gap-2">
-                                <div class="w-3 h-3 rounded-full bg-red-500"></div>
-                                <div class="w-3 h-3 rounded-full bg-yellow-500"></div>
-                                <div class="w-3 h-3 rounded-full bg-green-500"></div>
-                                <span class="ml-3 text-xs text-slate-400 font-mono">sys_output@srpcom:~</span>
-                            </div>
-                            <button onclick="clearTerminal()" class="text-slate-500 hover:text-slate-300 transition text-xs" title="Clear Terminal">
-                                <i class="fas fa-trash-alt"></i>
+                            <button onclick="submitAction()" id="btn-submit" class="mt-6 w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3.5 px-4 rounded-xl shadow-[0_4px_14px_0_rgba(37,99,235,0.39)] hover:shadow-[0_6px_20px_rgba(37,99,235,0.23)] hover:-translate-y-0.5 transition-all duration-200 flex items-center justify-center group">
+                                <i class="fas fa-terminal mr-2 group-hover:animate-pulse"></i> <span>Eksekusi Perintah</span>
                             </button>
                         </div>
-                        <div class="p-4 flex-1 overflow-y-auto font-mono text-sm leading-relaxed text-[#00ff00] break-words" id="terminal-output">
-                            > SRPCOM Panel OS initialized.<br>> Awaiting commands...
-                        </div>
-                    </div>
 
+                        <!-- Terminal Output Window (Kanan) -->
+                        <div class="lg:col-span-7 bg-[#0a0f14] rounded-2xl border border-slate-700 shadow-2xl flex flex-col min-h-[400px] relative">
+                            <div class="bg-slate-800/80 px-4 py-3 border-b border-slate-700 flex justify-between items-center rounded-t-2xl backdrop-blur-sm">
+                                <div class="flex items-center gap-2.5">
+                                    <div class="w-3 h-3 rounded-full bg-red-500 shadow-[0_0_5px_rgba(239,68,68,0.5)]"></div>
+                                    <div class="w-3 h-3 rounded-full bg-yellow-500 shadow-[0_0_5px_rgba(234,179,8,0.5)]"></div>
+                                    <div class="w-3 h-3 rounded-full bg-green-500 shadow-[0_0_5px_rgba(34,197,94,0.5)]"></div>
+                                    <span class="ml-3 text-xs text-slate-400 font-mono tracking-wide">root@srpcom:~# console</span>
+                                </div>
+                                <div class="flex gap-2">
+                                    <button onclick="copyTerminal()" class="bg-slate-700 hover:bg-blue-600 text-slate-300 hover:text-white transition-colors text-xs py-1 px-3 rounded flex items-center gap-1" title="Copy Output">
+                                        <i class="fas fa-copy"></i> <span class="hidden sm:inline">Copy</span>
+                                    </button>
+                                    <button onclick="clearTerminal()" class="bg-slate-700 hover:bg-red-600 text-slate-300 hover:text-white transition-colors text-xs py-1 px-3 rounded flex items-center gap-1" title="Clear Terminal">
+                                        <i class="fas fa-trash-alt"></i> <span class="hidden sm:inline">Clear</span>
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="p-5 flex-1 overflow-y-auto font-mono text-sm leading-relaxed text-[#00ff00] break-words whitespace-pre-wrap select-text" id="terminal-output">> Sistem SRPCOM V5 Panel Online.
+> Autentikasi berhasil.
+> Menunggu instruksi...</div>
+                        </div>
+
+                    </div>
                 </div>
             </div>
             
             <!-- Mobile Menu Bar (Bottom) -->
-            <nav class="md:hidden fixed bottom-0 w-full bg-slate-800 border-t border-slate-700 flex justify-around p-2 pb-safe z-30">
-                <a href="#" onclick="setMode('xray')" class="flex flex-col items-center p-2 text-slate-400 hover:text-blue-400 transition">
-                    <i class="fas fa-bolt text-lg mb-1"></i>
-                    <span class="text-[10px]">Xray</span>
-                </a>
-                <a href="#" onclick="setMode('ssh')" class="flex flex-col items-center p-2 text-slate-400 hover:text-blue-400 transition">
-                    <i class="fas fa-shield-alt text-lg mb-1"></i>
-                    <span class="text-[10px]">SSH</span>
-                </a>
-                <a href="#" onclick="setMode('l2tp')" class="flex flex-col items-center p-2 text-slate-400 hover:text-blue-400 transition">
-                    <i class="fas fa-network-wired text-lg mb-1"></i>
-                    <span class="text-[10px]">L2TP</span>
-                </a>
-                <a href="#" onclick="executeMonitor('sys-backup', 'GET')" class="flex flex-col items-center p-2 text-slate-400 hover:text-blue-400 transition">
-                    <i class="fas fa-download text-lg mb-1"></i>
-                    <span class="text-[10px]">Backup</span>
-                </a>
+            <nav class="md:hidden fixed bottom-0 w-full bg-slate-800/90 backdrop-blur-md border-t border-slate-700 flex justify-around p-2 pb-safe z-30 shadow-[0_-5px_20px_rgba(0,0,0,0.3)]">
+                <button onclick="setMode('xray')" class="flex flex-col items-center p-2 flex-1 text-slate-400 hover:text-yellow-400 transition nav-btn-mobile" id="nav-mob-xray">
+                    <i class="fas fa-bolt text-xl mb-1"></i>
+                    <span class="text-[10px] font-bold">XRAY</span>
+                </button>
+                <button onclick="setMode('ssh')" class="flex flex-col items-center p-2 flex-1 text-slate-400 hover:text-green-400 transition nav-btn-mobile" id="nav-mob-ssh">
+                    <i class="fas fa-shield-alt text-xl mb-1"></i>
+                    <span class="text-[10px] font-bold">SSH</span>
+                </button>
+                <button onclick="setMode('l2tp')" class="flex flex-col items-center p-2 flex-1 text-slate-400 hover:text-purple-400 transition nav-btn-mobile" id="nav-mob-l2tp">
+                    <i class="fas fa-network-wired text-xl mb-1"></i>
+                    <span class="text-[10px] font-bold">L2TP</span>
+                </button>
+                <button onclick="executeMonitor('cek-xray', 'GET')" class="flex flex-col items-center p-2 flex-1 text-slate-400 hover:text-blue-400 transition">
+                    <i class="fas fa-heartbeat text-xl mb-1"></i>
+                    <span class="text-[10px] font-bold">STATUS</span>
+                </button>
             </nav>
         </main>
     </div>
 
+    <!-- Hidden textarea for fallback clipboard copy -->
+    <textarea id="clipboard-fallback" class="hidden absolute -z-50"></textarea>
+
     <script>
         let currentMode = '';
 
+        function showToast(message, type = 'success') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            
+            let bgClass = type === 'success' ? 'bg-green-600' : (type === 'error' ? 'bg-red-600' : 'bg-blue-600');
+            let icon = type === 'success' ? 'fa-check-circle' : (type === 'error' ? 'fa-times-circle' : 'fa-info-circle');
+            
+            toast.className = `${bgClass} text-white px-4 py-3 rounded-lg shadow-lg flex items-center gap-3 toast-enter pointer-events-auto border border-white/10`;
+            toast.innerHTML = `<i class="fas ${icon} text-lg"></i> <span class="font-medium text-sm">${message}</span>`;
+            
+            container.appendChild(toast);
+            
+            setTimeout(() => {
+                toast.classList.replace('toast-enter', 'toast-leave');
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+
         function initApp() {
             const key = localStorage.getItem('srpcom_api_key');
-            if(key) {
-                // Lakukan ping ke server untuk memastikan key valid
-                verifyKey(key);
-            }
+            if(key) verifyKey(key);
         }
 
         async function verifyKey(key) {
-            const btn = document.querySelector('#login-overlay button');
-            if(btn) btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Menghubungkan...';
+            const btn = document.getElementById('btn-login');
+            const originalBtnHtml = btn.innerHTML;
+            btn.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i> <span class="ml-2">Memverifikasi...</span>';
+            btn.disabled = true;
             
             try {
-                // Cek status server sekaligus memverifikasi API Key
                 const res = await fetch('/user_legend/cek-xray', {
                     headers: { 'x-api-key': key }
                 });
@@ -226,15 +301,13 @@
                 if(res.ok) {
                     const data = await res.json();
                     
-                    // Ekstrak domain dari respons text (misal: "Xray status: active, Domain: xyz.com")
                     const domainMatch = data.stdout ? data.stdout.match(/Domain:\s*([^\s,]+)/i) : null;
                     if(domainMatch && domainMatch[1]) {
-                        document.getElementById('display-domain').innerHTML = `<span class="w-2 h-2 rounded-full bg-green-500 mr-2 animate-pulse"></span>${domainMatch[1]}`;
+                        document.getElementById('display-domain').innerText = domainMatch[1];
                     } else {
-                        document.getElementById('display-domain').innerHTML = `<span class="w-2 h-2 rounded-full bg-green-500 mr-2 animate-pulse"></span>${window.location.hostname}`;
+                        document.getElementById('display-domain').innerText = window.location.hostname;
                     }
 
-                    // Tampilkan UI App
                     const overlay = document.getElementById('login-overlay');
                     const app = document.getElementById('app-container');
                     
@@ -242,8 +315,9 @@
                     setTimeout(() => {
                         overlay.classList.add('hidden');
                         app.classList.remove('hidden');
+                        showToast('Autentikasi Berhasil', 'success');
                         setTimeout(() => app.classList.remove('opacity-0'), 50);
-                    }, 300);
+                    }, 500);
                     
                 } else {
                     throw new Error("Unauthorized");
@@ -251,13 +325,17 @@
             } catch (err) {
                 localStorage.removeItem('srpcom_api_key');
                 document.getElementById('login-error').classList.remove('hidden');
-                if(btn) btn.innerHTML = 'Masuk ke Panel';
+                btn.innerHTML = originalBtnHtml;
+                btn.disabled = false;
             }
         }
 
         function performLogin() {
             const key = document.getElementById('inp-apikey').value.trim();
-            if(!key) return;
+            if(!key) {
+                showToast('API Key tidak boleh kosong', 'error');
+                return;
+            }
             localStorage.setItem('srpcom_api_key', key);
             verifyKey(key);
         }
@@ -267,65 +345,148 @@
             window.location.reload();
         }
 
-        // --- Logic UI Panel ---
         function clearTerminal() {
-            document.getElementById('terminal-output').innerHTML = "> Terminal cleared.";
+            document.getElementById('terminal-output').innerHTML = "> Konsol dibersihkan.\n> Menunggu instruksi...";
+            showToast('Terminal dibersihkan', 'info');
+        }
+
+        function copyTerminal() {
+            const term = document.getElementById('terminal-output');
+            const textToCopy = term.innerText;
+            
+            if (navigator.clipboard && window.isSecureContext) {
+                navigator.clipboard.writeText(textToCopy).then(() => {
+                    showToast('Output disalin ke clipboard!', 'success');
+                }).catch(err => {
+                    fallbackCopyTextToClipboard(textToCopy);
+                });
+            } else {
+                fallbackCopyTextToClipboard(textToCopy);
+            }
+        }
+
+        function fallbackCopyTextToClipboard(text) {
+            const textArea = document.getElementById('clipboard-fallback');
+            textArea.value = text;
+            textArea.classList.remove('hidden');
+            textArea.focus();
+            textArea.select();
+            try {
+                document.execCommand('copy');
+                showToast('Output disalin (Fallback)', 'success');
+            } catch (err) {
+                showToast('Gagal menyalin text', 'error');
+            }
+            textArea.classList.add('hidden');
         }
 
         function updateActiveNav(mode) {
+            // Desktop
             document.querySelectorAll('.nav-btn').forEach(el => {
-                el.classList.remove('bg-slate-700', 'text-white');
+                el.classList.remove('bg-slate-700', 'text-white', 'border-l-4', 'border-blue-500');
                 el.classList.add('text-slate-300');
             });
             const activeNav = document.getElementById(`nav-${mode}`);
             if(activeNav) {
-                activeNav.classList.add('bg-slate-700', 'text-white');
+                activeNav.classList.add('bg-slate-700', 'text-white', 'border-l-4', 'border-blue-500');
                 activeNav.classList.remove('text-slate-300');
+            }
+
+            // Mobile
+            document.querySelectorAll('.nav-btn-mobile').forEach(el => {
+                el.classList.remove('text-blue-400');
+                el.classList.add('text-slate-400');
+            });
+            const activeMobNav = document.getElementById(`nav-mob-${mode}`);
+            if(activeMobNav) {
+                // Determine color based on mode
+                let colorClass = mode === 'xray' ? 'text-yellow-400' : (mode === 'ssh' ? 'text-green-400' : 'text-purple-400');
+                activeMobNav.classList.remove('text-slate-400');
+                activeMobNav.classList.add(colorClass);
+            }
+        }
+
+        function updateFormVisibility() {
+            const act = document.getElementById('action-type').value;
+            const inputs = document.getElementById('input-fields');
+            const fieldUser = document.getElementById('field-user');
+            const fieldPass = document.getElementById('field-pass');
+            const fieldLimits = document.getElementById('field-limits');
+            const fieldExp = document.getElementById('field-exp');
+            const fieldIp = document.getElementById('field-ip');
+            const fieldQuota = document.getElementById('field-quota');
+
+            // Reset visibility
+            inputs.classList.remove('hidden');
+            fieldUser.classList.remove('hidden');
+            fieldPass.classList.add('hidden');
+            fieldLimits.classList.add('hidden');
+            fieldExp.classList.add('hidden');
+            fieldIp.classList.add('hidden');
+            fieldQuota.classList.add('hidden');
+
+            if(act === 'list-accounts' || act === 'trial') {
+                inputs.classList.add('hidden');
+            } else if (act === 'del' || act === 'detail') {
+                // Hanya butuh username
+            } else if (act === 'renew') {
+                fieldLimits.classList.remove('hidden');
+                fieldExp.classList.remove('hidden');
+                // ip dan quota tetap hidden
+            } else if (act === 'add') {
+                fieldLimits.classList.remove('hidden');
+                fieldExp.classList.remove('hidden');
+                
+                if (currentMode === 'xray') {
+                    fieldIp.classList.remove('hidden');
+                    fieldQuota.classList.remove('hidden');
+                } else {
+                    fieldPass.classList.remove('hidden');
+                    fieldIp.classList.remove('hidden'); // L2TP tidak pakai, tapi backend toleran
+                    if(currentMode === 'l2tp') fieldIp.classList.add('hidden'); // Sembunyikan untuk L2TP biar rapi
+                }
             }
         }
 
         function setMode(mode) {
             currentMode = mode;
             updateActiveNav(mode);
-            document.getElementById('form-container').classList.remove('hidden');
+            
+            const container = document.getElementById('form-container');
+            container.classList.remove('hidden');
+            // Trigger animation
+            setTimeout(() => container.classList.remove('opacity-0'), 10);
+
             const protSelect = document.getElementById('protocol-type');
             protSelect.innerHTML = '';
             
             if(mode === 'xray') {
                 document.getElementById('mode-title').innerText = 'Manajemen Xray';
+                document.getElementById('mode-desc').innerText = 'Kelola akun VMess, VLess, dan Trojan (WebSocket).';
                 protSelect.innerHTML = '<option value="vmessws">VMess WS</option><option value="vlessws">VLess WS</option><option value="trojanws">Trojan WS</option>';
-                document.getElementById('field-pass').classList.add('hidden');
-                document.getElementById('field-limits').classList.remove('hidden');
             } else if(mode === 'ssh') {
                 document.getElementById('mode-title').innerText = 'Manajemen SSH & OVPN';
-                protSelect.innerHTML = '<option value="ssh">SSH & OVPN</option>';
-                document.getElementById('field-pass').classList.remove('hidden');
-                document.getElementById('field-limits').classList.remove('hidden');
+                document.getElementById('mode-desc').innerText = 'Kelola akun OpenSSH, Dropbear, SSH-WS, dan OpenVPN.';
+                protSelect.innerHTML = '<option value="ssh">SSH & OVPN Protocol</option>';
             } else if(mode === 'l2tp') {
                 document.getElementById('mode-title').innerText = 'Manajemen L2TP IPsec';
-                protSelect.innerHTML = '<option value="l2tp">L2TP IPsec</option>';
-                document.getElementById('field-pass').classList.remove('hidden');
-                document.getElementById('field-limits').classList.remove('hidden');
+                document.getElementById('mode-desc').innerText = 'Kelola kredensial pengguna L2TP VPN.';
+                protSelect.innerHTML = '<option value="l2tp">L2TP IPsec Protocol</option>';
             }
-        }
 
-        document.getElementById('action-type').addEventListener('change', function() {
-            const act = this.value;
-            const inputs = document.getElementById('input-fields');
-            if(act === 'list-accounts' || act === 'trial') {
-                inputs.classList.add('hidden');
-            } else {
-                inputs.classList.remove('hidden');
-            }
-        });
+            // Panggil update form visibility setiap kali mode berubah
+            document.getElementById('action-type').value = 'add'; // Reset ke add
+            updateFormVisibility();
+        }
 
         async function submitAction() {
             const act = document.getElementById('action-type').value;
             const prot = document.getElementById('protocol-type').value;
-            const user = document.getElementById('inp-user').value;
-            const pass = document.getElementById('inp-pass').value;
+            const user = document.getElementById('inp-user').value.trim();
+            const pass = document.getElementById('inp-pass').value.trim();
             const exp = document.getElementById('inp-exp').value;
             const limit_ip = document.getElementById('inp-ip').value;
+            const limit_quota = document.getElementById('inp-quota').value;
 
             let endpoint = `/user_legend/${act}-${prot}`;
             let method = (act === 'list-accounts' || act === 'detail') ? 'GET' : 'POST';
@@ -334,28 +495,41 @@
             let payload = {};
             if (act !== 'list-accounts' && act !== 'trial') {
                 if(!user) {
-                    printToTerminal(`<span class="text-red-400">❌ Error: Username wajib diisi!</span>`);
+                    printToTerminal(`[ERROR] Username wajib diisi untuk aksi ${act.toUpperCase()}!`, 'error');
+                    showToast('Username wajib diisi', 'error');
                     return;
                 }
                 payload.user = user;
-                if(currentMode !== 'xray') payload.password = pass || '123';
-                payload.exp = parseInt(exp) || 30;
-                payload.limit_ip = parseInt(limit_ip) || 0;
+                
+                if (act === 'add') {
+                    if(currentMode !== 'xray') payload.password = pass || '123';
+                    payload.exp = parseInt(exp) || 30;
+                    payload.limit_ip = parseInt(limit_ip) || 0;
+                    if(currentMode === 'xray') payload.limit_quota = parseInt(limit_quota) || 0;
+                } else if (act === 'renew') {
+                    payload.exp = parseInt(exp) || 30;
+                }
             }
 
             const btn = document.getElementById('btn-submit');
-            btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Memproses...';
+            const originalBtnHtml = btn.innerHTML;
+            btn.innerHTML = '<i class="fas fa-circle-notch fa-spin mr-2"></i> <span>Memproses...</span>';
             btn.disabled = true;
+            btn.classList.add('opacity-75');
 
-            printToTerminal(`\n<span class="text-blue-400">> root@server:~#</span> Executing ${act} on ${prot}...`);
+            printToTerminal(`\n> Executing [${act.toUpperCase()}] on protocol [${prot.toUpperCase()}]...`, 'info');
+            
             await fetchAPI(endpoint, method, method === 'GET' ? null : payload);
             
-            btn.innerHTML = '<i class="fas fa-paper-plane mr-2"></i> Eksekusi Perintah';
+            btn.innerHTML = originalBtnHtml;
             btn.disabled = false;
+            btn.classList.remove('opacity-75');
+            
+            if(act === 'add' || act === 'trial') document.getElementById('inp-user').value = ''; // auto clear
         }
 
         async function executeMonitor(endpoint, method) {
-            printToTerminal(`\n<span class="text-blue-400">> root@server:~#</span> Requesting ${endpoint}...`);
+            printToTerminal(`\n> Requesting sistem monitor [${endpoint}]...`, 'info');
             await fetchAPI(`/user_legend/${endpoint}`, method);
         }
 
@@ -366,38 +540,66 @@
                     method: method,
                     headers: { 'Content-Type': 'application/json', 'x-api-key': key }
                 };
-                if(payload && method !== 'GET') options.body = JSON.stringify(payload);
+                
+                // Gunakan POST untuk GET request yang butuh payload (seperti detail) karena fetch GET standard tidak terima body
+                if(payload) {
+                    if (method === 'GET') options.method = 'POST'; // Backend Python di xray-api.py sudah menolerir POST untuk detail
+                    options.body = JSON.stringify(payload);
+                }
 
                 const res = await fetch(endpoint, options);
                 const data = await res.json();
                 
                 if (res.status === 401 || res.status === 403) {
-                    printToTerminal(`<span class="text-red-400">❌ Akses Ditolak (Unauthorized). Silakan login ulang atau periksa status API Auth.</span>`);
+                    printToTerminal(`[ERROR] Akses Ditolak (HTTP ${res.status}).\nAlasan: ${data.stdout || 'API Key tidak valid atau Lisensi Habis.'}`, 'error');
+                    showToast('Akses Ditolak', 'error');
                     if(res.status === 401) setTimeout(performLogout, 2000);
                     return;
                 }
 
                 if (data.data && endpoint.includes('backup')) {
-                    printToTerminal("✅ File Backup berhasil di-generate. Data Base64 telah diterima (cek Console/Telegram).");
+                    printToTerminal("✅ [SUCCESS] File Backup berhasil di-generate. Data Base64 telah diterima dan siap untuk didecode.");
+                    showToast('Backup berhasil', 'success');
                 } else if(data.stdout) {
-                    printToTerminal(data.stdout);
+                    // Cek apakah string mengandung indikator error (untuk pewarnaan)
+                    let isError = data.stdout.includes('❌') || data.stdout.includes('Error:');
+                    printToTerminal(data.stdout, isError ? 'error' : 'success');
+                    if(isError) showToast('Terjadi kesalahan eksekusi', 'error');
+                    else showToast('Perintah berhasil dieksekusi', 'success');
                 } else {
-                    printToTerminal(`<span class="text-yellow-400">Response: ${JSON.stringify(data)}</span>`);
+                    printToTerminal(`[WARNING] Response format tidak dikenali:\n${JSON.stringify(data, null, 2)}`, 'warning');
                 }
             } catch (err) {
-                printToTerminal(`<span class="text-red-400">❌ Terjadi Kesalahan Koneksi: ${err.message}</span>`);
+                printToTerminal(`[FATAL] Gagal terhubung ke Node Server API.\nDetail: ${err.message}`, 'error');
+                showToast('Koneksi Gagal', 'error');
             }
         }
 
-        function printToTerminal(text) {
+        function printToTerminal(text, type = 'normal') {
             const term = document.getElementById('terminal-output');
-            term.innerHTML += `<br>${text}`;
-            term.scrollTop = term.scrollHeight; // Auto scroll to bottom
+            
+            // Pewarnaan teks terminal berdasarkan tipe pesan
+            let colorClass = 'text-[#00ff00]'; // default green
+            if (type === 'error') colorClass = 'text-red-400';
+            else if (type === 'info') colorClass = 'text-blue-400';
+            else if (type === 'warning') colorClass = 'text-yellow-400';
+            else if (type === 'success') colorClass = 'text-teal-300'; // slightly different green for api success responses
+
+            // Bungkus output dengan span berwarna
+            const formattedText = `<span class="${colorClass}">${text}</span>`;
+            
+            // Tambahkan newline jika belum ada di akhir teks sebelumnya
+            const prefix = term.innerHTML === '' ? '' : '\n';
+            term.innerHTML += `${prefix}${formattedText}`;
+            
+            // Auto scroll to bottom
+            term.scrollTop = term.scrollHeight; 
         }
 
-        // Eksekusi aksi jika tekan tombol Enter di form
+        // Listener untuk tombol Enter di dalam form input
         document.getElementById('input-fields').addEventListener('keypress', function (e) {
             if (e.key === 'Enter') {
+                e.preventDefault(); // Mencegah submit form default jika ada
                 submitAction();
             }
         });
