@@ -56,7 +56,10 @@ add_trial_ssh() {
     echo "     CREATE TRIAL SSH ACCOUNT (60M)   "
     echo "======================================"
     
-    user="trialsrp-$(date +%m%d%H%M)"
+    # PERBAIKAN: Format Jam-Menit-Detik + 1 Karakter Random
+    rand_char=$(tr -dc 'a-z' < /dev/urandom | head -c 1)
+    user="trialsrp-$(date +%H%M%S)${rand_char}"
+    
     password="1"
     limit_ip=1
     masaaktif="60 Minutes"
