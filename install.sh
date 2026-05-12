@@ -1,7 +1,7 @@
 #!/bin/bash
 # ==========================================
 # install.sh
-# MODULE: AUTO INSTALLER XRAY, CADDY, L2TP, SSH, OVPN, BADVPN
+# MODULE: AUTO INSTALLER XRAY, CADDY, L2TP, SSH, OVPN, BADVPN, WEB PANEL
 # OS Support: Ubuntu 20.04 / 22.04 / 24.04 LTS
 # ==========================================
 
@@ -89,7 +89,7 @@ while true; do
     fi
 done
 
-echo -e "\n[1/11] Memperbarui sistem & dependensi..."
+echo -e "\n[1/12] Memperbarui sistem & dependensi..."
 export DEBIAN_FRONTEND=noninteractive
 apt update && apt upgrade -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold"
 apt install curl wget unzip uuid-runtime jq tzdata ufw cron gnupg2 gnupg python3 python3-flask python3-pip strongswan xl2tpd iptables dropbear openvpn cmake make gcc git net-tools -y
@@ -104,6 +104,7 @@ apt install speedtest -y
 mkdir -p /usr/local/etc/srpcom
 mkdir -p /usr/local/bin/srpcom
 mkdir -p /usr/local/etc/xray
+mkdir -p /usr/local/etc/srpcom/panel
 
 # SIMPAN VPS NAME SECARA PERMANEN
 cat > /usr/local/etc/srpcom/env.conf << EOF
@@ -125,7 +126,7 @@ BOT_TOKEN=""
 ADMIN_ID=""
 EOF
 
-echo -e "\n[2/11] Optimasi Performa Server (BBR & Swap RAM)..."
+echo -e "\n[2/12] Optimasi Performa Server (BBR & Swap RAM)..."
 if [ ! -f "/swapfile" ]; then
     echo "=> Membuat Swap Memory 2GB..."
     dd if=/dev/zero of=/swapfile bs=1M count=2048 status=none
@@ -148,11 +149,11 @@ EOF
     sysctl -p >/dev/null 2>&1
 fi
 
-echo -e "\n[3/11] Menginstal Xray-core..."
+echo -e "\n[3/12] Menginstal Xray-core..."
 bash -c "$(curl -L https://github.com/XTLS/Xray-install/raw/main/install-release.sh)" @ install
 systemctl enable xray
 
-echo -e "\n[4/11] Mengonfigurasi Xray Core (Limit & Kuota Enabled)..."
+echo -e "\n[4/12] Mengonfigurasi Xray Core (Limit & Kuota Enabled)..."
 mkdir -p /var/log/xray
 touch /var/log/xray/access.log
 touch /var/log/xray/error.log
@@ -189,7 +190,7 @@ EOF
 echo "SANGATRAHASIA123" > /usr/local/etc/xray/api_key.conf
 echo "OFF" > /usr/local/etc/xray/api_auth.conf
 
-echo -e "\n[5/11] Mengonfigurasi L2TP & IPsec..."
+echo -e "\n[5/12] Mengonfigurasi L2TP & IPsec..."
 mkdir -p /etc/xl2tpd
 mkdir -p /etc/ppp
 cat > /etc/ipsec.conf << EOF
@@ -250,7 +251,7 @@ EOF
 touch /usr/local/etc/srpcom/l2tp_expiry.txt
 systemctl enable ipsec xl2tpd
 
-echo -e "\n[6/11] Mengonfigurasi SSH, Dropbear, SSH-WS, BadVPN & OpenVPN..."
+echo -e "\n[6/12] Mengonfigurasi SSH, Dropbear, SSH-WS, BadVPN & OpenVPN..."
 cat > /etc/default/dropbear << 'EOF'
 NO_START=0
 DROPBEAR_PORT=109
@@ -455,7 +456,7 @@ $TA_CERT
 </tls-auth>
 EOF
 
-echo -e "\n[7/11] Mendownload Modul Sistem dari GitHub..."
+echo -e "\n[7/12] Mendownload Modul Sistem dari GitHub..."
 wget -q -O /usr/local/bin/srpcom/utils.sh "$GITHUB_RAW/core/utils.sh"
 wget -q -O /usr/local/bin/srpcom/telegram.sh "$GITHUB_RAW/core/telegram.sh"
 wget -q -O /usr/local/bin/srpcom/xray.sh "$GITHUB_RAW/core/xray.sh"
@@ -477,7 +478,7 @@ chmod +x /usr/local/bin/srpcom/*.sh
 chmod +x /usr/local/bin/xray-api.py
 chmod +x /usr/local/bin/bot-admin.py
 
-echo -e "\n[8/11] Mengonfigurasi Layanan API & Bot Admin..."
+echo -e "\n[8/12] Mengonfigurasi Layanan API & Bot Admin..."
 cat > /etc/systemd/system/xray-api.service << EOF
 [Unit]
 Description=Xray Python API Backend
@@ -510,7 +511,7 @@ systemctl enable xray-api
 systemctl start xray-api
 systemctl disable srpcom-bot >/dev/null 2>&1
 
-echo -e "\n[9/11] Mengonfigurasi Firewall (UFW & Iptables NAT L2TP/OVPN)..."
+echo -e "\n[9/12] Mengonfigurasi Firewall (UFW & Iptables NAT L2TP/OVPN)..."
 ufw allow 22/tcp
 ufw allow 80/tcp
 ufw allow 109/tcp
@@ -546,7 +547,14 @@ systemctl start vpn-nat
 sed -i '/net.ipv4.ip_forward/s/^#//g' /etc/sysctl.conf
 sysctl -p
 
-echo -e "\n[10/11] Menginstal & Mengonfigurasi Caddy..."
+echo -e "\n[10/12] Mendownload WEB PANEL HTML..."
+wget -q -O /usr/local/etc/srpcom/panel/index.html "$GITHUB_RAW/core/index.html"
+if [ ! -s "/usr/local/etc/srpcom/panel/index.html" ]; then
+    echo -e "\e[33m[WARNING]\e[0m Gagal mengunduh index.html Web Panel. Akan dibuat template dasar."
+    echo "<h1>Web Panel Sedang Maintenance</h1>" > /usr/local/etc/srpcom/panel/index.html
+fi
+
+echo -e "\n[11/12] Menginstal & Mengonfigurasi Caddy..."
 apt install -y debian-keyring debian-archive-keyring apt-transport-https
 curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | gpg --dearmor --yes -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
 curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | tee /etc/apt/sources.list.d/caddy-stable.list
@@ -563,6 +571,12 @@ $DOMAINS_STR {
         root * /usr/local/etc/srpcom
         file_server
     }
+    handle /panel/* {
+        root * /usr/local/etc/srpcom
+        file_server
+    }
+    redir /panel /panel/
+    
     handle / {
         respond "Server is running normally." 200
     }
@@ -581,7 +595,7 @@ $DOMAINS_STR {
 }
 EOF
 
-echo -e "\n[11/11] Setup Cronjob Selesai..."
+echo -e "\n[12/12] Setup Cronjob Selesai..."
 if ! grep -q "menu" /root/.profile; then echo "menu" >> /root/.profile; fi
 
 echo "0 * * * * root /usr/local/bin/srpcom/auto_expired.sh >/dev/null 2>&1" > /etc/cron.d/auto_expired
@@ -603,8 +617,11 @@ echo "======================================================"
 echo "Protokol: VMESS, VLESS, TROJAN, L2TP, SSH, OVPN, UDPGW"
 echo "Optimasi: TCP BBR & Swap RAM 2GB Aktif!"
 echo "Default SNI/Bug: support.zoom.us.$DOMAIN"
-echo "Ketik 'menu' untuk masuk ke dashboard manajemen."
-echo "Ketik 'srpcom' untuk melihat daftar perintah cepat."
+echo "------------------------------------------------------"
+echo -e "\e[36m[ AKSES SISTEM ]\e[0m"
+echo "1. Akses Terminal (CLI) : Ketik 'menu'"
+echo "2. Akses Web Panel GUI  : https://${DOMAIN}/panel/"
+echo "   Password Web Panel   : SANGATRAHASIA123"
 echo "------------------------------------------------------"
 echo "Untuk menjadikan VPS ini sebagai MASTER BOT, masuk ke menu:"
 echo "-> [5] Settings -> [9] Setting Telegram Admin Bot -> Mulai Bot"
