@@ -2,11 +2,10 @@
 # ==========================================
 # xray-api.py
 # MODULE: PYTHON API BACKEND (MULTI-NODE SUPPORT)
-# Modified by Mega - API Key OFF = Block Access
 # ==========================================
 
 from flask import Flask, request, jsonify
-import json, os, subprocess, uuid, datetime, base64
+import json, os, subprocess, uuid, datetime, base64, random, string
 import urllib.request
 
 app = Flask(__name__)
@@ -44,25 +43,21 @@ def get_api_key():
     except: return "DEFAULT_KEY"
 
 def check_auth():
+    # Baca status ON/OFF
+    auth_status = "OFF"
     try:
-        with open(API_AUTH_FILE, 'r') as f:
-            auth_status = f.read().strip()
+        if os.path.exists(API_AUTH_FILE):
+            with open(API_AUTH_FILE, 'r') as f:
+                auth_status = f.read().strip()
     except:
-        auth_status = "ON"
-
-    # === MODIFIKASI PENTING ===
+        pass
+        
+    # Jika status OFF, loloskan semua request (bypass auth)
     if auth_status == "OFF":
-        # Ketika OFF → Blokir total akses Web Panel & API
-        return False
-
-    # Ketika ON → Cek API Key
-    provided_key = request.headers.get('x-api-key')
-    correct_key = get_api_key()
-    
-    if provided_key != correct_key:
-        return False
-    
-    return True
+        return True
+        
+    # Jika status ON, verifikasi header x-api-key
+    return request.headers.get('x-api-key') == get_api_key()
 
 def is_license_active():
     try:
@@ -77,11 +72,12 @@ def is_license_active():
 
 @app.before_request
 def check_license_lock():
+    # Mencegat semua request yang merubah database (add, del, renew, trial, lock, change)
     if request.method in ['POST', 'DELETE']:
         mutating_paths = ['/add-', '/del-', '/renew-', '/trial-', '/lock-', '/change-uuid']
         if any(p in request.path for p in mutating_paths):
             if not is_license_active():
-                return jsonify({"stdout": "❌ AKSES DITOLAK: Masa aktif Lisensi Autoscript untuk Node Server ini telah habis."}), 403
+                return jsonify({"stdout": "❌ AKSES DITOLAK: Masa aktif Lisensi Autoscript untuk Node Server ini telah habis. Eksekusi dibatalkan."}), 403
 
 def load_json(p):
     if not os.path.exists(p): return {}
@@ -119,7 +115,7 @@ def remove_from_txt(filepath, user):
             if not line.startswith(user + " "): f.write(line)
 
 # ==========================================
-# REMOTE NODE FEATURES
+# REMOTE NODE FEATURES (MONITOR, LIST, BACKUP)
 # ==========================================
 @app.route('/user_legend/list-accounts/<protocol>', methods=['GET'])
 def list_accounts(protocol):
@@ -323,10 +319,14 @@ def add_user(protocol):
 def trial_user(protocol):
     if not check_auth(): return jsonify({"stdout": "Unauthorized"}), 401
     data = request.json or {}
+    
     exp_min = 60 
     limit_ip = int(data.get('limit_ip', 1))
     
-    user = f"trialsrp-{datetime.datetime.now().strftime('%m%d%H%M')}"
+    # PERBAIKAN: Format Jam-Menit-Detik + 1 Karakter Random
+    rand_char = random.choice(string.ascii_lowercase)
+    user = f"trialsrp-{datetime.datetime.now().strftime('%H%M%S')}{rand_char}"
+    
     uid = str(uuid.uuid4())
     dt = datetime.datetime.now() + datetime.timedelta(minutes=exp_min)
     cfg = load_json(XRAY_CONF)
@@ -417,6 +417,7 @@ def renew_user(protocol):
     if found:
         return jsonify({"stdout": f"✅ Akun '{user}' berhasil diperpanjang!\nExpired baru: {dt_str} WIB"})
     return jsonify({"stdout": f"❌ Gagal: Akun '{user}' tidak ditemukan di sistem Xray."})
+
 
 # ==========================================
 # SSH ENDPOINTS
@@ -552,10 +553,14 @@ def detail_ssh():
 def trial_ssh():
     if not check_auth(): return jsonify({"stdout": "Unauthorized"}), 401
     data = request.json or {}
+    
     exp_min = 60 
     limit_ip = int(data.get('limit_ip', 1))
     
-    user = f"trialsrp-{datetime.datetime.now().strftime('%m%d%H%M')}"
+    # PERBAIKAN: Format Jam-Menit-Detik + 1 Karakter Random
+    rand_char = random.choice(string.ascii_lowercase)
+    user = f"trialsrp-{datetime.datetime.now().strftime('%H%M%S')}{rand_char}"
+    
     password = "1"
     
     dt = datetime.datetime.now() + datetime.timedelta(minutes=exp_min)
@@ -701,7 +706,7 @@ def trial_l2tp():
     return jsonify({"stdout": "L2TP Trial created (Demo via API)"})
 
 # ==========================================
-# LOCK ENDPOINTS
+# LOCK ENDPOINTS (AUTOKILL)
 # ==========================================
 @app.route('/user_legend/lock-ssh', methods=['POST'])
 def lock_ssh():
