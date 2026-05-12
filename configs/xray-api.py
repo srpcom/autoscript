@@ -232,6 +232,53 @@ def monitor_ssh():
         return jsonify({"stdout": res + "\n".join(active_users)})
     except Exception as e: return jsonify({"stdout": f"Error: {e}"})
 
+@app.route('/user_legend/log-<logtype>', methods=['GET'])
+def read_logs(logtype):
+    try:
+        out = ""
+        lines = "50"
+        if logtype == 'xray-access':
+            out = subprocess.run(['tail', '-n', lines, '/var/log/xray/access.log'], capture_output=True, text=True).stdout
+        elif logtype == 'xray-error':
+            out = subprocess.run(['tail', '-n', lines, '/var/log/xray/error.log'], capture_output=True, text=True).stdout
+        elif logtype == 'l2tp':
+            out = subprocess.run(['journalctl', '-u', 'xl2tpd', '-u', 'ipsec', '-n', lines, '--no-pager'], capture_output=True, text=True).stdout
+        elif logtype == 'openvpn':
+            out = subprocess.run(['journalctl', '-u', 'openvpn-server@server-udp', '-u', 'openvpn-server@server-tcp', '-n', lines, '--no-pager'], capture_output=True, text=True).stdout
+        elif logtype == 'caddy':
+            out = subprocess.run(['journalctl', '-u', 'caddy', '-n', lines, '--no-pager'], capture_output=True, text=True).stdout
+        
+        if not out.strip():
+            out = "Tidak ada log / file kosong."
+        
+        return jsonify({"stdout": f"📄 LIVE LOG: {logtype.upper()}\n━━━━━━━━━━━━━━━━━━━━\n{out.strip()}"})
+    except Exception as e:
+        return jsonify({"stdout": f"Error: {e}"})
+
+@app.route('/user_legend/sys-resource', methods=['GET'])
+def sys_resource():
+    try:
+        ram = subprocess.run(['free', '-h'], capture_output=True, text=True).stdout
+        disk = subprocess.run(['df', '-h', '/'], capture_output=True, text=True).stdout
+        cpu = subprocess.run(['top', '-bn1'], capture_output=True, text=True).stdout.split('\n')[:5]
+        cpu_str = '\n'.join(cpu)
+        res = f"💻 SYSTEM RESOURCES (CPU, RAM, DISK)\n━━━━━━━━━━━━━━━━━━━━\n{cpu_str}\n\n[RAM USAGE]\n{ram}\n[DISK USAGE]\n{disk}"
+        return jsonify({"stdout": res.strip()})
+    except Exception as e:
+        return jsonify({"stdout": f"Error: {e}"})
+
+@app.route('/user_legend/speedtest', methods=['GET'])
+def run_speedtest():
+    try:
+        # Menjalankan speedtest butuh waktu, berikan timeout lebih panjang
+        out = subprocess.run(['speedtest', '--accept-license', '--accept-gdpr'], capture_output=True, text=True, timeout=40).stdout
+        res = f"🚀 SPEEDTEST SERVER\n━━━━━━━━━━━━━━━━━━━━\n{out.strip()}"
+        return jsonify({"stdout": res})
+    except subprocess.TimeoutExpired:
+        return jsonify({"stdout": "❌ Speedtest Timeout (> 40s). Coba jalankan ulang atau via CLI."})
+    except Exception as e:
+        return jsonify({"stdout": f"❌ Error: Speedtest CLI mungkin belum terinstall.\n{e}"})
+
 @app.route('/user_legend/sys-backup', methods=['GET'])
 def sys_backup():
     now_str = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
