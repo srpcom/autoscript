@@ -2,7 +2,7 @@
 <html lang="id">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>SRPCOM V5.1 - Web Panel</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
@@ -27,6 +27,11 @@
         ::-webkit-scrollbar-thumb:hover { background: #475569; }
         .toast-enter { animation: slideInRight 0.3s forwards; }
         .toast-leave { animation: fadeOut 0.3s forwards; }
+        
+        /* Safe Area Padding untuk HP Modern (iPhone dll) */
+        .pb-safe { padding-bottom: env(safe-area-inset-bottom, 0px); }
+        .pt-safe { padding-top: env(safe-area-inset-top, 0px); }
+
         @keyframes slideInRight {
             from { transform: translateX(100%); opacity: 0; }
             to { transform: translateX(0); opacity: 1; }
@@ -37,10 +42,11 @@
         }
     </style>
 </head>
-<body class="bg-slate-900 text-slate-200 font-sans antialiased overflow-hidden h-screen" onload="initApp()">
+<!-- Menggunakan h-[100dvh] agar menyesuaikan address bar HP yang bisa tersembunyi -->
+<body class="bg-slate-900 text-slate-200 font-sans antialiased overflow-hidden h-[100dvh]" onload="initApp()">
 
     <!-- Toast Notification Container -->
-    <div id="toast-container" class="fixed top-5 right-5 z-[100] flex flex-col gap-3 pointer-events-none"></div>
+    <div id="toast-container" class="fixed top-5 right-5 z-[100] flex flex-col gap-3 pointer-events-none pt-safe"></div>
 
     <!-- Login Overlay -->
     <div id="login-overlay" class="absolute inset-0 bg-slate-900 z-50 flex items-center justify-center transition-opacity duration-500">
@@ -70,7 +76,7 @@
     <div id="app-container" class="flex h-full w-full hidden opacity-0 transition-opacity duration-500">
         <!-- Sidebar Desktop -->
         <aside class="w-64 bg-slate-800 border-r border-slate-700 flex-col hidden md:flex z-20 shadow-xl">
-            <div class="h-16 flex items-center px-6 border-b border-slate-700 bg-slate-850">
+            <div class="h-16 flex items-center px-6 border-b border-slate-700 bg-slate-850 pt-safe">
                 <div class="w-8 h-8 bg-blue-500/20 rounded-lg flex items-center justify-center text-blue-400 mr-3">
                     <i class="fas fa-server"></i>
                 </div>
@@ -99,7 +105,7 @@
                     <i class="fas fa-cloud-download-alt w-6 text-slate-400 group-hover:text-orange-400 transition-colors"></i> Request Backup
                 </button>
             </nav>
-            <div class="p-4 border-t border-slate-700 bg-slate-850">
+            <div class="p-4 border-t border-slate-700 bg-slate-850 pb-safe">
                 <button onclick="performLogout()" class="flex items-center justify-center w-full bg-slate-700/50 hover:bg-red-500/20 text-slate-300 hover:text-red-400 border border-slate-600 hover:border-red-500/50 py-2.5 rounded-lg transition font-medium">
                     <i class="fas fa-sign-out-alt mr-2"></i> Akhiri Sesi
                 </button>
@@ -109,7 +115,7 @@
         <!-- Main Content -->
         <main class="flex-1 flex flex-col h-full bg-slate-900 overflow-hidden relative">
             <!-- Header Mobile -->
-            <header class="h-16 bg-slate-800 border-b border-slate-700 flex items-center justify-between px-6 md:hidden z-20 shadow-md">
+            <header class="h-16 shrink-0 bg-slate-800 border-b border-slate-700 flex items-center justify-between px-6 md:hidden z-20 shadow-md pt-safe">
                 <div class="flex items-center">
                     <div class="w-8 h-8 bg-blue-500/20 rounded-lg flex items-center justify-center text-blue-400 mr-3">
                         <i class="fas fa-server"></i>
@@ -119,11 +125,14 @@
                 <button onclick="performLogout()" class="text-slate-400 hover:text-red-400 transition bg-slate-700/50 p-2 rounded-lg"><i class="fas fa-sign-out-alt"></i></button>
             </header>
 
+            <!-- Scrollable Content Area -->
+            <!-- PERBAIKAN: pb-28 ditambahkan di container luar untuk spasi ekstra di bawah -->
             <div class="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8">
-                <div class="max-w-5xl mx-auto flex flex-col gap-6 h-full pb-24 md:pb-0">
+                <!-- PERBAIKAN: Menggunakan min-h-full agar scroll atas-bawah tidak terpotong flex -->
+                <div class="max-w-5xl mx-auto flex flex-col gap-6 min-h-full pb-28 md:pb-6">
                     
                     <!-- Status Bar -->
-                    <div class="bg-gradient-to-r from-slate-800 to-slate-850 rounded-2xl p-6 border border-slate-700 shadow-xl flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 relative overflow-hidden">
+                    <div class="shrink-0 bg-gradient-to-r from-slate-800 to-slate-850 rounded-2xl p-6 border border-slate-700 shadow-xl flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 relative overflow-hidden">
                         <div class="absolute top-0 right-0 -mt-4 -mr-4 w-24 h-24 bg-blue-500/10 rounded-full blur-2xl"></div>
                         <div class="relative z-10">
                             <h2 class="text-2xl md:text-3xl font-bold text-white mb-1 tracking-tight" id="mode-title">Selamat Datang</h2>
@@ -142,7 +151,7 @@
                     </div>
 
                     <!-- Layout Grid untuk Form & Terminal -->
-                    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 flex-1 min-h-0">
+                    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 flex-1">
                         
                         <!-- Form Builder (Kiri) -->
                         <div id="form-container" class="lg:col-span-5 bg-slate-800 rounded-2xl p-6 border border-slate-700 shadow-xl flex flex-col hidden opacity-0 transition-opacity duration-300">
@@ -204,14 +213,14 @@
                                 </div>
                             </div>
 
-                            <button onclick="submitAction()" id="btn-submit" class="mt-6 w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3.5 px-4 rounded-xl shadow-[0_4px_14px_0_rgba(37,99,235,0.39)] hover:shadow-[0_6px_20px_rgba(37,99,235,0.23)] hover:-translate-y-0.5 transition-all duration-200 flex items-center justify-center group">
+                            <button onclick="submitAction()" id="btn-submit" class="mt-6 shrink-0 w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3.5 px-4 rounded-xl shadow-[0_4px_14px_0_rgba(37,99,235,0.39)] hover:shadow-[0_6px_20px_rgba(37,99,235,0.23)] hover:-translate-y-0.5 transition-all duration-200 flex items-center justify-center group">
                                 <i class="fas fa-terminal mr-2 group-hover:animate-pulse"></i> <span>Eksekusi Perintah</span>
                             </button>
                         </div>
 
                         <!-- Terminal Output Window (Kanan) -->
-                        <div class="lg:col-span-7 bg-[#0a0f14] rounded-2xl border border-slate-700 shadow-2xl flex flex-col min-h-[400px] relative">
-                            <div class="bg-slate-800/80 px-4 py-3 border-b border-slate-700 flex justify-between items-center rounded-t-2xl backdrop-blur-sm">
+                        <div class="lg:col-span-7 bg-[#0a0f14] rounded-2xl border border-slate-700 shadow-2xl flex flex-col min-h-[400px] h-[500px] lg:h-auto relative">
+                            <div class="bg-slate-800/80 px-4 py-3 border-b border-slate-700 flex justify-between items-center rounded-t-2xl backdrop-blur-sm shrink-0">
                                 <div class="flex items-center gap-2.5">
                                     <div class="w-3 h-3 rounded-full bg-red-500 shadow-[0_0_5px_rgba(239,68,68,0.5)]"></div>
                                     <div class="w-3 h-3 rounded-full bg-yellow-500 shadow-[0_0_5px_rgba(234,179,8,0.5)]"></div>
@@ -237,20 +246,21 @@
             </div>
             
             <!-- Mobile Menu Bar (Bottom) -->
-            <nav class="md:hidden fixed bottom-0 w-full bg-slate-800/90 backdrop-blur-md border-t border-slate-700 flex justify-around p-2 pb-safe z-30 shadow-[0_-5px_20px_rgba(0,0,0,0.3)]">
-                <button onclick="setMode('xray')" class="flex flex-col items-center p-2 flex-1 text-slate-400 hover:text-yellow-400 transition nav-btn-mobile" id="nav-mob-xray">
+            <!-- PERBAIKAN: pb-safe dan pt-2 memberikan padding yang lega agar icon tidak numpuk di pinggir layar HP -->
+            <nav class="md:hidden fixed bottom-0 w-full bg-slate-800/95 backdrop-blur-md border-t border-slate-700 flex justify-around pt-2 pb-safe z-30 shadow-[0_-10px_25px_rgba(0,0,0,0.4)]">
+                <button onclick="setMode('xray')" class="flex flex-col items-center p-2 mb-1 flex-1 text-slate-400 hover:text-yellow-400 transition nav-btn-mobile" id="nav-mob-xray">
                     <i class="fas fa-bolt text-xl mb-1"></i>
                     <span class="text-[10px] font-bold">XRAY</span>
                 </button>
-                <button onclick="setMode('ssh')" class="flex flex-col items-center p-2 flex-1 text-slate-400 hover:text-green-400 transition nav-btn-mobile" id="nav-mob-ssh">
+                <button onclick="setMode('ssh')" class="flex flex-col items-center p-2 mb-1 flex-1 text-slate-400 hover:text-green-400 transition nav-btn-mobile" id="nav-mob-ssh">
                     <i class="fas fa-shield-alt text-xl mb-1"></i>
                     <span class="text-[10px] font-bold">SSH</span>
                 </button>
-                <button onclick="setMode('l2tp')" class="flex flex-col items-center p-2 flex-1 text-slate-400 hover:text-purple-400 transition nav-btn-mobile" id="nav-mob-l2tp">
+                <button onclick="setMode('l2tp')" class="flex flex-col items-center p-2 mb-1 flex-1 text-slate-400 hover:text-purple-400 transition nav-btn-mobile" id="nav-mob-l2tp">
                     <i class="fas fa-network-wired text-xl mb-1"></i>
                     <span class="text-[10px] font-bold">L2TP</span>
                 </button>
-                <button onclick="executeMonitor('cek-xray', 'GET')" class="flex flex-col items-center p-2 flex-1 text-slate-400 hover:text-blue-400 transition">
+                <button onclick="executeMonitor('cek-xray', 'GET')" class="flex flex-col items-center p-2 mb-1 flex-1 text-slate-400 hover:text-blue-400 transition">
                     <i class="fas fa-heartbeat text-xl mb-1"></i>
                     <span class="text-[10px] font-bold">STATUS</span>
                 </button>
@@ -524,7 +534,6 @@
             btn.disabled = true;
             btn.classList.add('opacity-75');
 
-            // PERBAIKAN: Bersihkan terminal sebelum eksekusi perintah baru
             document.getElementById('terminal-output').innerHTML = '';
             printToTerminal(`> Executing [${act.toUpperCase()}] on protocol [${prot.toUpperCase()}]...`, 'info');
             
@@ -538,7 +547,6 @@
         }
 
         async function executeMonitor(endpoint, method) {
-            // PERBAIKAN: Bersihkan terminal sebelum menampilkan data monitor
             document.getElementById('terminal-output').innerHTML = '';
             printToTerminal(`> Requesting sistem monitor [${endpoint}]...`, 'info');
             await fetchAPI(`/user_legend/${endpoint}`, method);
