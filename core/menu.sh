@@ -6,7 +6,7 @@
 # Versi : 1.4 (Fitur: API Auth & Web Panel Update)
 # ==========================================
 
-SCRIPT_VERSION="1.4 (13050550)"
+SCRIPT_VERSION="1.4 (1106 0745)"
 
 source /usr/local/etc/srpcom/env.conf 2>/dev/null
 source /usr/local/bin/srpcom/utils.sh 2>/dev/null
@@ -803,6 +803,9 @@ menu_api_key() {
         fi
 
         echo -e "Status API Auth : $st"
+        if [[ "$auth_status" == "ON" ]]; then
+            echo "Web Panel       : https://${DOMAIN}/panel"
+        fi
         echo "Current Key     : ${current_key}"
         echo "======================================"
         echo " 1. Turn ON / OFF API Authentication"
