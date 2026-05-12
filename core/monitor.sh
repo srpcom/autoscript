@@ -3,9 +3,11 @@
 # monitor.sh
 # MODULE: LIVE MONITORING & DEBUGGING
 # Memantau aktivitas login user dan System Logs
+# SQLITE VERSION
 # ==========================================
 
 source /usr/local/etc/srpcom/env.conf
+DB_PATH="/usr/local/etc/srpcom/database.db"
 
 monitor_xray() {
     clear
@@ -15,20 +17,24 @@ monitor_xray() {
     printf " %-2s | %-12s | %-3s | %-8s\n" "No" "User" "IP" "Usage"
     echo "--------------------------------------"
     
-    mapfile -t xray_users < <(jq -r '.inbounds[] | select(.protocol=="vmess" or .protocol=="vless" or .protocol=="trojan") | .protocol as $prot | .settings.clients[].email | "\($prot):\(.)"' /usr/local/etc/xray/config.json 2>/dev/null)
+    # Ambil user dari SQLite
+    xray_users=$(sqlite3 "$DB_PATH" "SELECT username FROM vpn_accounts WHERE protocol IN ('vmessws', 'vlessws', 'trojanws') AND status='active';" 2>/dev/null)
     
-    if [ ${#xray_users[@]} -eq 0 ] || [ -z "${xray_users[0]}" ]; then
+    if [ -z "$xray_users" ]; then
         echo " Belum ada akun Xray yang dibuat."
     else
+        # Tarik data penggunaan Xray langsung dari API lokal
         stats_json=$(/usr/local/bin/xray api statsquery --server=127.0.0.1:10085 2>/dev/null)
         
+        # Salin log Xray sementara
+        cp /var/log/xray/access.log /tmp/xray_access_mon.log 2>/dev/null
+        
         no=1
-        for item in "${xray_users[@]}"; do
-            prot=$(echo "$item" | cut -d':' -f1)
-            user=$(echo "$item" | cut -d':' -f2)
+        for user in $xray_users; do
+            # Hitung IP Unik Aktif dari log
+            ip_count=$(grep "email: $user$" /tmp/xray_access_mon.log 2>/dev/null | awk '{print $3}' | cut -d: -f1 | sort -u | wc -l)
             
-            ip_count=$(grep "email: $user$" /var/log/xray/access.log 2>/dev/null | awk '{print $3}' | cut -d: -f1 | sort -u | wc -l)
-            
+            # Ekstrak data kuota menggunakan jq
             dl=$(echo "$stats_json" | jq -r '.stat[] | select(.name == "user>>>'${user}'>>>traffic>>>downlink") | .value' 2>/dev/null)
             ul=$(echo "$stats_json" | jq -r '.stat[] | select(.name == "user>>>'${user}'>>>traffic>>>uplink") | .value' 2>/dev/null)
             
@@ -36,20 +42,27 @@ monitor_xray() {
             ul=${ul:-0}
             total_bytes=$((dl + ul))
             
+            # Format Output Usage (MB/GB)
             if [ "$total_bytes" -ge 1073741824 ]; then
-                total_gb=$(awk "BEGIN {printf \"%.2fGB\", $total_bytes/1073741824}")
+                usage=$(awk "BEGIN {printf \"%.2f GB\", $total_bytes / 1073741824}")
             elif [ "$total_bytes" -ge 1048576 ]; then
-                total_gb=$(awk "BEGIN {printf \"%.0fMB\", $total_bytes/1048576}")
+                usage=$(awk "BEGIN {printf \"%.2f MB\", $total_bytes / 1048576}")
+            elif [ "$total_bytes" -gt 0 ]; then
+                usage=$(awk "BEGIN {printf \"%.2f KB\", $total_bytes / 1024}")
             else
-                total_gb="0MB"
+                usage="0 MB"
             fi
             
-            local display_user="${user:0:12}"
-            printf " %-2s | %-12s | %-3s | %-8s\n" "$no." "$display_user" "$ip_count" "$total_gb"
-            ((no++))
+            if [ "$ip_count" -gt 0 ] || [ "$total_bytes" -gt 0 ]; then
+               printf " %-2s | %-12s | %-3s | %-8s\n" "$no" "$user" "$ip_count" "$usage"
+               no=$((no + 1))
+            fi
         done
+        rm -f /tmp/xray_access_mon.log
+        if [ "$no" -eq 1 ]; then
+             echo " Belum ada aktivitas penggunaan."
+        fi
     fi
-    
     echo "======================================"
     pause
 }
@@ -57,80 +70,28 @@ monitor_xray() {
 monitor_ssh() {
     clear
     echo "======================================"
-    echo "      MONITORING USER SSH AKTIF       "
+    echo "      LIVE SSH & OVPN MONITOR         "
     echo "======================================"
-    echo " USERNAME   |  PID  |   IP ADDRESS    "
+    printf " %-2s | %-12s | %-6s\n" "No" "User" "Login"
     echo "--------------------------------------"
     
-    tmp_log="/tmp/active_ssh_monitor.log"
-    > "$tmp_log"
+    ssh_users=$(sqlite3 "$DB_PATH" "SELECT username FROM vpn_accounts WHERE protocol='ssh' AND status='active';" 2>/dev/null)
     
-    netstat -tnpa 2>/dev/null | grep 'ESTABLISHED' | grep -E 'sshd|dropbear' | while read -r line; do
-        ip_port=$(echo "$line" | awk '{print $5}')
-        client_ip=$(echo "$ip_port" | cut -d':' -f1)
-        
-        if [[ "$client_ip" == "127.0.0.1" || "$client_ip" == "::1" ]]; then continue; fi
-        
-        pid_prog=$(echo "$line" | awk '{print $7}')
-        pid=$(echo "$pid_prog" | cut -d'/' -f1)
-        
-        user=$(ps -o user= -p "$pid" 2>/dev/null | awk '{print $1}')
-        
-        if [[ -n "$user" && "$user" != "root" && "$user" != "sshd" && "$user" != "messagebus" ]]; then
-            local display_user="${user:0:10}"
-            printf " %-10s | %-5s | %-15s \n" "$display_user" "$pid" "$client_ip" >> "$tmp_log"
-        fi
-    done
-    
-    if [ -s "$tmp_log" ]; then
-        cat "$tmp_log" | sort -u
-        total=$(cat "$tmp_log" | sort -u | wc -l)
-        echo "--------------------------------------"
-        echo " Total Aktif: $total User Login"
+    if [ -z "$ssh_users" ]; then
+        echo " Belum ada akun SSH yang dibuat."
     else
-        echo " Belum ada user aktif saat ini."
+        no=1
+        for user in $ssh_users; do
+             total_login=$(ps -u "$user" 2>/dev/null | grep -E -c "sshd|dropbear")
+             if [ "$total_login" -gt 0 ]; then
+                 printf " %-2s | %-12s | %-6s\n" "$no" "$user" "$total_login"
+                 no=$((no + 1))
+             fi
+        done
+        if [ "$no" -eq 1 ]; then
+             echo " Belum ada user SSH yang online."
+        fi
     fi
-    
-    rm -f "$tmp_log"
-    echo "======================================"
-    pause
-}
-
-monitor_system() {
-    clear
-    echo -e "\n\e[33m[INFO]\e[0m Membuka System Resource Monitor..."
-    echo -e "\e[31m=> Tekan tombol 'q' atau 'F10' untuk keluar dari monitor.\e[0m\n"
-    sleep 2
-    
-    # Cek dan instal htop jika belum ada
-    if ! command -v htop &> /dev/null; then
-        echo "=> Menginstal komponen htop..."
-        export DEBIAN_FRONTEND=noninteractive
-        apt-get update -y > /dev/null 2>&1
-        apt-get install htop -y > /dev/null 2>&1
-    fi
-    
-    # Menjalankan htop
-    htop
-}
-
-run_speedtest() {
-    clear
-    echo "======================================"
-    echo "          SPEEDTEST SERVER            "
-    echo "======================================"
-    # Memeriksa apakah speedtest terinstal, jika belum akan memberitahu
-    if ! command -v speedtest &> /dev/null; then
-        echo -e "\e[31m[ERROR]\e[0m Speedtest CLI belum terpasang."
-        echo "Sedang mencoba menginstal..."
-        curl -s https://packagecloud.io/install/repositories/ookla/speedtest-cli/script.deb.sh | bash
-        apt install speedtest -y
-    fi
-    
-    echo "Sedang menjalankan pengujian... Mohon tunggu."
-    echo "--------------------------------------"
-    # Menjalankan speedtest dengan otomatis menerima license
-    speedtest --accept-license --accept-gdpr
     echo "======================================"
     pause
 }
@@ -139,24 +100,22 @@ menu_monitor() {
     while true; do
         clear
         echo "╔════════════════════════════════════╗"
-        echo "║          MONITORING PANEL          ║"
+        echo "║            LIVE MONITOR            ║"
         echo "╚════════════════════════════════════╝"
-        echo " 1. Monitor SSH & Dropbear (Live)"
-        echo " 2. Monitor Xray & Kuota (Tabel)"
-        echo " 3. Xray Access Log (Live Tail)"
-        echo " 4. Xray Error Log (Live Tail)"
-        echo " 5. L2TP & IPsec Log (Live Debug)"
-        echo " 6. OpenVPN Log (Live Debug)"
-        echo " 7. Caddy Proxy Log (Live Debug)"
-        echo " 8. System Resource (CPU & RAM)"
-        echo " 9. Speedtest Server"
+        echo " 1. Monitor XRAY (Usage & IP)"
+        echo " 2. Monitor SSH (Multi-Login)"
         echo "--------------------------------------"
-        echo " 0/x. Kembali ke Menu Utama"
+        echo " 3. Live Log Xray Access"
+        echo " 4. Live Log Xray Error"
+        echo " 5. Live Log L2TP/IPsec"
+        echo " 6. Live Log OpenVPN"
+        echo "--------------------------------------"
+        echo " 0. Kembali ke Menu Utama"
         echo "======================================"
-        read -p " Pilih Opsi [0-9 or x]: " opt
+        read -p " Pilih Opsi [0-6]: " opt
         case $opt in
-            1) monitor_ssh ;;
-            2) monitor_xray ;;
+            1) monitor_xray ;;
+            2) monitor_ssh ;;
             3) 
                 echo -e "\n\e[33m[INFO]\e[0m Membuka log akses Xray..."
                 echo -e "\e[31m=> Tekan Ctrl+C untuk keluar.\e[0m\n"
@@ -173,15 +132,7 @@ menu_monitor() {
                 echo -e "\n\e[33m[INFO]\e[0m Membuka live log OpenVPN TCP & UDP..."
                 echo -e "\e[31m=> Tekan Ctrl+C untuk keluar.\e[0m\n"
                 sleep 2; journalctl -u openvpn-server@server-udp -u openvpn-server@server-tcp -f ;;
-            7)
-                echo -e "\n\e[33m[INFO]\e[0m Membuka live log Caddy Server..."
-                echo -e "\e[31m=> Tekan Ctrl+C untuk keluar.\e[0m\n"
-                sleep 2; journalctl -u caddy -f ;;
-            8)
-                monitor_system ;;
-            9)
-                run_speedtest ;;
-            0|x|X) break ;;
+            0) break ;;
             *) echo -e "\n=> Pilihan tidak valid!"; sleep 1 ;;
         esac
     done
