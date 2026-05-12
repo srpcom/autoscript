@@ -45,6 +45,37 @@ add_l2tp() {
     pause
 }
 
+add_trial_l2tp() {
+    clear
+    echo "======================================"
+    echo "      CREATE TRIAL L2TP (60M)         "
+    echo "======================================"
+    
+    user="trialsrp-$(date +%m%d%H%M)"
+    password="1"
+    masaaktif="60 Minutes"
+    
+    exp_date=$(date -d "+60 minutes" +"%Y-%m-%d")
+    exp_time=$(date -d "+60 minutes" +"%H:%M:%S")
+    
+    # Menambahkan ke konfigurasi sistem (chap-secrets)
+    echo "\"$user\" l2tpd \"$password\" *" >> /etc/ppp/chap-secrets
+    
+    # Menyimpan database kustom
+    echo "$user $password $exp_date $exp_time" >> /usr/local/etc/srpcom/l2tp_expiry.txt
+    
+    # Restart layanan agar membaca config baru
+    systemctl restart ipsec xl2tpd
+    
+    msg_cli=$(echo -e "━━━━━━━━━━━━━━━━━━━━\n❖ TRIAL L2TP / IPsec ❖\n━━━━━━━━━━━━━━━━━━━━\nUsername : ${user}\nPassword : ${password}\nDomain : ${DOMAIN}\nIP : ${IP_ADD}\nIPsec PSK : srpcom_vpn\n━━━━━━━━━━━━━━━━━━━━\nEXPIRED ON : ${exp_date} ${exp_time} WIB (${masaaktif})")
+    
+    msg_tg=$(echo -e "━━━━━━━━━━━━━━━━━━━━\n❖ TRIAL L2TP / IPsec ❖\n━━━━━━━━━━━━━━━━━━━━\nUsername : \`${user}\`\nPassword : \`${password}\`\nDomain : ${DOMAIN}\nIP : ${IP_ADD}\nIPsec PSK : \`srpcom_vpn\`\n━━━━━━━━━━━━━━━━━━━━\nEXPIRED ON : ${exp_date} ${exp_time} WIB (${masaaktif})")
+    
+    clear; echo "$msg_cli"
+    send_telegram "$msg_tg"
+    pause
+}
+
 delete_l2tp() {
     clear
     echo "======================================"
@@ -65,13 +96,11 @@ delete_l2tp() {
     for i in "${!users[@]}"; do
         echo "$((i+1)). ${users[$i]}"
     done
-    echo "0. Back"
-    echo "x. Back to Main Menu"
+    echo "0. Kembali"
     echo "======================================"
-    read -p "Pilih nomor akun untuk dihapus [1-${#users[@]} or 0/x]: " choice
+    read -p "Pilih nomor yang dihapus [1-${#users[@]} or 0]: " choice
     
     if [[ "$choice" == "0" ]]; then return; fi
-    if [[ "$choice" == "x" || "$choice" == "X" ]]; then exec menu; fi
 
     if [[ "$choice" -gt 0 && "$choice" -le "${#users[@]}" ]]; then
         user="${users[$((choice-1))]}"
@@ -108,13 +137,11 @@ renew_l2tp() {
     for i in "${!users[@]}"; do
         echo "$((i+1)). ${users[$i]}"
     done
-    echo "0. Back"
-    echo "x. Back to Main Menu"
+    echo "0. Kembali"
     echo "======================================"
-    read -p "Pilih nomor akun [1-${#users[@]} or 0/x]: " choice
+    read -p "Pilih nomor akun [1-${#users[@]} or 0]: " choice
     
     if [[ "$choice" == "0" ]]; then return; fi
-    if [[ "$choice" == "x" || "$choice" == "X" ]]; then exec menu; fi
 
     if [[ "$choice" -gt 0 && "$choice" -le "${#users[@]}" ]]; then
         user="${users[$((choice-1))]}"
@@ -181,13 +208,11 @@ detail_l2tp() {
     for i in "${!users[@]}"; do
         echo "$((i+1)). ${users[$i]}"
     done
-    echo "0. Back"
-    echo "x. Back to Main Menu"
+    echo "0. Kembali"
     echo "======================================"
-    read -p "Pilih nomor akun [1-${#users[@]} or 0/x]: " choice
+    read -p "Pilih nomor akun [1-${#users[@]} or 0]: " choice
     
     if [[ "$choice" == "0" ]]; then return; fi
-    if [[ "$choice" == "x" || "$choice" == "X" ]]; then exec menu; fi
 
     if [[ "$choice" -gt 0 && "$choice" -le "${#users[@]}" ]]; then
         user="${users[$((choice-1))]}"
@@ -221,20 +246,23 @@ menu_l2tp() {
         echo "╔════════════════════════════════════╗"
         echo "║             MENU L2TP              ║"
         echo "╚════════════════════════════════════╝"
-        echo "1. Create L2TP Account"
-        echo "2. Delete L2TP Account"
-        echo "3. Renew L2TP Account"
-        echo "4. List L2TP Account"
-        echo "5. Detail L2TP Account"
-        echo "0/x. Back to Main Menu"
+        echo " 1. Create L2TP Account"
+        echo " 2. Create Trial L2TP (60M)"
+        echo " 3. Delete L2TP Account"
+        echo " 4. Renew L2TP Account"
+        echo " 5. List L2TP Account"
+        echo " 6. Detail L2TP Account"
+        echo "--------------------------------------"
+        echo " 0/x. Kembali ke Menu Utama"
         echo "======================================"
-        read -p "Please select an option [0-5 or x]: " opt
+        read -p " Pilih opsi [0-6 or x]: " opt
         case $opt in
             1) add_l2tp ;; 
-            2) delete_l2tp ;; 
-            3) renew_l2tp ;;
-            4) list_l2tp ;;
-            5) detail_l2tp ;;
+            2) add_trial_l2tp ;;
+            3) delete_l2tp ;; 
+            4) renew_l2tp ;;
+            5) list_l2tp ;;
+            6) detail_l2tp ;;
             0|x|X) break ;;
             *) echo -e "\n=> Pilihan tidak valid!"; sleep 1 ;;
         esac
