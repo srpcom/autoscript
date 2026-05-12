@@ -42,23 +42,6 @@ def get_api_key():
         with open(API_KEY_FILE, 'r') as f: return f.read().strip()
     except: return "DEFAULT_KEY"
 
-def check_auth():
-    # Baca status ON/OFF
-    auth_status = "OFF"
-    try:
-        if os.path.exists(API_AUTH_FILE):
-            with open(API_AUTH_FILE, 'r') as f:
-                auth_status = f.read().strip()
-    except:
-        pass
-        
-    # Jika status OFF, loloskan semua request (bypass auth)
-    if auth_status == "OFF":
-        return True
-        
-    # Jika status ON, verifikasi header x-api-key
-    return request.headers.get('x-api-key') == get_api_key()
-
 def is_license_active():
     try:
         if os.path.exists(LICENSE_FILE):
@@ -70,14 +53,38 @@ def is_license_active():
         pass
     return True
 
+# ==========================================
+# GERBANG KEAMANAN UTAMA (GLOBAL AUTH)
+# ==========================================
 @app.before_request
-def check_license_lock():
-    # Mencegat semua request yang merubah database (add, del, renew, trial, lock, change)
+def enforce_security():
+    # Hanya lindungi rute API kita
+    if not request.path.startswith('/user_legend/'):
+        return
+        
+    # 1. CEK STATUS API (ON/OFF)
+    auth_status = "OFF"
+    try:
+        if os.path.exists(API_AUTH_FILE):
+            with open(API_AUTH_FILE, 'r') as f:
+                auth_status = f.read().strip()
+    except:
+        pass
+        
+    if auth_status == "OFF":
+        return jsonify({"stdout": "❌ AKSES DITOLAK: Fitur API Website sedang di-OFF-kan dari Terminal VPS. Akses Web Panel & Remote API diblokir."}), 403
+        
+    # 2. CEK VALIDITAS API KEY
+    if request.headers.get('x-api-key') != get_api_key():
+        return jsonify({"stdout": "❌ Unauthorized: API Key tidak valid atau kosong."}), 401
+        
+    # 3. CEK LISENSI UNTUK AKSI CRUD (MODIFIKASI DATA)
     if request.method in ['POST', 'DELETE']:
         mutating_paths = ['/add-', '/del-', '/renew-', '/trial-', '/lock-', '/change-uuid']
         if any(p in request.path for p in mutating_paths):
             if not is_license_active():
                 return jsonify({"stdout": "❌ AKSES DITOLAK: Masa aktif Lisensi Autoscript untuk Node Server ini telah habis. Eksekusi dibatalkan."}), 403
+
 
 def load_json(p):
     if not os.path.exists(p): return {}
@@ -119,7 +126,6 @@ def remove_from_txt(filepath, user):
 # ==========================================
 @app.route('/user_legend/list-accounts/<protocol>', methods=['GET'])
 def list_accounts(protocol):
-    if not check_auth(): return jsonify({"stdout": "Unauthorized"}), 401
     result = []
     if protocol in ['vmess', 'vless', 'trojan']:
         cfg = load_json(XRAY_CONF)
@@ -156,7 +162,6 @@ def list_accounts(protocol):
 
 @app.route('/user_legend/monitor-xray', methods=['GET'])
 def monitor_xray():
-    if not check_auth(): return jsonify({"stdout": "Unauthorized"}), 401
     try:
         ip_data = {}
         if os.path.exists('/var/log/xray/access.log'):
@@ -208,7 +213,6 @@ def monitor_xray():
 
 @app.route('/user_legend/monitor-ssh', methods=['GET'])
 def monitor_ssh():
-    if not check_auth(): return jsonify({"stdout": "Unauthorized"}), 401
     try:
         res = "💻 *SSH MONITORING*\n━━━━━━━━━━━━━━━━━━━━\n"
         out = subprocess.run('netstat -tnpa', shell=True, capture_output=True, text=True)
@@ -230,7 +234,6 @@ def monitor_ssh():
 
 @app.route('/user_legend/sys-backup', methods=['GET'])
 def sys_backup():
-    if not check_auth(): return jsonify({"stdout": "Unauthorized"}), 401
     now_str = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
     backup_file = f"/tmp/srpcom-backup-{now_str}.tar.gz"
     files = [XRAY_CONF, EXP_FILE, LIMIT_FILE, L2TP_EXP, SSH_EXP, SSH_LIMIT, CHAP_SECRETS]
@@ -289,7 +292,6 @@ def generate_account_detail(protocol, user, uid, exp_date_str, is_trial=False, l
 
 @app.route('/user_legend/add-<protocol>ws', methods=['POST'])
 def add_user(protocol):
-    if not check_auth(): return jsonify({"stdout": "Unauthorized"}), 401
     data = request.json or {}
     user, exp = data.get('user'), int(data.get('exp', 30))
     limit_ip, limit_quota = int(data.get('limit_ip', 0)), int(data.get('limit_quota', 0))
@@ -332,13 +334,11 @@ def add_user(protocol):
 
 @app.route('/user_legend/trial-<protocol>ws', methods=['POST'])
 def trial_user(protocol):
-    if not check_auth(): return jsonify({"stdout": "Unauthorized"}), 401
     data = request.json or {}
     
     exp_min = 60 
     limit_ip = int(data.get('limit_ip', 1))
     
-    # PERBAIKAN: Format Jam-Menit-Detik + 1 Karakter Random
     rand_char = random.choice(string.ascii_lowercase)
     user = f"trialsrp-{datetime.datetime.now().strftime('%H%M%S')}{rand_char}"
     
@@ -365,7 +365,6 @@ def trial_user(protocol):
 
 @app.route('/user_legend/detail-<protocol>ws', methods=['GET', 'POST'])
 def detail_user(protocol):
-    if not check_auth(): return jsonify({"stdout": "Unauthorized"}), 401
     user = (request.json or {}).get('user')
     cfg = load_json(XRAY_CONF)
     uid = None
@@ -394,7 +393,6 @@ def detail_user(protocol):
 
 @app.route('/user_legend/del-<protocol>ws', methods=['DELETE', 'POST'])
 def del_user(protocol):
-    if not check_auth(): return jsonify({"stdout": "Unauthorized"}), 401
     user = (request.json or {}).get('user')
     if not user: return jsonify({"stdout": "Error: User required"}), 400
     cfg = load_json(XRAY_CONF)
@@ -414,7 +412,6 @@ def del_user(protocol):
 
 @app.route('/user_legend/renew-<protocol>ws', methods=['POST'])
 def renew_user(protocol):
-    if not check_auth(): return jsonify({"stdout": "Unauthorized"}), 401
     user, exp = (request.json or {}).get('user'), int((request.json or {}).get('exp', 30))
     if not user: return jsonify({"stdout": "Error: User required"}), 400
     dt_str = "Error"
@@ -439,7 +436,6 @@ def renew_user(protocol):
 # ==========================================
 @app.route('/user_legend/add-ssh', methods=['POST'])
 def add_ssh():
-    if not check_auth(): return jsonify({"stdout": "Unauthorized"}), 401
     data = request.json or {}
     user, password, exp = data.get('user'), data.get('password', '123'), int(data.get('exp', 30))
     limit_ip = int(data.get('limit_ip', 0))
@@ -492,7 +488,6 @@ def add_ssh():
 
 @app.route('/user_legend/del-ssh', methods=['DELETE', 'POST'])
 def del_ssh():
-    if not check_auth(): return jsonify({"stdout": "Unauthorized"}), 401
     user = (request.json or {}).get('user')
     if not user: return jsonify({"stdout": "Error: User required"}), 400
     subprocess.run(['userdel', '-f', user])
@@ -502,7 +497,6 @@ def del_ssh():
 
 @app.route('/user_legend/renew-ssh', methods=['POST'])
 def renew_ssh():
-    if not check_auth(): return jsonify({"stdout": "Unauthorized"}), 401
     user, exp = (request.json or {}).get('user'), int((request.json or {}).get('exp', 30))
     if not user: return jsonify({"stdout": "Error: User required"}), 400
     
@@ -526,7 +520,6 @@ def renew_ssh():
 
 @app.route('/user_legend/detail-ssh', methods=['GET', 'POST'])
 def detail_ssh():
-    if not check_auth(): return jsonify({"stdout": "Unauthorized"}), 401
     user = (request.json or {}).get('user')
     
     found = False
@@ -570,13 +563,11 @@ def detail_ssh():
 
 @app.route('/user_legend/trial-ssh', methods=['POST'])
 def trial_ssh():
-    if not check_auth(): return jsonify({"stdout": "Unauthorized"}), 401
     data = request.json or {}
     
     exp_min = 60 
     limit_ip = int(data.get('limit_ip', 1))
     
-    # PERBAIKAN: Format Jam-Menit-Detik + 1 Karakter Random
     rand_char = random.choice(string.ascii_lowercase)
     user = f"trialsrp-{datetime.datetime.now().strftime('%H%M%S')}{rand_char}"
     
@@ -613,7 +604,6 @@ def trial_ssh():
 # ==========================================
 @app.route('/user_legend/add-l2tp', methods=['POST'])
 def add_l2tp():
-    if not check_auth(): return jsonify({"stdout": "Unauthorized"}), 401
     data = request.json or {}
     user, password, exp = data.get('user'), data.get('password', '123'), int(data.get('exp', 30))
     if not user: return jsonify({"stdout": "Error: User required"}), 400
@@ -654,7 +644,6 @@ def add_l2tp():
 
 @app.route('/user_legend/del-l2tp', methods=['DELETE', 'POST'])
 def del_l2tp():
-    if not check_auth(): return jsonify({"stdout": "Unauthorized"}), 401
     user = (request.json or {}).get('user')
     if not user: return jsonify({"stdout": "Error: User required"}), 400
     
@@ -673,7 +662,6 @@ def del_l2tp():
 
 @app.route('/user_legend/renew-l2tp', methods=['POST'])
 def renew_l2tp():
-    if not check_auth(): return jsonify({"stdout": "Unauthorized"}), 401
     user, exp = (request.json or {}).get('user'), int((request.json or {}).get('exp', 30))
     if not user: return jsonify({"stdout": "Error: User required"}), 400
     
@@ -696,7 +684,6 @@ def renew_l2tp():
 
 @app.route('/user_legend/detail-l2tp', methods=['GET', 'POST'])
 def detail_l2tp():
-    if not check_auth(): return jsonify({"stdout": "Unauthorized"}), 401
     user = (request.json or {}).get('user')
     
     found = False
@@ -728,7 +715,6 @@ def detail_l2tp():
 
 @app.route('/user_legend/trial-l2tp', methods=['POST'])
 def trial_l2tp():
-    if not check_auth(): return jsonify({"stdout": "Unauthorized"}), 401
     return jsonify({"stdout": "L2TP Trial created (Demo via API)"})
 
 # ==========================================
@@ -736,14 +722,12 @@ def trial_l2tp():
 # ==========================================
 @app.route('/user_legend/lock-ssh', methods=['POST'])
 def lock_ssh():
-    if not check_auth(): return jsonify({"stdout": "Unauthorized"}), 401
     user = (request.json or {}).get('user')
     if user: subprocess.run(['usermod', '-L', user])
     return jsonify({"stdout": "Locked"})
 
 @app.route('/user_legend/lock-xray', methods=['POST', 'GET'])
 def lock_xray():
-    if not check_auth(): return jsonify({"stdout": "Unauthorized"}), 401
     user = (request.json or {}).get('user') if request.method == 'POST' else request.args.get('user')
     if not user and request.json: user = request.json.get('user')
     
@@ -759,13 +743,11 @@ def lock_xray():
 
 @app.route('/user_legend/cek-xray', methods=['GET'])
 def cek_xray():
-    if not check_auth(): return jsonify({"stdout": "Unauthorized"}), 401
     out = subprocess.run(['systemctl', 'is-active', 'xray'], capture_output=True, text=True).stdout.strip()
     return jsonify({"stdout": f"Xray status: {out}, Domain: {DOMAIN}"})
 
 @app.route('/user_legend/change-uuid', methods=['POST'])
 def change_uuid():
-    if not check_auth(): return jsonify({"stdout": "Unauthorized"}), 401
     data = request.json or {}
     old_uuid = data.get('uuidold')
     new_uuid = data.get('uuidnew')
