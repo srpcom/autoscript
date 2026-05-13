@@ -710,29 +710,63 @@ menu_extra_domain() {
 restore_data() {
     clear
     echo "======================================"
-    echo "     RESTORE DATA (MULTI-PROTOCOL)    "
+    echo "     RESTORE DATA (TERENKRIPSI)       "
     echo "======================================"
-    read -p "Nama file backup (misal: srpcom-backup.tar.gz) atau 'x' untuk batal : " backup_name
-    
-    if [ -z "$backup_name" ]; then return; fi
-    if [[ "$backup_name" == "x" || "$backup_name" == "X" ]]; then return; fi
-    if [ ! -f "/root/$backup_name" ]; then
-        echo -e "\n\e[31m[ERROR]\e[0m File /root/$backup_name tidak ditemukan!"
-        sleep 2; return
+    echo "1. Restore dari Local VPS (Otomatis)"
+    echo "2. Restore dari Link Bashupload"
+    echo "0. Kembali"
+    echo "======================================"
+    read -p "Pilih Metode Restore [0-2]: " rest_opt
+
+    local target_file="/tmp/target_backup.tar.gz.enc"
+    rm -f "$target_file"
+
+    if [[ "$rest_opt" == "1" ]]; then
+        local local_file=$(ls /root/srpcom-backup-*.tar.gz.enc 2>/dev/null | head -n 1)
+        if [ -z "$local_file" ]; then
+            echo -e "\n\e[31m[ERROR]\e[0m Tidak ditemukan file backup terenkripsi di /root/"
+            sleep 2; return
+        fi
+        echo -e "\n=> Menggunakan file: $local_file"
+        cp "$local_file" "$target_file"
+    elif [[ "$rest_opt" == "2" ]]; then
+        echo ""
+        read -p "Masukkan URL Bashupload: " cloud_url
+        if [ -z "$cloud_url" ]; then return; fi
+        echo "=> Mengunduh file dari Cloud..."
+        wget -qO "$target_file" "$cloud_url"
+        if [ ! -s "$target_file" ]; then
+            echo -e "\n\e[31m[ERROR]\e[0m Gagal mengunduh file atau link tidak valid/expired!"
+            sleep 2; return
+        fi
+    else
+        return
     fi
 
-    echo -e "\nMetode Restore (VPN Saja):"
+    echo -e "\n=> Membuka dekripsi file..."
+    local BACKUP_PASS=$(cat /usr/local/etc/xray/api_key.conf 2>/dev/null)
+    if [ -z "$BACKUP_PASS" ]; then BACKUP_PASS="DEFAULT_KEY"; fi
+
+    openssl enc -aes-256-cbc -d -in "$target_file" -out /tmp/backup-ready.tar.gz -pass pass:"$BACKUP_PASS" -pbkdf2 2>/dev/null
+    
+    if [ $? -ne 0 ]; then
+        echo -e "\n\e[31m[ERROR]\e[0m Gagal dekripsi! API Key server ini berbeda dengan password file backup."
+        rm -f "$target_file" /tmp/backup-ready.tar.gz
+        sleep 3; return
+    fi
+
+    echo -e "\nMetode Merge Data:"
     echo "1. Replace (Ganti total)"
     echo "2. Merge (Tambahkan data lama)"
     read -p "Pilih Metode [1-2]: " restore_mode
 
     if [[ "$restore_mode" != "1" && "$restore_mode" != "2" ]]; then
-        echo "Batal."; sleep 1; return
+        echo "Batal."; rm -f "$target_file" /tmp/backup-ready.tar.gz; sleep 1; return
     fi
 
-    echo -e "\nMemproses data..."
+    echo -e "\nMemproses pemulihan data..."
     mkdir -p /tmp/restore_temp
-    tar -xzf "/root/$backup_name" -C /tmp/restore_temp 2>/dev/null
+    tar -xzf /tmp/backup-ready.tar.gz -C /tmp/restore_temp 2>/dev/null
     
     if [ -f "/tmp/restore_temp/usr/local/etc/xray/config.json" ]; then
         if [ "$restore_mode" == "1" ]; then
@@ -778,7 +812,7 @@ restore_data() {
         done < /usr/local/etc/srpcom/ssh_expiry.txt
     fi
 
-    rm -rf /tmp/restore_temp
+    rm -rf /tmp/restore_temp "$target_file" /tmp/backup-ready.tar.gz
     systemctl restart xray caddy xray-api ipsec xl2tpd dropbear ssh-ws srpcom-bot
     echo -e "\n\e[32m[SUCCESS]\e[0m Restore Berhasil!"
     pause
