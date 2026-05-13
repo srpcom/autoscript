@@ -388,6 +388,10 @@ menu_bot_admin() {
         
         echo "Status Service :"
         if systemctl is-active --quiet srpcom-bot; then echo -e "\e[32m[ RUNNING ]\e[0m"; else echo -e "\e[31m[ OFF / STANDBY ]\e[0m"; fi
+        
+        echo ""
+        echo "bot token saat ini : ${bot_token:-OFF}"
+        echo "chat id : ${admin_id:-OFF}"
         echo "--------------------------------------"
         echo " 1. Mulai / Restart Bot Admin"
         echo " 2. Ubah Token & ID Bot"
