@@ -39,25 +39,46 @@ run_autobackup() {
     if [[ -z "$token" || -z "$chat_id" ]]; then exit 0; fi
     
     local date_str=$(date +"%Y-%m-%d_%H-%M")
-    local backup_file="/tmp/srpcom-backup-${date_str}.tar.gz"
+    local tmp_backup="/tmp/backup-temp.tar.gz"
+    local enc_backup="/tmp/srpcom-backup-latest.tar.gz.enc"
+    local final_local="/root/srpcom-backup-${date_str}.tar.gz.enc"
+    
+    # 1. Ambil API KEY
+    local BACKUP_PASS=$(cat /usr/local/etc/xray/api_key.conf 2>/dev/null)
+    if [ -z "$BACKUP_PASS" ]; then BACKUP_PASS="DEFAULT_KEY"; fi
     
     # Mengompresi HANYA file database akun (Xray, SSH, L2TP) tanpa settingan sistem
     local valid_files=""
     for f in /usr/local/etc/xray/config.json /usr/local/etc/xray/expiry.txt /usr/local/etc/xray/limit.txt /usr/local/etc/srpcom/l2tp_expiry.txt /usr/local/etc/srpcom/ssh_expiry.txt /usr/local/etc/srpcom/ssh_limit.txt /etc/ppp/chap-secrets; do
         if [ -f "$f" ]; then valid_files="$valid_files $f"; fi
     done
-    tar -czf "$backup_file" $valid_files 2>/dev/null
+    tar -czf "$tmp_backup" $valid_files 2>/dev/null
     
-    local caption="📦 *AUTO BACKUP HARIAN*\n━━━━━━━━━━━━━━━━━━━━\nDomain : ${DOMAIN}\nIP VPS : ${IP_ADD}\nTanggal : $(date +"%Y-%m-%d %H:%M:%S")\n━━━━━━━━━━━━━━━━━━━━\n_Pesan otomatis dari server_"
+    # Enkripsi dengan AES-256
+    openssl enc -aes-256-cbc -salt -in "$tmp_backup" -out "$enc_backup" -pass pass:"$BACKUP_PASS" -pbkdf2
+    
+    # Eksekusi 3 Jalur
+    # Jalur 1: Local VPS
+    rm -f /root/srpcom-backup-*.tar.gz.enc
+    cp "$enc_backup" "$final_local"
+    local stat_local="✅ Sukses ($final_local)"
+
+    # Jalur 2: Bashupload
+    local bashupload_res=$(curl -s -T "$enc_backup" bashupload.com)
+    local bashupload_link=$(echo "$bashupload_res" | grep -o 'http.*')
+    local stat_cloud="❌ Gagal"
+    if [ -n "$bashupload_link" ]; then stat_cloud="✅ Sukses"; fi
+    
+    local caption="📦 *AUTO BACKUP HARIAN*\n🔒 Status Enkripsi: AMAN (Password Protected)\n━━━━━━━━━━━━━━━━━━━━\nDomain : ${DOMAIN}\nIP VPS : ${IP_ADD}\nTanggal : $(date +"%Y-%m-%d %H:%M:%S")\n━━━━━━━━━━━━━━━━━━━━\n💾 *Local VPS:* $stat_local\n🤖 *Telegram:* ✅ Sukses\n☁️ *Bashupload:* $stat_cloud\n🔗 Link Cloud: \`$bashupload_link\`\n━━━━━━━━━━━━━━━━━━━━\n_Password ekstrak: API KEY Anda_"
     
     # Mengirim file ke Telegram
     curl -s -X POST "https://api.telegram.org/bot${token}/sendDocument" \
         -F chat_id="${chat_id}" \
-        -F document=@"${backup_file}" \
+        -F document=@"${enc_backup}" \
         -F caption="$(echo -e "$caption")" \
         -F parse_mode="Markdown" > /dev/null 2>&1
         
-    rm -f "$backup_file"
+    rm -f "$tmp_backup" "$enc_backup"
 }
 
 # ==========================================
@@ -77,32 +98,55 @@ manual_backup_telegram() {
         pause; return
     fi
     
-    echo "=> Sedang membuat file backup..."
+    echo "=> Sedang membuat file backup terenkripsi..."
     local date_str=$(date +"%Y-%m-%d_%H-%M")
-    local backup_file="/root/srpcom-backup-${date_str}.tar.gz"
+    local tmp_backup="/tmp/backup-temp.tar.gz"
+    local enc_backup="/tmp/srpcom-backup-latest.tar.gz.enc"
+    local final_local="/root/srpcom-backup-${date_str}.tar.gz.enc"
+    
+    # 1. Ambil API KEY
+    local BACKUP_PASS=$(cat /usr/local/etc/xray/api_key.conf 2>/dev/null)
+    if [ -z "$BACKUP_PASS" ]; then BACKUP_PASS="DEFAULT_KEY"; fi
     
     # Mengompresi HANYA file database akun (Xray, SSH, L2TP) tanpa settingan sistem
     local valid_files=""
     for f in /usr/local/etc/xray/config.json /usr/local/etc/xray/expiry.txt /usr/local/etc/xray/limit.txt /usr/local/etc/srpcom/l2tp_expiry.txt /usr/local/etc/srpcom/ssh_expiry.txt /usr/local/etc/srpcom/ssh_limit.txt /etc/ppp/chap-secrets; do
         if [ -f "$f" ]; then valid_files="$valid_files $f"; fi
     done
-    tar -czf "$backup_file" $valid_files 2>/dev/null
+    tar -czf "$tmp_backup" $valid_files 2>/dev/null
     
-    echo "=> Sedang mengirim file ke Telegram Anda..."
-    local caption="📦 *MANUAL BACKUP VPS*\n━━━━━━━━━━━━━━━━━━━━\nDomain : ${DOMAIN}\nIP VPS : ${IP_ADD}\nTanggal : $(date +"%Y-%m-%d %H:%M:%S")\n━━━━━━━━━━━━━━━━━━━━"
+    # Enkripsi dengan AES-256
+    openssl enc -aes-256-cbc -salt -in "$tmp_backup" -out "$enc_backup" -pass pass:"$BACKUP_PASS" -pbkdf2
+    
+    # Eksekusi 3 Jalur
+    # Jalur 1: Local VPS
+    rm -f /root/srpcom-backup-*.tar.gz.enc
+    cp "$enc_backup" "$final_local"
+    local stat_local="✅ Sukses ($final_local)"
+
+    # Jalur 2: Bashupload
+    echo "=> Mengunggah ke Cloud (Bashupload)..."
+    local bashupload_res=$(curl -s -T "$enc_backup" bashupload.com)
+    local bashupload_link=$(echo "$bashupload_res" | grep -o 'http.*')
+    local stat_cloud="❌ Gagal"
+    if [ -n "$bashupload_link" ]; then stat_cloud="✅ Sukses"; fi
+    
+    echo "=> Mengirim file ke Telegram Anda..."
+    local caption="📦 *MANUAL BACKUP VPS*\n🔒 Status Enkripsi: AMAN (Password Protected)\n━━━━━━━━━━━━━━━━━━━━\nDomain : ${DOMAIN}\nIP VPS : ${IP_ADD}\nTanggal : $(date +"%Y-%m-%d %H:%M:%S")\n━━━━━━━━━━━━━━━━━━━━\n💾 *Local VPS:* $stat_local\n🤖 *Telegram:* ✅ Sukses\n☁️ *Bashupload:* $stat_cloud\n🔗 Link Cloud: \`$bashupload_link\`\n━━━━━━━━━━━━━━━━━━━━\n_Password ekstrak: API KEY Anda_"
     
     res=$(curl -s -X POST "https://api.telegram.org/bot${token}/sendDocument" \
         -F chat_id="${chat_id}" \
-        -F document=@"${backup_file}" \
+        -F document=@"${enc_backup}" \
         -F caption="$(echo -e "$caption")" \
         -F parse_mode="Markdown")
         
     if echo "$res" | grep -q '"ok":true'; then
-        echo -e "\n\e[32m[SUCCESS]\e[0m File Backup berhasil dikirim ke Bot Telegram Anda!"
-        rm -f "$backup_file"
+        echo -e "\n\e[32m[SUCCESS]\e[0m Laporan Backup berhasil dikirim ke Bot Telegram Anda!"
     else
         echo -e "\n\e[31m[ERROR]\e[0m Gagal mengirim backup. Pastikan Bot Token benar dan Anda sudah 'Start' bot tersebut."
     fi
+    
+    rm -f "$tmp_backup" "$enc_backup"
     pause
 }
 
