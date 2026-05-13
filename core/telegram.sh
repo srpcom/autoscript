@@ -65,15 +65,15 @@ run_autobackup() {
     local stat_local="✅ Sukses ($final_local)"
 
     # Jalur 2: Bashupload
-    local bashupload_res=$(curl -s -T "$enc_backup" bashupload.com)
-    local bashupload_link=$(echo "$bashupload_res" | grep -o 'http.*')
+    local bashupload_res=$(curl -s -H "X-Expiration-Seconds: 86400" -T "$enc_backup" bashupload.app)
+    local bashupload_link=$(echo "$bashupload_res" | grep -oE 'https?://[a-zA-Z0-9./?=_-]+' | head -n 1)
     local stat_cloud="❌ Gagal"
     if [ -n "$bashupload_link" ]; then stat_cloud="✅ Sukses"; fi
     
     local stat_tg="❌ Dilewati"
     if [[ "$send_tg" == true ]]; then stat_tg="✅ Sukses"; fi
     
-    local caption="📦 *AUTO BACKUP HARIAN*\n🔒 Status Enkripsi: AMAN (Password Protected)\n━━━━━━━━━━━━━━━━━━━━\nDomain : ${DOMAIN}\nIP VPS : ${IP_ADD}\nTanggal : $(date +"%Y-%m-%d %H:%M:%S")\n━━━━━━━━━━━━━━━━━━━━\n💾 *Local VPS:* $stat_local\n🤖 *Telegram:* $stat_tg\n☁️ *Bashupload:* $stat_cloud\n🔗 Link Cloud: \`$bashupload_link\`\n━━━━━━━━━━━━━━━━━━━━\n_Password ekstrak: API KEY Anda_"
+    local caption="📦 *AUTO BACKUP HARIAN*\n🔒 Status Enkripsi: AMAN (Password Protected)\n━━━━━━━━━━━━━━━━━━━━\nDomain : ${DOMAIN}\nIP VPS : ${IP_ADD}\nTanggal : $(date +"%Y-%m-%d %H:%M:%S")\n━━━━━━━━━━━━━━━━━━━━\n💾 *Local VPS:* $stat_local\n🤖 *Telegram:* $stat_tg\n☁️ *Bashupload:* $stat_cloud\n🔗 Link Cloud: \`${bashupload_link:--}\`\n━━━━━━━━━━━━━━━━━━━━\n_Password ekstrak: API KEY Anda_"
     
     if [[ "$send_tg" == true ]]; then
         # Mengirim file ke Telegram
@@ -132,15 +132,16 @@ manual_backup_telegram() {
 
     # Jalur 2: Bashupload
     echo "=> Mengunggah ke Cloud (Bashupload)..."
-    local bashupload_res=$(curl -s -T "$enc_backup" bashupload.com)
-    local bashupload_link=$(echo "$bashupload_res" | grep -o 'http.*')
+    local bashupload_res=$(curl -s -H "X-Expiration-Seconds: 86400" -T "$enc_backup" bashupload.app)
+    # Penyesuaian grep agar lebih kuat menangkap URL
+    local bashupload_link=$(echo "$bashupload_res" | grep -oE 'https?://[a-zA-Z0-9./?=_-]+' | head -n 1)
     local stat_cloud="❌ Gagal"
     if [ -n "$bashupload_link" ]; then stat_cloud="✅ Sukses"; fi
     
     local stat_tg="❌ Dilewati"
     if [[ "$send_tg" == true ]]; then stat_tg="✅ Sukses"; fi
     
-    local caption="📦 *MANUAL BACKUP VPS*\n🔒 Status Enkripsi: AMAN (Password Protected)\n━━━━━━━━━━━━━━━━━━━━\nDomain : ${DOMAIN}\nIP VPS : ${IP_ADD}\nTanggal : $(date +"%Y-%m-%d %H:%M:%S")\n━━━━━━━━━━━━━━━━━━━━\n💾 *Local VPS:* $stat_local\n🤖 *Telegram:* $stat_tg\n☁️ *Bashupload:* $stat_cloud\n🔗 Link Cloud: \`$bashupload_link\`\n━━━━━━━━━━━━━━━━━━━━\n_Password ekstrak: API KEY Anda_"
+    local caption="📦 *MANUAL BACKUP VPS*\n🔒 Status Enkripsi: AMAN (Password Protected)\n━━━━━━━━━━━━━━━━━━━━\nDomain : ${DOMAIN}\nIP VPS : ${IP_ADD}\nTanggal : $(date +"%Y-%m-%d %H:%M:%S")\n━━━━━━━━━━━━━━━━━━━━\n💾 *Local VPS:* $stat_local\n🤖 *Telegram:* $stat_tg\n☁️ *Bashupload:* $stat_cloud\n🔗 Link Cloud: \`${bashupload_link:--}\`\n━━━━━━━━━━━━━━━━━━━━\n_Password ekstrak: API KEY Anda_"
     
     if [[ "$send_tg" == true ]]; then
         echo "=> Mengirim file ke Telegram Anda..."
@@ -157,9 +158,8 @@ manual_backup_telegram() {
         fi
     else
         echo -e "\n\e[32m[SUCCESS]\e[0m Backup berhasil disimpan di VPS dan Cloud."
-        if [ -n "$bashupload_link" ]; then
-            echo -e "Link bash upload : $bashupload_link"
-        fi
+        # Link akan selalu ditampikan dan terisi dengan keterangan gagal jika regex gagal menangkap link
+        echo -e "Link bash upload : ${bashupload_link:-Gagal mendapatkan link bashupload}"
     fi
     
     rm -f "$tmp_backup" "$enc_backup"
