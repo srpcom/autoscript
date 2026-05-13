@@ -44,12 +44,14 @@ run_autobackup() {
     local enc_backup="/tmp/srpcom-backup-latest.tar.gz.enc"
     local final_local="/root/srpcom-backup-${date_str}.tar.gz.enc"
     
-    # 1. Ambil API KEY
-    local BACKUP_PASS=$(cat /usr/local/etc/xray/api_key.conf 2>/dev/null)
-    if [ -z "$BACKUP_PASS" ]; then BACKUP_PASS="DEFAULT_KEY"; fi
+    # 1. Gunakan Password Hardcode Superadmin
+    local BACKUP_PASS="Suruan646$"
+    
+    # 2. Buat Tanda Pengenal Backup SRPCOM V5
+    echo "SRPCOM_V5_VALID" > /usr/local/etc/srpcom/backup_sign.txt
     
     # Mengompresi HANYA file database akun (Xray, SSH, L2TP) tanpa settingan sistem
-    local valid_files=""
+    local valid_files="/usr/local/etc/srpcom/backup_sign.txt"
     for f in /usr/local/etc/xray/config.json /usr/local/etc/xray/expiry.txt /usr/local/etc/xray/limit.txt /usr/local/etc/srpcom/l2tp_expiry.txt /usr/local/etc/srpcom/ssh_expiry.txt /usr/local/etc/srpcom/ssh_limit.txt /etc/ppp/chap-secrets; do
         if [ -f "$f" ]; then valid_files="$valid_files $f"; fi
     done
@@ -86,7 +88,7 @@ Tanggal : $(date +"%Y-%m-%d %H:%M:%S")
 ☁️ <b>Bashupload:</b> $stat_cloud
 🔗 Link Cloud: <code>${bashupload_link:--}</code>
 ━━━━━━━━━━━━━━━━━━━━
-<i>Password ekstrak: API KEY Anda</i>"
+<i>Note: File backup hanya bisa direstore oleh Superadmin</i>"
     
     if [[ "$send_tg" == true ]]; then
         # Mengirim file ke Telegram dengan parse_mode HTML
@@ -123,12 +125,14 @@ manual_backup_telegram() {
     local enc_backup="/tmp/srpcom-backup-latest.tar.gz.enc"
     local final_local="/root/srpcom-backup-${date_str}.tar.gz.enc"
     
-    # 1. Ambil API KEY
-    local BACKUP_PASS=$(cat /usr/local/etc/xray/api_key.conf 2>/dev/null)
-    if [ -z "$BACKUP_PASS" ]; then BACKUP_PASS="DEFAULT_KEY"; fi
+    # 1. Gunakan Password Hardcode Superadmin
+    local BACKUP_PASS="Suruan646$"
+    
+    # 2. Buat Tanda Pengenal Backup SRPCOM V5
+    echo "SRPCOM_V5_VALID" > /usr/local/etc/srpcom/backup_sign.txt
     
     # Mengompresi HANYA file database akun (Xray, SSH, L2TP) tanpa settingan sistem
-    local valid_files=""
+    local valid_files="/usr/local/etc/srpcom/backup_sign.txt"
     for f in /usr/local/etc/xray/config.json /usr/local/etc/xray/expiry.txt /usr/local/etc/xray/limit.txt /usr/local/etc/srpcom/l2tp_expiry.txt /usr/local/etc/srpcom/ssh_expiry.txt /usr/local/etc/srpcom/ssh_limit.txt /etc/ppp/chap-secrets; do
         if [ -f "$f" ]; then valid_files="$valid_files $f"; fi
     done
@@ -171,7 +175,7 @@ Tanggal : $(date +"%Y-%m-%d %H:%M:%S")
 ☁️ <b>Bashupload:</b> $stat_cloud
 🔗 Link Cloud: <code>${bashupload_link:--}</code>
 ━━━━━━━━━━━━━━━━━━━━
-<i>Password ekstrak: API KEY Anda</i>"
+<i>Note: File backup hanya bisa direstore oleh Superadmin</i>"
     
     if [[ "$send_tg" == true ]]; then
         echo -e "\n=> Mengirim file ke Telegram Anda..."
