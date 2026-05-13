@@ -937,7 +937,7 @@ menu_settings() {
         echo "╚════════════════════════════════════╝"
         echo " 1. Autobackup via Bot Telegram"
         echo " 2. Autosend Created VPN via Bot"
-        echo " 3. Backup Manual via Bot"
+        echo " 3. Backup Manual"
         echo " 4. Restore Data VPS"
         echo " 5. Setting API Key Web"
         echo " 6. Ganti Domain VPS"
