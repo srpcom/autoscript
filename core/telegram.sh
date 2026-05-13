@@ -158,7 +158,7 @@ manual_backup_telegram() {
     else
         echo -e "\n\e[32m[SUCCESS]\e[0m Backup berhasil disimpan di VPS dan Cloud."
         if [ -n "$bashupload_link" ]; then
-            echo -e "\e[36m=> Link Cloud: $bashupload_link\e[0m"
+            echo -e "Link bash upload : $bashupload_link"
         fi
     fi
     
