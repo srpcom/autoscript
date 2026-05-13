@@ -73,15 +73,28 @@ run_autobackup() {
     local stat_tg="❌ Dilewati"
     if [[ "$send_tg" == true ]]; then stat_tg="✅ Sukses"; fi
     
-    local caption="📦 *AUTO BACKUP HARIAN*\n🔒 Status Enkripsi: AMAN (Password Protected)\n━━━━━━━━━━━━━━━━━━━━\nDomain : ${DOMAIN}\nIP VPS : ${IP_ADD}\nTanggal : $(date +"%Y-%m-%d %H:%M:%S")\n━━━━━━━━━━━━━━━━━━━━\n💾 *Local VPS:* $stat_local\n☁️ *Bashupload:* $stat_cloud\n🔗 Link Cloud: \`${bashupload_link:--}\`\n━━━━━━━━━━━━━━━━━━━━\n_Password ekstrak: API KEY Anda_"
+    # MENGGUNAKAN FORMAT HTML AGAR UNDERSCORE (_) PADA NAMA FILE TIDAK ERROR
+    local caption="📦 <b>AUTO BACKUP HARIAN</b>
+🔒 Status Enkripsi: AMAN (Password Protected)
+━━━━━━━━━━━━━━━━━━━━
+Domain : <code>${DOMAIN}</code>
+IP VPS : <code>${IP_ADD}</code>
+Tanggal : $(date +"%Y-%m-%d %H:%M:%S")
+━━━━━━━━━━━━━━━━━━━━
+💾 <b>Local VPS:</b> $stat_local
+🤖 <b>Telegram:</b> $stat_tg
+☁️ <b>Bashupload:</b> $stat_cloud
+🔗 Link Cloud: <code>${bashupload_link:--}</code>
+━━━━━━━━━━━━━━━━━━━━
+<i>Password ekstrak: API KEY Anda</i>"
     
     if [[ "$send_tg" == true ]]; then
-        # Mengirim file ke Telegram
+        # Mengirim file ke Telegram dengan parse_mode HTML
         curl -s -X POST "https://api.telegram.org/bot${token}/sendDocument" \
             -F chat_id="${chat_id}" \
             -F document=@"${enc_backup}" \
             -F caption="$(echo -e "$caption")" \
-            -F parse_mode="Markdown" > /dev/null 2>&1
+            -F parse_mode="HTML" > /dev/null 2>&1
     fi
         
     rm -f "$tmp_backup" "$enc_backup"
@@ -145,7 +158,20 @@ manual_backup_telegram() {
     local stat_tg="❌ Dilewati"
     if [[ "$send_tg" == true ]]; then stat_tg="✅ Sukses"; fi
     
-    local caption="📦 *MANUAL BACKUP VPS*\n🔒 Status Enkripsi: AMAN (Password Protected)\n━━━━━━━━━━━━━━━━━━━━\nDomain : ${DOMAIN}\nIP VPS : ${IP_ADD}\nTanggal : $(date +"%Y-%m-%d %H:%M:%S")\n━━━━━━━━━━━━━━━━━━━━\n💾 *Local VPS:* $stat_local\n☁️ *Bashupload:* $stat_cloud\n🔗 Link Cloud: \`${bashupload_link:--}\`\n━━━━━━━━━━━━━━━━━━━━\n_Password ekstrak: API KEY Anda_"
+    # MENGGUNAKAN FORMAT HTML AGAR UNDERSCORE (_) PADA NAMA FILE TIDAK ERROR
+    local caption="📦 <b>MANUAL BACKUP VPS</b>
+🔒 Status Enkripsi: AMAN (Password Protected)
+━━━━━━━━━━━━━━━━━━━━
+Domain : <code>${DOMAIN}</code>
+IP VPS : <code>${IP_ADD}</code>
+Tanggal : $(date +"%Y-%m-%d %H:%M:%S")
+━━━━━━━━━━━━━━━━━━━━
+💾 <b>Local VPS:</b> $stat_local
+🤖 <b>Telegram:</b> $stat_tg
+☁️ <b>Bashupload:</b> $stat_cloud
+🔗 Link Cloud: <code>${bashupload_link:--}</code>
+━━━━━━━━━━━━━━━━━━━━
+<i>Password ekstrak: API KEY Anda</i>"
     
     if [[ "$send_tg" == true ]]; then
         echo -e "\n=> Mengirim file ke Telegram Anda..."
@@ -153,7 +179,7 @@ manual_backup_telegram() {
             -F chat_id="${chat_id}" \
             -F document=@"${enc_backup}" \
             -F caption="$(echo -e "$caption")" \
-            -F parse_mode="Markdown")
+            -F parse_mode="HTML")
             
         if echo "$res" | grep -q '"ok":true'; then
             echo -e "\e[32m[SUCCESS]\e[0m Laporan Backup berhasil dikirim ke Bot Telegram Anda!"
