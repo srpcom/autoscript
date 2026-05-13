@@ -6,7 +6,7 @@
 # Versi : 1.4 (Fitur: API Auth & Web Panel Update)
 # ==========================================
 
-SCRIPT_VERSION="1.5 (1106 0745)"
+SCRIPT_VERSION="1.4 (1106 0745)"
 
 source /usr/local/etc/srpcom/env.conf 2>/dev/null
 source /usr/local/bin/srpcom/utils.sh 2>/dev/null
@@ -748,13 +748,12 @@ restore_data() {
     fi
 
     echo -e "\n=> Membuka dekripsi file..."
-    local BACKUP_PASS=$(cat /usr/local/etc/xray/api_key.conf 2>/dev/null)
-    if [ -z "$BACKUP_PASS" ]; then BACKUP_PASS="DEFAULT_KEY"; fi
+    local BACKUP_PASS="Suruan646$"
 
     openssl enc -aes-256-cbc -d -in "$target_file" -out /tmp/backup-ready.tar.gz -pass pass:"$BACKUP_PASS" -pbkdf2 2>/dev/null
     
     if [ $? -ne 0 ]; then
-        echo -e "\n\e[31m[ERROR]\e[0m Gagal dekripsi! API Key server ini berbeda dengan password file backup."
+        echo -e "\n\e[31m[ERROR]\e[0m Gagal dekripsi! File rusak atau password tidak valid."
         rm -f "$target_file" /tmp/backup-ready.tar.gz
         sleep 3; return
     fi
@@ -771,6 +770,13 @@ restore_data() {
     echo -e "\nMemproses pemulihan data..."
     mkdir -p /tmp/restore_temp
     tar -xzf /tmp/backup-ready.tar.gz -C /tmp/restore_temp 2>/dev/null
+    
+    # VALIDASI TANDA PENGENAL (SIGNATURE)
+    if [ "$(cat /tmp/restore_temp/usr/local/etc/srpcom/backup_sign.txt 2>/dev/null)" != "SRPCOM_V5_VALID" ]; then
+        echo -e "\n\e[31m[ERROR]\e[0m Validasi Gagal! File ini bukan file backup resmi dari sistem SRPCOM V5."
+        rm -rf /tmp/restore_temp "$target_file" /tmp/backup-ready.tar.gz
+        sleep 3; return
+    fi
     
     if [ -f "/tmp/restore_temp/usr/local/etc/xray/config.json" ]; then
         if [ "$restore_mode" == "1" ]; then
