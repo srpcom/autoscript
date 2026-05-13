@@ -73,7 +73,7 @@ run_autobackup() {
     local stat_tg="❌ Dilewati"
     if [[ "$send_tg" == true ]]; then stat_tg="✅ Sukses"; fi
     
-    local caption="📦 *AUTO BACKUP HARIAN*\n🔒 Status Enkripsi: AMAN (Password Protected)\n━━━━━━━━━━━━━━━━━━━━\nDomain : ${DOMAIN}\nIP VPS : ${IP_ADD}\nTanggal : $(date +"%Y-%m-%d %H:%M:%S")\n━━━━━━━━━━━━━━━━━━━━\n💾 *Local VPS:* $stat_local\n🤖 *Telegram:* $stat_tg\n☁️ *Bashupload:* $stat_cloud\n🔗 Link Cloud: \`${bashupload_link:--}\`\n━━━━━━━━━━━━━━━━━━━━\n_Password ekstrak: API KEY Anda_"
+    local caption="📦 *AUTO BACKUP HARIAN*\n🔒 Status Enkripsi: AMAN (Password Protected)\n━━━━━━━━━━━━━━━━━━━━\nDomain : ${DOMAIN}\nIP VPS : ${IP_ADD}\nTanggal : $(date +"%Y-%m-%d %H:%M:%S")\n━━━━━━━━━━━━━━━━━━━━\n💾 *Local VPS:* $stat_local\n☁️ *Bashupload:* $stat_cloud\n🔗 Link Cloud: \`${bashupload_link:--}\`\n━━━━━━━━━━━━━━━━━━━━\n_Password ekstrak: API KEY Anda_"
     
     if [[ "$send_tg" == true ]]; then
         # Mengirim file ke Telegram
@@ -138,13 +138,17 @@ manual_backup_telegram() {
     local stat_cloud="❌ Gagal"
     if [ -n "$bashupload_link" ]; then stat_cloud="✅ Sukses"; fi
     
+    # Tampilkan status local dan cloud terlebih dahulu agar selalu muncul
+    echo -e "\n\e[32m[SUCCESS]\e[0m Backup berhasil diproses ke VPS dan Cloud."
+    echo -e "Link bash upload : ${bashupload_link:-Gagal mendapatkan link bashupload}"
+    
     local stat_tg="❌ Dilewati"
     if [[ "$send_tg" == true ]]; then stat_tg="✅ Sukses"; fi
     
-    local caption="📦 *MANUAL BACKUP VPS*\n🔒 Status Enkripsi: AMAN (Password Protected)\n━━━━━━━━━━━━━━━━━━━━\nDomain : ${DOMAIN}\nIP VPS : ${IP_ADD}\nTanggal : $(date +"%Y-%m-%d %H:%M:%S")\n━━━━━━━━━━━━━━━━━━━━\n💾 *Local VPS:* $stat_local\n🤖 *Telegram:* $stat_tg\n☁️ *Bashupload:* $stat_cloud\n🔗 Link Cloud: \`${bashupload_link:--}\`\n━━━━━━━━━━━━━━━━━━━━\n_Password ekstrak: API KEY Anda_"
+    local caption="📦 *MANUAL BACKUP VPS*\n🔒 Status Enkripsi: AMAN (Password Protected)\n━━━━━━━━━━━━━━━━━━━━\nDomain : ${DOMAIN}\nIP VPS : ${IP_ADD}\nTanggal : $(date +"%Y-%m-%d %H:%M:%S")\n━━━━━━━━━━━━━━━━━━━━\n💾 *Local VPS:* $stat_local\n☁️ *Bashupload:* $stat_cloud\n🔗 Link Cloud: \`${bashupload_link:--}\`\n━━━━━━━━━━━━━━━━━━━━\n_Password ekstrak: API KEY Anda_"
     
     if [[ "$send_tg" == true ]]; then
-        echo "=> Mengirim file ke Telegram Anda..."
+        echo -e "\n=> Mengirim file ke Telegram Anda..."
         res=$(curl -s -X POST "https://api.telegram.org/bot${token}/sendDocument" \
             -F chat_id="${chat_id}" \
             -F document=@"${enc_backup}" \
@@ -152,14 +156,14 @@ manual_backup_telegram() {
             -F parse_mode="Markdown")
             
         if echo "$res" | grep -q '"ok":true'; then
-            echo -e "\n\e[32m[SUCCESS]\e[0m Laporan Backup berhasil dikirim ke Bot Telegram Anda!"
+            echo -e "\e[32m[SUCCESS]\e[0m Laporan Backup berhasil dikirim ke Bot Telegram Anda!"
         else
-            echo -e "\n\e[31m[ERROR]\e[0m Gagal mengirim backup. Pastikan Bot Token benar dan Anda sudah 'Start' bot tersebut."
+            # Mengekstrak alasan kegagalan langsung dari API Telegram
+            local err_desc=$(echo "$res" | grep -o '"description":"[^"]*' | cut -d'"' -f4)
+            echo -e "\e[31m[ERROR]\e[0m Gagal mengirim backup ke Telegram."
+            echo -e "Alasan  : \e[33m${err_desc:-Token/ID tidak valid atau koneksi bermasalah}\e[0m"
+            echo "Pastikan Bot Token benar dan Anda sudah mengirim '/start' ke bot tersebut."
         fi
-    else
-        echo -e "\n\e[32m[SUCCESS]\e[0m Backup berhasil disimpan di VPS dan Cloud."
-        # Link akan selalu ditampikan dan terisi dengan keterangan gagal jika regex gagal menangkap link
-        echo -e "Link bash upload : ${bashupload_link:-Gagal mendapatkan link bashupload}"
     fi
     
     rm -f "$tmp_backup" "$enc_backup"
