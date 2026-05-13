@@ -636,3 +636,7 @@ echo "-> [5] Settings -> [9] Setting Telegram Admin Bot -> Mulai Bot"
 echo "Untuk menghubungkan Node lain, gunakan API Key Default:"
 echo "SANGATRAHASIA123 (Ubah di menu 5 -> 5 jika perlu)"
 echo "======================================================"
+
+# Menghapus otomatis file script instalasi setelah selesai
+rm -f /root/install.sh
+rm -f "$0"
