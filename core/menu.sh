@@ -6,7 +6,7 @@
 # Versi : 1.4 (Fitur: API Auth & Web Panel Update)
 # ==========================================
 
-SCRIPT_VERSION="1.4 (1106 0745)"
+SCRIPT_VERSION="1.4 (1106 0945)"
 
 source /usr/local/etc/srpcom/env.conf 2>/dev/null
 source /usr/local/bin/srpcom/utils.sh 2>/dev/null
@@ -571,23 +571,32 @@ add_extra_domain() {
     echo "======================================"
     echo "      TAMBAH SUBDOMAIN (BUG) BARU     "
     echo "======================================"
-    read -p "Subdomain (contoh: bug.wa): " input_bug
+    read -p "Masukkan Domain/Subdomain: " input_bug
     
     if [[ "$input_bug" == "x" || "$input_bug" == "X" || -z "$input_bug" ]]; then return; fi
     
-    input_bug=${input_bug%.$DOMAIN}
-    full_domain="${input_bug}.${DOMAIN}"
-    
     echo -e "\nMemeriksa resolusi DNS..."
-    domain_ip=$(getent ahostsv4 "$full_domain" | awk '{ print $1 }' | head -n 1)
     
-    if [[ "$domain_ip" != "$IP_ADD" ]]; then
-        echo -e "\n\e[31m[ERROR]\e[0m Resolusi DNS Gagal!"
-        sleep 4; return
+    # Skenario 1: Cek apakah input adalah Full Domain / SNI utuh
+    domain_ip=$(getent ahostsv4 "$input_bug" | awk '{ print $1 }' | head -n 1)
+    
+    if [[ "$domain_ip" == "$IP_ADD" ]]; then
+        full_domain="$input_bug"
+    else
+        # Skenario 2: Asumsikan input adalah prefix subdomain dari domain utama
+        clean_input=${input_bug%.$DOMAIN}
+        full_domain="${clean_input}.${DOMAIN}"
+        domain_ip=$(getent ahostsv4 "$full_domain" | awk '{ print $1 }' | head -n 1)
+        
+        if [[ "$domain_ip" != "$IP_ADD" ]]; then
+            echo -e "\n\e[31m[ERROR]\e[0m Resolusi DNS Gagal!"
+            echo -e "Domain \e[33m$input_bug\e[0m atau \e[33m$full_domain\e[0m tidak mengarah ke IP $IP_ADD."
+            sleep 4; return
+        fi
     fi
     
     if grep -q "^$full_domain$" /usr/local/etc/srpcom/extra_domains.txt 2>/dev/null; then
-        echo -e "\n\e[33m[INFO]\e[0m Domain sudah ada."
+        echo -e "\n\e[33m[INFO]\e[0m Domain sudah ada di dalam daftar."
         sleep 2; return
     fi
     
@@ -652,7 +661,7 @@ import_github_domain() {
     
     wget -q -O /tmp/new_domains.txt "$GITHUB_RAW/core/extra_domains.txt"
     if [ ! -s /tmp/new_domains.txt ]; then
-        echo -e "\e[31m[ERROR]\e[0m Gagal mengambil data!"
+        echo -e "\e[31m[ERROR]\e[0m Gagal mengambil data dari GitHub!"
         rm -f /tmp/new_domains.txt; sleep 2; return
     fi
     
@@ -665,13 +674,25 @@ import_github_domain() {
         echo "Batal."; rm -f /tmp/new_domains.txt; sleep 1; return
     fi
 
-    echo -e "\n=> Memproses import..."
+    echo -e "\n=> Memproses import dan validasi DNS..."
     local has_new=false
     while read -r domain; do
         if [ -z "$domain" ]; then continue; fi
-        if ! grep -q "^${domain}$" /usr/local/etc/srpcom/extra_domains.txt 2>/dev/null; then
+        
+        # Hindari duplikat
+        if grep -q "^${domain}$" /usr/local/etc/srpcom/extra_domains.txt 2>/dev/null; then
+            echo -e " \e[33m[SKIP]\e[0m $domain (Sudah ada)"
+            continue
+        fi
+        
+        # Validasi resolusi IP sebelum memasukkan ke daftar
+        domain_ip=$(getent ahostsv4 "$domain" | awk '{ print $1 }' | head -n 1)
+        if [[ "$domain_ip" == "$IP_ADD" ]]; then
             echo "$domain" >> /usr/local/etc/srpcom/extra_domains.txt
+            echo -e " \e[32m[ OK ]\e[0m $domain"
             has_new=true
+        else
+            echo -e " \e[31m[FAIL]\e[0m $domain (IP tidak cocok/tidak resolve)"
         fi
     done < /tmp/new_domains.txt
     
@@ -679,11 +700,12 @@ import_github_domain() {
 
     if [ "$has_new" = true ]; then
         rebuild_caddyfile
-        echo -e "\n\e[32m[SUCCESS]\e[0m Domain ditambahkan!"
+        echo -e "\n\e[32m[SUCCESS]\e[0m Domain yang valid berhasil ditambahkan!"
     else
-        echo -e "\n\e[33m[INFO]\e[0m Tidak ada data baru."
+        echo -e "\n\e[33m[INFO]\e[0m Tidak ada data baru yang divalidasi."
     fi
-    sleep 2
+    echo "======================================"
+    pause
 }
 
 menu_extra_domain() {
