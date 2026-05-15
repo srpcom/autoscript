@@ -468,7 +468,18 @@ def renew_user(protocol):
         with open(EXP_FILE, "w") as f:
             for line in lines:
                 if line.startswith(user + " "):
-                    dt = datetime.datetime.now() + datetime.timedelta(days=exp)
+                    try:
+                        curr_dt_str = line.strip().split(' ', 1)[1]
+                        curr_dt = datetime.datetime.strptime(curr_dt_str, '%Y-%m-%d %H:%M:%S')
+                        now = datetime.datetime.now()
+                        # Akumulasi jika belum expired, mulai dari 'now' jika sudah expired
+                        if curr_dt > now:
+                            dt = curr_dt + datetime.timedelta(days=exp)
+                        else:
+                            dt = now + datetime.timedelta(days=exp)
+                    except:
+                        dt = datetime.datetime.now() + datetime.timedelta(days=exp)
+                    
                     dt_str = dt.strftime('%Y-%m-%d %H:%M:%S')
                     f.write(f"{user} {dt_str}\n")
                     found = True
@@ -555,7 +566,18 @@ def renew_ssh():
                 if line.startswith(user + " "):
                     parts = line.strip().split()
                     pw = parts[1] if len(parts) > 1 else "123"
-                    dt = datetime.datetime.now() + datetime.timedelta(days=exp)
+                    
+                    now = datetime.datetime.now()
+                    try:
+                        curr_dt = datetime.datetime.strptime(f"{parts[2]} {parts[3]}", '%Y-%m-%d %H:%M:%S')
+                        # Akumulasi jika belum expired, mulai dari 'now' jika sudah expired
+                        if curr_dt > now:
+                            dt = curr_dt + datetime.timedelta(days=exp)
+                        else:
+                            dt = now + datetime.timedelta(days=exp)
+                    except:
+                        dt = now + datetime.timedelta(days=exp)
+                        
                     exp_date, exp_time = dt.strftime('%Y-%m-%d'), dt.strftime('%H:%M:%S')
                     f.write(f"{user} {pw} {exp_date} {exp_time}\n")
                     subprocess.run(['chage', '-E', exp_date, user])
@@ -720,7 +742,18 @@ def renew_l2tp():
                 if line.startswith(user + " "):
                     parts = line.strip().split()
                     pw = parts[1] if len(parts) > 1 else "123"
-                    dt = datetime.datetime.now() + datetime.timedelta(days=exp)
+                    
+                    now = datetime.datetime.now()
+                    try:
+                        curr_dt = datetime.datetime.strptime(f"{parts[2]} {parts[3]}", '%Y-%m-%d %H:%M:%S')
+                        # Akumulasi jika belum expired, mulai dari 'now' jika sudah expired
+                        if curr_dt > now:
+                            dt = curr_dt + datetime.timedelta(days=exp)
+                        else:
+                            dt = now + datetime.timedelta(days=exp)
+                    except:
+                        dt = now + datetime.timedelta(days=exp)
+                        
                     exp_date, exp_time = dt.strftime('%Y-%m-%d'), dt.strftime('%H:%M:%S')
                     f.write(f"{user} {pw} {exp_date} {exp_time}\n")
                     dt_str = f"{exp_date} {exp_time}"
