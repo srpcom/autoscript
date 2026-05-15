@@ -174,9 +174,10 @@ add_trojan_ws() {
     systemctl restart xray
     
     link_tls="trojan://${uuid}@${DOMAIN}:443?path=/trojanws&security=tls&host=${DOMAIN}&type=ws&sni=${DOMAIN}#${user}"
+    link_none_tls="trojan://${uuid}@${DOMAIN}:80?path=/trojanws&security=none&host=${DOMAIN}&type=ws#${user}"
     
-    msg_cli=$(echo -e "━━━━━━━━━━━━━━━━━━━━\n❖ XRAY/TROJAN WS ❖\n━━━━━━━━━━━━━━━━━━━━\nRemarks : ${user}\nIP Address : ${IP_ADD}\nDomain : ${DOMAIN}\nPort TLS : 443\nPassword : ${uuid}\nNetwork : Websocket\nWebsocket Path : /trojanws\n━━━━━━━━━━━━━━━━━━━━\nLINK WS TLS : ${link_tls}\n━━━━━━━━━━━━━━━━━━━━\nEXPIRED ON : ${exp_date} ${exp_time} WIB (${masaaktif} days)")
-    msg_tg=$(echo -e "━━━━━━━━━━━━━━━━━━━━\n❖ XRAY/TROJAN WS ❖\n━━━━━━━━━━━━━━━━━━━━\nRemarks : \`${user}\`\nIP Address : ${IP_ADD}\nDomain : ${DOMAIN}\nPort TLS : 443\nPassword : \`${uuid}\`\nNetwork : Websocket\nWebsocket Path : /trojanws\n━━━━━━━━━━━━━━━━━━━━\nLINK WS TLS : \`${link_tls}\`\n━━━━━━━━━━━━━━━━━━━━\nEXPIRED ON : ${exp_date} ${exp_time} WIB (${masaaktif} days)")
+    msg_cli=$(echo -e "━━━━━━━━━━━━━━━━━━━━\n❖ XRAY/TROJAN WS ❖\n━━━━━━━━━━━━━━━━━━━━\nRemarks : ${user}\nIP Address : ${IP_ADD}\nDomain : ${DOMAIN}\nPort TLS : 443\nPort NONE-TLS : 80\nPassword : ${uuid}\nNetwork : Websocket\nWebsocket Path : /trojanws\n━━━━━━━━━━━━━━━━━━━━\nLINK WS TLS : ${link_tls}\n━━━━━━━━━━━━━━━━━━━━\nLINK WS NONE-TLS : ${link_none_tls}\n━━━━━━━━━━━━━━━━━━━━\nEXPIRED ON : ${exp_date} ${exp_time} WIB (${masaaktif} days)")
+    msg_tg=$(echo -e "━━━━━━━━━━━━━━━━━━━━\n❖ XRAY/TROJAN WS ❖\n━━━━━━━━━━━━━━━━━━━━\nRemarks : \`${user}\`\nIP Address : ${IP_ADD}\nDomain : ${DOMAIN}\nPort TLS : 443\nPort NONE-TLS : 80\nPassword : \`${uuid}\`\nNetwork : Websocket\nWebsocket Path : /trojanws\n━━━━━━━━━━━━━━━━━━━━\nLINK WS TLS : \`${link_tls}\`\n━━━━━━━━━━━━━━━━━━━━\nLINK WS NONE-TLS : \`${link_none_tls}\`\n━━━━━━━━━━━━━━━━━━━━\nEXPIRED ON : ${exp_date} ${exp_time} WIB (${masaaktif} days)")
     
     clear; echo "$msg_cli"
     send_telegram "$msg_tg"
@@ -197,7 +198,7 @@ add_trial() {
     
     if [[ "$prot_opt" == "0" ]]; then return; fi
     
-    # PERBAIKAN: Format Jam-Menit-Detik + 1 Karakter Random
+    # Format Jam-Menit-Detik + 1 Karakter Random
     rand_char=$(tr -dc 'a-z' < /dev/urandom | head -c 1)
     user="trialsrp-$(date +%H%M%S)${rand_char}"
     
@@ -237,20 +238,14 @@ add_trial() {
         path="/vlessws"
     elif [[ "$prot" == "trojan" ]]; then
         link_tls="trojan://${uuid}@${DOMAIN}:443?path=/trojanws&security=tls&host=${DOMAIN}&type=ws&sni=${DOMAIN}#${user}"
-        link_none_tls="-"
-        port_none="-"
+        link_none_tls="trojan://${uuid}@${DOMAIN}:80?path=/trojanws&security=none&host=${DOMAIN}&type=ws#${user}"
+        port_none="80"
         path="/trojanws"
     fi
 
-    msg_str_cli="━━━━━━━━━━━━━━━━━━━━\n❖ XRAY/${prot^^} WS TRIAL ❖\n━━━━━━━━━━━━━━━━━━━━\nRemarks : ${user}\nIP Address : ${IP_ADD}\nDomain : ${DOMAIN}\nPort TLS : 443\nPort NONE-TLS : ${port_none}\nID/PW : ${uuid}\nNetwork : Websocket\nWebsocket Path : ${path}\n━━━━━━━━━━━━━━━━━━━━\nLINK WS TLS : ${link_tls}\n━━━━━━━━━━━━━━━━━━━━"
-    msg_str_tg="━━━━━━━━━━━━━━━━━━━━\n❖ XRAY/${prot^^} WS TRIAL ❖\n━━━━━━━━━━━━━━━━━━━━\nRemarks : \`${user}\`\nIP Address : ${IP_ADD}\nDomain : ${DOMAIN}\nPort TLS : 443\nPort NONE-TLS : ${port_none}\nID/PW : \`${uuid}\`\nNetwork : Websocket\nWebsocket Path : ${path}\n━━━━━━━━━━━━━━━━━━━━\nLINK WS TLS : \`${link_tls}\`\n━━━━━━━━━━━━━━━━━━━━"
+    msg_str_cli="━━━━━━━━━━━━━━━━━━━━\n❖ XRAY/${prot^^} WS TRIAL ❖\n━━━━━━━━━━━━━━━━━━━━\nRemarks : ${user}\nIP Address : ${IP_ADD}\nDomain : ${DOMAIN}\nPort TLS : 443\nPort NONE-TLS : ${port_none}\nID/PW : ${uuid}\nNetwork : Websocket\nWebsocket Path : ${path}\n━━━━━━━━━━━━━━━━━━━━\nLINK WS TLS : ${link_tls}\n━━━━━━━━━━━━━━━━━━━━\nLINK WS NONE-TLS : ${link_none_tls}\n━━━━━━━━━━━━━━━━━━━━\nEXPIRED ON : ${exp_date} ${exp_time} WIB (${masaaktif})"
     
-    if [[ "$prot" != "trojan" ]]; then
-        msg_str_cli="${msg_str_cli}\nLINK WS NONE-TLS : ${link_none_tls}\n━━━━━━━━━━━━━━━━━━━━"
-        msg_str_tg="${msg_str_tg}\nLINK WS NONE-TLS : \`${link_none_tls}\`\n━━━━━━━━━━━━━━━━━━━━"
-    fi
-    msg_str_cli="${msg_str_cli}\nEXPIRED ON : ${exp_date} ${exp_time} WIB (${masaaktif})"
-    msg_str_tg="${msg_str_tg}\nEXPIRED ON : ${exp_date} ${exp_time} WIB (${masaaktif})"
+    msg_str_tg="━━━━━━━━━━━━━━━━━━━━\n❖ XRAY/${prot^^} WS TRIAL ❖\n━━━━━━━━━━━━━━━━━━━━\nRemarks : \`${user}\`\nIP Address : ${IP_ADD}\nDomain : ${DOMAIN}\nPort TLS : 443\nPort NONE-TLS : ${port_none}\nID/PW : \`${uuid}\`\nNetwork : Websocket\nWebsocket Path : ${path}\n━━━━━━━━━━━━━━━━━━━━\nLINK WS TLS : \`${link_tls}\`\n━━━━━━━━━━━━━━━━━━━━\nLINK WS NONE-TLS : \`${link_none_tls}\`\n━━━━━━━━━━━━━━━━━━━━\nEXPIRED ON : ${exp_date} ${exp_time} WIB (${masaaktif})"
     
     msg_cli=$(echo -e "$msg_str_cli")
     msg_tg=$(echo -e "$msg_str_tg")
@@ -408,10 +403,10 @@ show_detail() {
     echo "IP Address : ${IP_ADD}"
     echo "Domain : ${DOMAIN}"
     echo "Port TLS : 443"
+    echo "Port NONE-TLS : 80"
     
     if [[ "$prot" == "vmess" ]]; then
         uuid=$(jq -r '.inbounds[] | select(.protocol=="vmess") | .settings.clients[] | select(.email=="'$user'") | .id' /usr/local/etc/xray/config.json 2>/dev/null)
-        echo "Port NONE-TLS : 80"
         echo "ID : ${uuid}"
         echo "Network : Websocket"
         echo "Websocket Path : /vmessws"
@@ -423,7 +418,6 @@ show_detail() {
         echo "LINK WS NONE-TLS : vmess://$(echo -n "$none_tls_json" | jq -c . | base64 -w 0)"
     elif [[ "$prot" == "vless" ]]; then
         uuid=$(jq -r '.inbounds[] | select(.protocol=="vless") | .settings.clients[] | select(.email=="'$user'") | .id' /usr/local/etc/xray/config.json 2>/dev/null)
-        echo "Port NONE-TLS : 80"
         echo "ID : ${uuid}"
         echo "Network : Websocket"
         echo "Websocket Path : /vlessws"
@@ -438,6 +432,8 @@ show_detail() {
         echo "Websocket Path : /trojanws"
         echo "━━━━━━━━━━━━━━━━━━━━"
         echo "LINK WS TLS : trojan://${uuid}@${DOMAIN}:443?path=/trojanws&security=tls&host=${DOMAIN}&type=ws&sni=${DOMAIN}#${user}"
+        echo "━━━━━━━━━━━━━━━━━━━━"
+        echo "LINK WS NONE-TLS : trojan://${uuid}@${DOMAIN}:80?path=/trojanws&security=none&host=${DOMAIN}&type=ws#${user}"
     fi
     echo "━━━━━━━━━━━━━━━━━━━━"
     exp_date=$(grep "^$user " /usr/local/etc/xray/expiry.txt | cut -d' ' -f2-)
