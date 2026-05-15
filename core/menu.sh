@@ -6,7 +6,7 @@
 # Versi : 1.4 (Fitur: API Auth & Web Panel Update)
 # ==========================================
 
-SCRIPT_VERSION="1.4 (1106 0945)"
+SCRIPT_VERSION="1.4 (1106 0745)"
 
 source /usr/local/etc/srpcom/env.conf 2>/dev/null
 source /usr/local/bin/srpcom/utils.sh 2>/dev/null
@@ -676,23 +676,33 @@ import_github_domain() {
 
     echo -e "\n=> Memproses import dan validasi DNS..."
     local has_new=false
-    while read -r domain; do
-        if [ -z "$domain" ]; then continue; fi
+    while read -r raw_domain; do
+        if [ -z "$raw_domain" ]; then continue; fi
         
-        # Hindari duplikat
-        if grep -q "^${domain}$" /usr/local/etc/srpcom/extra_domains.txt 2>/dev/null; then
-            echo -e " \e[33m[SKIP]\e[0m $domain (Sudah ada)"
-            continue
+        # Skenario 1: Cek apakah raw_domain adalah Full Domain
+        domain_ip=$(getent ahostsv4 "$raw_domain" | awk '{ print $1 }' | head -n 1)
+        
+        if [[ "$domain_ip" == "$IP_ADD" ]]; then
+            full_domain="$raw_domain"
+        else
+            # Skenario 2: Asumsikan raw_domain adalah prefix subdomain
+            clean_input=${raw_domain%.$DOMAIN}
+            full_domain="${clean_input}.${DOMAIN}"
+            domain_ip=$(getent ahostsv4 "$full_domain" | awk '{ print $1 }' | head -n 1)
         fi
         
-        # Validasi resolusi IP sebelum memasukkan ke daftar
-        domain_ip=$(getent ahostsv4 "$domain" | awk '{ print $1 }' | head -n 1)
+        # Validasi akhir untuk disimpan ke sistem
         if [[ "$domain_ip" == "$IP_ADD" ]]; then
-            echo "$domain" >> /usr/local/etc/srpcom/extra_domains.txt
-            echo -e " \e[32m[ OK ]\e[0m $domain"
-            has_new=true
+            # Hindari duplikat
+            if grep -q "^${full_domain}$" /usr/local/etc/srpcom/extra_domains.txt 2>/dev/null; then
+                echo -e " \e[33m[SKIP]\e[0m $full_domain (Sudah ada)"
+            else
+                echo "$full_domain" >> /usr/local/etc/srpcom/extra_domains.txt
+                echo -e " \e[32m[ OK ]\e[0m $full_domain"
+                has_new=true
+            fi
         else
-            echo -e " \e[31m[FAIL]\e[0m $domain (IP tidak cocok/tidak resolve)"
+            echo -e " \e[31m[FAIL]\e[0m $raw_domain (IP tidak cocok/tidak resolve)"
         fi
     done < /tmp/new_domains.txt
     
@@ -702,7 +712,7 @@ import_github_domain() {
         rebuild_caddyfile
         echo -e "\n\e[32m[SUCCESS]\e[0m Domain yang valid berhasil ditambahkan!"
     else
-        echo -e "\n\e[33m[INFO]\e[0m Tidak ada data baru yang divalidasi."
+        echo -e "\n\e[33m[INFO]\e[0m Tidak ada data baru yang ditambahkan."
     fi
     echo "======================================"
     pause
