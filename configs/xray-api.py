@@ -311,7 +311,7 @@ def generate_account_detail(protocol, user, uid, exp_date_str, is_trial=False, l
         link_none = f"vless://{uid}@{DOMAIN}:80?path=/vlessws&security=none&encryption=none&host={DOMAIN}&type=ws#{user}"
     elif protocol == 'trojan':
         link_tls = f"trojan://{uid}@{DOMAIN}:443?path=/trojanws&security=tls&host={DOMAIN}&type=ws&sni={DOMAIN}#{user}"
-        link_none = ""
+        link_none = f"trojan://{uid}@{DOMAIN}:80?path=/trojanws&security=none&host={DOMAIN}&type=ws#{user}"
 
     msg_cli = (
         f"━━━━━━━━━━━━━━━━━━━━\n❖ XRAY/{protocol.upper()} WS{trial_txt} ❖\n━━━━━━━━━━━━━━━━━━━━\n"
@@ -319,8 +319,8 @@ def generate_account_detail(protocol, user, uid, exp_date_str, is_trial=False, l
         f"Port TLS : 443\nPort NONE-TLS : 80\n{'Password' if protocol == 'trojan' else 'ID'} : {uid}\n"
         f"Network : Websocket\nWebsocket Path : /{protocol}ws\n━━━━━━━━━━━━━━━━━━━━\n"
         f"Limit IP : {lim_ip_str}\nLimit Kuota : {lim_q_str}\n━━━━━━━━━━━━━━━━━━━━\n"
-        f"LINK WS TLS : {link_tls}\n{'━━━━━━━━━━━━━━━━━━━━' if protocol != 'trojan' else ''}\n"
-        f"{'LINK WS NONE-TLS : ' + link_none if protocol != 'trojan' else ''}\n"
+        f"LINK WS TLS : {link_tls}\n━━━━━━━━━━━━━━━━━━━━\n"
+        f"LINK WS NONE-TLS : {link_none}\n"
         f"━━━━━━━━━━━━━━━━━━━━\nExpired On : {exp_date_str} WIB"
     )
 
@@ -330,8 +330,8 @@ def generate_account_detail(protocol, user, uid, exp_date_str, is_trial=False, l
         f"Port TLS : 443\nPort NONE-TLS : 80\n{'Password' if protocol == 'trojan' else 'ID'} : `{uid}`\n"
         f"Network : Websocket\nWebsocket Path : /{protocol}ws\n━━━━━━━━━━━━━━━━━━━━\n"
         f"Limit IP : {lim_ip_str}\nLimit Kuota : {lim_q_str}\n━━━━━━━━━━━━━━━━━━━━\n"
-        f"LINK WS TLS : `{link_tls}`\n{'━━━━━━━━━━━━━━━━━━━━' if protocol != 'trojan' else ''}\n"
-        f"{'LINK WS NONE-TLS : `' + link_none + '`' if protocol != 'trojan' else ''}\n"
+        f"LINK WS TLS : `{link_tls}`\n━━━━━━━━━━━━━━━━━━━━\n"
+        f"LINK WS NONE-TLS : `{link_none}`\n"
         f"━━━━━━━━━━━━━━━━━━━━\nExpired On : {exp_date_str} WIB"
     )
     
