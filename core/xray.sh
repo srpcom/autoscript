@@ -351,8 +351,14 @@ renew_xray() {
         if [ -z "$current_date" ] || [ "$current_date" == "Lifetime" ]; then current_date=$(date +"%Y-%m-%d"); fi
         if [ -z "$current_time" ]; then current_time=$(date +"%H:%M:%S"); fi
         
+        now_sec=$(date +%s)
         current_sec=$(date -d "$current_date $current_time" +%s 2>/dev/null)
-        if [ -z "$current_sec" ]; then current_sec=$(date +%s); fi
+        if [ -z "$current_sec" ]; then current_sec=$now_sec; fi
+        
+        # Akumulasi: Jika sudah expired, mulai dari hari ini. Jika belum, tambah dari sisa hari.
+        if [ "$now_sec" -gt "$current_sec" ]; then
+            current_sec=$now_sec
+        fi
         
         new_sec=$((current_sec + (masaaktif * 86400)))
         new_exp_date=$(date -d "@$new_sec" +"%Y-%m-%d")
