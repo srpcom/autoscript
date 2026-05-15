@@ -137,6 +137,7 @@ EOFSC
     build_sc "set-autoexp" "menu_auto_expired"
     build_sc "set-autobackup" "menu_autobackup"
     build_sc "set-autosend" "menu_autosend"
+    build_sc "set-banner" "change_banner"
     build_sc "menu" "main_menu"
     
     cat > /usr/bin/srpcom << 'EOFSC'
@@ -185,6 +186,7 @@ echo " set-node    : Manajemen Bot Master"
 echo " set-bot     : Setting Telegram Bot"
 echo " set-autokill: Daemon Auto-Kill"
 echo " set-autoexp : Daemon Auto-Expired"
+echo " set-banner  : Rubah Banner SSH/VPN"
 echo "======================================"
 echo -e " Ketik \e[33mmenu\e[0m untuk antarmuka utama."
 echo "======================================"
@@ -743,6 +745,71 @@ menu_extra_domain() {
     done
 }
 
+change_banner() {
+    while true; do
+        clear
+        echo "======================================"
+        echo "       UBAH BANNER LOGIN SSH/VPN      "
+        echo "======================================"
+        echo " 1. Gunakan Template TUBAN.STORE (HTML)"
+        echo " 2. Edit Manual (Editor Nano)"
+        echo " 0. Kembali"
+        echo "======================================"
+        read -p " Pilih opsi [0-2]: " opt
+        
+        case $opt in
+            1)
+                echo -e "\n=> Menerapkan Template TUBAN.STORE..."
+                cat > /etc/issue.net << 'EOF'
+<font color="#00FF00">======================================</font><br>
+<font color="#00FFFF"><b>WELCOME TO TUBAN.STORE</b></font><br>
+<font color="#00FF00">======================================</font><br>
+<font color="#FFFF00"><b>PERINGATAN PENGGUNAAN SERVER:</b></font><br>
+<font color="#FFFFFF">Dilarang keras menggunakan layanan ini untuk:</font><br>
+<font color="#FF0000">✖ Carding & Fraud</font><br>
+<font color="#FF0000">✖ Hacking & DDOS</font><br>
+<font color="#FF0000">✖ Spamming & Torrent</font><br>
+<font color="#FF9900"><b>Jika melanggar, akun akan di-BANNED permanen!</b></font><br>
+<font color="#00FF00">======================================</font><br>
+EOF
+                break
+                ;;
+            2)
+                echo -e "\n=> Membuka editor nano..."
+                sleep 1
+                nano /etc/issue.net
+                break
+                ;;
+            0) return ;;
+            *) echo -e "\n=> Pilihan tidak valid!"; sleep 1 ;;
+        esac
+    done
+
+    echo -e "\n=> Mengonfigurasi Dropbear & OpenSSH..."
+    
+    # Dropbear config integration
+    if grep -q "^DROPBEAR_BANNER=" /etc/default/dropbear 2>/dev/null; then
+        sed -i 's|^DROPBEAR_BANNER=.*|DROPBEAR_BANNER="/etc/issue.net"|g' /etc/default/dropbear
+    else
+        echo 'DROPBEAR_BANNER="/etc/issue.net"' >> /etc/default/dropbear
+    fi
+    
+    # OpenSSH config integration
+    if grep -q "^Banner" /etc/ssh/sshd_config 2>/dev/null; then
+        sed -i 's|^Banner.*|Banner /etc/issue.net|g' /etc/ssh/sshd_config
+    elif grep -q "^#Banner" /etc/ssh/sshd_config 2>/dev/null; then
+        sed -i 's|^#Banner.*|Banner /etc/issue.net|g' /etc/ssh/sshd_config
+    else
+        echo "Banner /etc/issue.net" >> /etc/ssh/sshd_config
+    fi
+    
+    echo "=> Merestart layanan SSH & Dropbear..."
+    systemctl restart ssh sshd dropbear 2>/dev/null
+    
+    echo -e "\n\e[32m[SUCCESS]\e[0m Banner Login berhasil diperbarui dan diterapkan!"
+    sleep 2
+}
+
 restore_data() {
     clear
     echo "======================================"
@@ -988,10 +1055,11 @@ menu_settings() {
         echo " 9. Setting Telegram Admin Bot"
         echo " 10. Manajemen Bug / SNI"
         echo " 11. Manajemen Node Server"
+        echo " 12. Rubah Banner Login SSH/VPN"
         echo "--------------------------------------"
         echo " 0/x. Kembali ke Menu Utama"
         echo "======================================"
-        read -p " Pilih opsi [0-11 or x]: " opt
+        read -p " Pilih opsi [0-12 or x]: " opt
         case $opt in
             1) menu_autobackup ;;
             2) menu_autosend ;;
@@ -1004,6 +1072,7 @@ menu_settings() {
             9) menu_bot_admin ;;
             10) menu_extra_domain ;;
             11) menu_node_server ;;
+            12) change_banner ;;
             0|x|X) break ;;
             *) echo "Pilihan tidak valid!"; sleep 1 ;;
         esac
