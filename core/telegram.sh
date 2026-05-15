@@ -64,7 +64,7 @@ run_autobackup() {
     # Jalur 1: Local VPS
     rm -f /root/srpcom-backup-*.tar.gz.enc
     cp "$enc_backup" "$final_local"
-    local stat_local="✅ Sukses ($final_local)"
+    local stat_local="✅ Sukses"
 
     # Jalur 2: Bashupload
     local bashupload_res=$(curl -s -H "X-Expiration-Seconds: 86400" -T "$enc_backup" bashupload.app)
@@ -87,8 +87,7 @@ Tanggal : $(date +"%Y-%m-%d %H:%M:%S")
 🤖 <b>Telegram:</b> $stat_tg
 ☁️ <b>Bashupload:</b> $stat_cloud
 🔗 Link Cloud: <code>${bashupload_link:--}</code>
-━━━━━━━━━━━━━━━━━━━━
-<i>Note: File backup hanya bisa direstore oleh Superadmin</i>"
+━━━━━━━━━━━━━━━━━━━━"
     
     if [[ "$send_tg" == true ]]; then
         # Mengirim file ke Telegram dengan parse_mode HTML
@@ -145,7 +144,7 @@ manual_backup_telegram() {
     # Jalur 1: Local VPS
     rm -f /root/srpcom-backup-*.tar.gz.enc
     cp "$enc_backup" "$final_local"
-    local stat_local="✅ Sukses ($final_local)"
+    local stat_local="✅ Sukses"
 
     # Jalur 2: Bashupload
     echo "=> Mengunggah ke Cloud (Bashupload)..."
@@ -174,8 +173,7 @@ Tanggal : $(date +"%Y-%m-%d %H:%M:%S")
 🤖 <b>Telegram:</b> $stat_tg
 ☁️ <b>Bashupload:</b> $stat_cloud
 🔗 Link Cloud: <code>${bashupload_link:--}</code>
-━━━━━━━━━━━━━━━━━━━━
-<i>Note: File backup hanya bisa direstore oleh Superadmin</i>"
+━━━━━━━━━━━━━━━━━━━━"
     
     if [[ "$send_tg" == true ]]; then
         echo -e "\n=> Mengirim file ke Telegram Anda..."
