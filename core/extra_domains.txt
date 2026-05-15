@@ -1,5 +1,5 @@
 ava.game.naver.com.ca.srpcom.cloud
-edu.udemy.com
+edu.udemy.com.ca.srpcom.cloud
 udemy.com
 dl.cvs.freefiremobile.com
 app.gopay.co.id
