@@ -57,7 +57,7 @@ add_trial_l2tp() {
     echo "      CREATE TRIAL L2TP (60M)         "
     echo "======================================"
     
-    # PERBAIKAN: Format Jam-Menit-Detik + 1 Karakter Random
+    # Format Jam-Menit-Detik + 1 Karakter Random
     rand_char=$(tr -dc 'a-z' < /dev/urandom | head -c 1)
     user="trialsrp-$(date +%H%M%S)${rand_char}"
     
@@ -164,8 +164,14 @@ renew_l2tp() {
         if [ -z "$current_date" ] || [ "$current_date" == "Lifetime" ]; then current_date=$(date +"%Y-%m-%d"); fi
         if [ -z "$current_time" ]; then current_time=$(date +"%H:%M:%S"); fi
         
+        now_sec=$(date +%s)
         current_sec=$(date -d "$current_date $current_time" +%s 2>/dev/null)
-        if [ -z "$current_sec" ]; then current_sec=$(date +%s); fi
+        if [ -z "$current_sec" ]; then current_sec=$now_sec; fi
+        
+        # Akumulasi: Jika sudah expired, mulai dari hari ini. Jika belum, tambah dari sisa hari.
+        if [ "$now_sec" -gt "$current_sec" ]; then
+            current_sec=$now_sec
+        fi
         
         new_sec=$((current_sec + (masaaktif * 86400)))
         new_exp_date=$(date -d "@$new_sec" +"%Y-%m-%d")
