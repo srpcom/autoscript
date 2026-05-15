@@ -763,7 +763,8 @@ change_banner() {
                 # Tidak menggunakan kutip tunggal pada EOF agar variabel bash terbaca
                 cat > /etc/issue.net << EOF
 <font color="#00FF00">======================================</font><br>
-<font color="#00FFFF"><b>WELCOME TO TUBAN.STORE</b></font><br>
+<font color="#00FFFF"><b>WELCOME TO SRPCOM SCRIPT</b></font><br>
+<font color="#00FFFF"><b>dev : t.me/srpcomadmin</b></font><br>
 <font color="#00FF00">======================================</font><br>
 <font color="#00FFFF"><b>Server : $DOMAIN</b></font><br>
 <font color="#FFFF00"><b>PERINGATAN PENGGUNAAN SERVER:</b></font><br>
