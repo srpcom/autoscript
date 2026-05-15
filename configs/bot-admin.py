@@ -52,7 +52,7 @@ if not BOT_TOKEN or not ADMIN_ID:
     print("Token ditemukan! Bot dijalankan...")
 
 bot = telebot.TeleBot(BOT_TOKEN)
-telebot.logger.setLevel(logging.INFO)
+telebot.logger.setLevel(logging.DEBUG)
 
 PROT_MAP = {'vmess': 'vmessws', 'vless': 'vlessws', 'trojan': 'trojanws', 'ssh': 'ssh', 'l2tp': 'l2tp'}
 
