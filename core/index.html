@@ -126,9 +126,7 @@
             </header>
 
             <!-- Scrollable Content Area -->
-            <!-- PERBAIKAN: pb-28 ditambahkan di container luar untuk spasi ekstra di bawah -->
             <div class="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8">
-                <!-- PERBAIKAN: Menggunakan min-h-full agar scroll atas-bawah tidak terpotong flex -->
                 <div class="max-w-5xl mx-auto flex flex-col gap-6 min-h-full pb-28 md:pb-6">
                     
                     <!-- Status Bar -->
@@ -169,6 +167,7 @@
                                                 <option value="add">➕ Create New Account</option>
                                                 <option value="trial">⏱️ Create Trial (60m)</option>
                                                 <option value="renew">🔄 Renew Account</option>
+                                                <option value="change-uuid" id="opt-change-uuid">🔑 Change UUID / Pass</option>
                                                 <option value="detail">🔍 Check Detail</option>
                                                 <option value="del">❌ Delete Account</option>
                                                 <option value="list-accounts" id="opt-list">📋 List All Accounts</option>
@@ -198,6 +197,16 @@
                                             <input type="text" id="inp-pass" placeholder="Ketik password..." class="w-full bg-slate-900 border border-slate-600 text-white rounded-lg py-3 px-4 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 placeholder-slate-500">
                                         </div>
                                         
+                                        <!-- Fields Khusus Change UUID Xray -->
+                                        <div id="field-uuid-old" class="hidden">
+                                            <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">UUID / Password Lama</label>
+                                            <input type="text" id="inp-uuid-old" placeholder="Masukkan UUID/Pass saat ini..." class="w-full bg-slate-900 border border-slate-600 text-white rounded-lg py-3 px-4 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 placeholder-slate-500 font-mono text-sm">
+                                        </div>
+                                        <div id="field-uuid-new" class="hidden">
+                                            <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">UUID / Password Baru</label>
+                                            <input type="text" id="inp-uuid-new" placeholder="Kosongkan untuk auto generate..." class="w-full bg-slate-900 border border-slate-600 text-white rounded-lg py-3 px-4 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 placeholder-slate-500 font-mono text-sm">
+                                        </div>
+
                                         <div class="grid grid-cols-2 gap-4" id="field-limits">
                                             <div id="field-exp">
                                                 <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Masa Aktif (Hari)</label>
@@ -286,7 +295,6 @@
             </div>
             
             <!-- Mobile Menu Bar (Bottom) -->
-            <!-- PERBAIKAN: pb-safe dan pt-2 memberikan padding yang lega agar icon tidak numpuk di pinggir layar HP -->
             <nav class="md:hidden fixed bottom-0 w-full bg-slate-800/95 backdrop-blur-md border-t border-slate-700 flex justify-around pt-2 pb-safe z-30 shadow-[0_-10px_25px_rgba(0,0,0,0.4)]">
                 <button onclick="setMode('xray')" class="flex flex-col items-center p-2 mb-1 flex-1 text-slate-400 hover:text-yellow-400 transition nav-btn-mobile" id="nav-mob-xray">
                     <i class="fas fa-bolt text-xl mb-1"></i>
@@ -375,7 +383,6 @@
             } catch (err) {
                 localStorage.removeItem('srpcom_api_key');
                 const errMsg = document.getElementById('login-error');
-                // PERBAIKAN: Berikan pesan jelas bahwa API sedang di-OFF-kan
                 errMsg.innerHTML = `<i class="fas fa-exclamation-circle mr-1"></i> Akses Ditolak: API sedang di-OFF-kan atau API Key salah.`;
                 errMsg.classList.remove('hidden');
                 btn.innerHTML = originalBtnHtml;
@@ -467,6 +474,8 @@
             const fieldExp = document.getElementById('field-exp');
             const fieldIp = document.getElementById('field-ip');
             const fieldQuota = document.getElementById('field-quota');
+            const fieldUuidOld = document.getElementById('field-uuid-old');
+            const fieldUuidNew = document.getElementById('field-uuid-new');
 
             // Reset visibility
             inputs.classList.remove('hidden');
@@ -476,15 +485,20 @@
             fieldExp.classList.add('hidden');
             fieldIp.classList.add('hidden');
             fieldQuota.classList.add('hidden');
+            fieldUuidOld.classList.add('hidden');
+            fieldUuidNew.classList.add('hidden');
 
             if(act === 'list-accounts' || act === 'trial') {
                 inputs.classList.add('hidden');
+            } else if (act === 'change-uuid') {
+                fieldUser.classList.add('hidden');
+                fieldUuidOld.classList.remove('hidden');
+                fieldUuidNew.classList.remove('hidden');
             } else if (act === 'del' || act === 'detail') {
                 // Hanya butuh username
             } else if (act === 'renew') {
                 fieldLimits.classList.remove('hidden');
                 fieldExp.classList.remove('hidden');
-                // ip dan quota tetap hidden
             } else if (act === 'add') {
                 fieldLimits.classList.remove('hidden');
                 fieldExp.classList.remove('hidden');
@@ -494,8 +508,8 @@
                     fieldQuota.classList.remove('hidden');
                 } else {
                     fieldPass.classList.remove('hidden');
-                    fieldIp.classList.remove('hidden'); // L2TP tidak pakai, tapi backend toleran
-                    if(currentMode === 'l2tp') fieldIp.classList.add('hidden'); // Sembunyikan untuk L2TP biar rapi
+                    fieldIp.classList.remove('hidden');
+                    if(currentMode === 'l2tp') fieldIp.classList.add('hidden'); 
                 }
             }
         }
@@ -513,6 +527,7 @@
             const monitorArea = document.getElementById('monitor-buttons-area');
             const panelTitle = document.getElementById('panel-title');
             const panelIcon = document.getElementById('panel-icon');
+            const optChangeUuid = document.getElementById('opt-change-uuid');
 
             if (mode === 'monitor') {
                 document.getElementById('mode-title').innerText = 'Monitoring Panel';
@@ -527,6 +542,19 @@
                 document.getElementById('terminal-output').innerHTML = '';
                 printToTerminal('> Mode Monitor Aktif.\n> Silakan pilih menu untuk mulai menampilkan laporan.', 'info');
                 return;
+            }
+
+            // Tampilkan/sembunyikan opsi Change UUID berdasarkan mode
+            if (mode === 'xray') {
+                if (optChangeUuid) optChangeUuid.classList.remove('hidden');
+            } else {
+                if (optChangeUuid) {
+                    optChangeUuid.classList.add('hidden');
+                    // Reset dropdown jika sedang memilih change-uuid
+                    if (document.getElementById('action-type').value === 'change-uuid') {
+                        document.getElementById('action-type').value = 'add';
+                    }
+                }
             }
 
             // Revert back to CRUD mode
@@ -566,19 +594,35 @@
             const limit_ip = document.getElementById('inp-ip').value;
             const limit_quota = document.getElementById('inp-quota').value;
 
-            // PERBAIKAN: Penyesuaian Endpoint URL khusus untuk list-accounts
             let endpoint = `/user_legend/${act}-${prot}`;
+            
             if (act === 'list-accounts') {
-                // Menghapus 'ws' dari nama protokol agar sesuai dengan backend Python (contoh: vmessws menjadi vmess)
                 const cleanProt = prot.replace('ws', '');
                 endpoint = `/user_legend/list-accounts/${cleanProt}`;
+            } else if (act === 'change-uuid') {
+                endpoint = '/user_legend/change-uuid'; // Change UUID pakai endpoint universal
             }
 
             let method = (act === 'list-accounts') ? 'GET' : 'POST';
             if (act === 'del') method = 'DELETE';
 
             let payload = {};
-            if (act !== 'list-accounts' && act !== 'trial') {
+            
+            if (act === 'change-uuid') {
+                const uuidold = document.getElementById('inp-uuid-old').value.trim();
+                let uuidnew = document.getElementById('inp-uuid-new').value.trim();
+                
+                if (!uuidold) {
+                    printToTerminal(`[ERROR] UUID/Password Lama wajib diisi!`, 'error');
+                    showToast('UUID Lama wajib diisi', 'error');
+                    return;
+                }
+                if (!uuidnew) {
+                    uuidnew = crypto.randomUUID(); // Auto generate jika kosong
+                }
+                payload = { uuidold: uuidold, uuidnew: uuidnew };
+                
+            } else if (act !== 'list-accounts' && act !== 'trial') {
                 if(!user) {
                     printToTerminal(`[ERROR] Username wajib diisi untuk aksi ${act.toUpperCase()}!`, 'error');
                     showToast('Username wajib diisi', 'error');
@@ -603,7 +647,12 @@
             btn.classList.add('opacity-75');
 
             document.getElementById('terminal-output').innerHTML = '';
-            printToTerminal(`> Executing [${act.toUpperCase()}] on protocol [${prot.toUpperCase()}]...`, 'info');
+            
+            if (act === 'change-uuid') {
+                printToTerminal(`> Executing [CHANGE UUID] request...`, 'info');
+            } else {
+                printToTerminal(`> Executing [${act.toUpperCase()}] on protocol [${prot.toUpperCase()}]...`, 'info');
+            }
             
             await fetchAPI(endpoint, method, (act === 'list-accounts') ? null : payload);
             
@@ -611,7 +660,12 @@
             btn.disabled = false;
             btn.classList.remove('opacity-75');
             
-            if(act === 'add' || act === 'trial') document.getElementById('inp-user').value = ''; // auto clear
+            // Auto-clear input setelah sukses
+            if(act === 'add' || act === 'trial') document.getElementById('inp-user').value = ''; 
+            if(act === 'change-uuid') {
+                document.getElementById('inp-uuid-old').value = '';
+                document.getElementById('inp-uuid-new').value = '';
+            }
         }
 
         async function executeMonitor(endpoint, method) {
@@ -634,22 +688,17 @@
                     headers: { 'Content-Type': 'application/json', 'x-api-key': key }
                 };
                 
-                // Gunakan POST untuk GET request yang butuh payload (seperti detail) karena fetch GET standard tidak terima body
                 if(payload) {
-                    if (method === 'GET') options.method = 'POST'; // Backend Python di xray-api.py sudah menolerir POST untuk detail
+                    if (method === 'GET') options.method = 'POST'; 
                     options.body = JSON.stringify(payload);
                 }
 
                 const res = await fetch(endpoint, options);
-                
-                // PERBAIKAN: Tangkap respon text murni sebelum di parse ke JSON 
-                // Ini untuk mencegah error (Unexpected token '<') saat server mengembalikan HTML Error Page (seperti 404/500)
                 const textResp = await res.text();
                 let data;
                 try {
                     data = JSON.parse(textResp);
                 } catch (err) {
-                    // Jika parsing JSON gagal, lemparkan error dengan cuplikan respon HTML/Teks
                     throw new Error(`Invalid response format dari server (HTTP ${res.status}). Detail: ${textResp.substring(0, 80)}...`);
                 }
                 
@@ -664,7 +713,6 @@
                     printToTerminal("✅ [SUCCESS] File Backup berhasil di-generate. Data Base64 telah diterima dan siap untuk didecode.");
                     showToast('Backup berhasil', 'success');
                 } else if(data.stdout) {
-                    // Cek apakah string mengandung indikator error (untuk pewarnaan)
                     let isError = data.stdout.includes('❌') || data.stdout.includes('Error:');
                     printToTerminal(data.stdout, isError ? 'error' : 'success');
                     if(isError) showToast('Terjadi kesalahan eksekusi', 'error');
@@ -681,34 +729,26 @@
         function printToTerminal(text, type = 'normal') {
             const term = document.getElementById('terminal-output');
             
-            // PERBAIKAN: Regex untuk mengubah teks URL menjadi Clickable Link
             const urlRegex = /(https?:\/\/[^\s]+)/g;
             const textWithLinks = text.replace(urlRegex, function(url) {
                 return `<a href="${url}" target="_blank" class="text-blue-400 hover:text-blue-300 underline decoration-blue-500/50 underline-offset-4 pointer-events-auto transition-colors">${url}</a>`;
             });
             
-            // Pewarnaan teks terminal berdasarkan tipe pesan
-            let colorClass = 'text-[#00ff00]'; // default green
+            let colorClass = 'text-[#00ff00]'; 
             if (type === 'error') colorClass = 'text-red-400';
             else if (type === 'info') colorClass = 'text-blue-400';
             else if (type === 'warning') colorClass = 'text-yellow-400';
-            else if (type === 'success') colorClass = 'text-teal-300'; // slightly different green for api success responses
+            else if (type === 'success') colorClass = 'text-teal-300'; 
 
-            // Bungkus output dengan span berwarna
             const formattedText = `<span class="${colorClass}">${textWithLinks}</span>`;
-            
-            // Tambahkan newline jika belum ada di akhir teks sebelumnya
             const prefix = term.innerHTML === '' ? '' : '\n';
             term.innerHTML += `${prefix}${formattedText}`;
-            
-            // Auto scroll to bottom
             term.scrollTop = term.scrollHeight; 
         }
 
-        // Listener untuk tombol Enter di dalam form input
         document.getElementById('input-fields').addEventListener('keypress', function (e) {
             if (e.key === 'Enter') {
-                e.preventDefault(); // Mencegah submit form default jika ada
+                e.preventDefault(); 
                 submitAction();
             }
         });
