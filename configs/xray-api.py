@@ -279,6 +279,23 @@ def run_speedtest():
     except Exception as e:
         return jsonify({"stdout": f"❌ Error: Speedtest CLI mungkin belum terinstall.\n{e}"})
 
+@app.route('/user_legend/bandwidth', methods=['GET'])
+def run_bandwidth():
+    try:
+        # Pengecekan apakah vnstat terinstal
+        check = subprocess.run(['which', 'vnstat'], capture_output=True, text=True)
+        if not check.stdout.strip():
+            return jsonify({"stdout": "❌ Error: vnStat belum terpasang di sistem. Jalankan 'apt install vnstat -y' terlebih dahulu."})
+
+        # Ambil data summary dan daily
+        out_summary = subprocess.run(['vnstat'], capture_output=True, text=True).stdout
+        out_daily = subprocess.run(['vnstat', '-d'], capture_output=True, text=True).stdout
+        
+        res = f"📊 BANDWIDTH USAGE (VNSTAT)\n━━━━━━━━━━━━━━━━━━━━\n[ SUMMARY USAGE ]\n{out_summary.strip()}\n\n[ DAILY USAGE ]\n{out_daily.strip()}"
+        return jsonify({"stdout": res})
+    except Exception as e:
+        return jsonify({"stdout": f"❌ Error saat menjalankan vnstat:\n{e}"})
+
 @app.route('/user_legend/sys-backup', methods=['GET'])
 def sys_backup():
     now_str = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
