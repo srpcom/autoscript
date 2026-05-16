@@ -196,7 +196,7 @@ EOFSC
 
 rebuild_caddyfile() {
     local main_domain="$DOMAIN"
-    local main_str="http://$main_domain, https://$main_domain, http://support.zoom.us.$main_domain, https://support.zoom.us.$main_domain"
+    local main_str="http://$main_domain, https://$main_domain"
     
     cat > /tmp/temp_caddyfile << EOF
 (proxy_rules) {
