@@ -179,6 +179,7 @@ def monitor_menu_keyboard():
     markup.add(
         InlineKeyboardButton("📈 MONITOR XRAY (IP & KUOTA)", callback_data="mon_xray"),
         InlineKeyboardButton("💻 MONITOR SSH (USER AKTIF)", callback_data="mon_ssh"),
+        InlineKeyboardButton("📊 BANDWIDTH USAGE (VNSTAT)", callback_data="mon_bandwidth"),
         InlineKeyboardButton("🔙 KEMBALI", callback_data="menu_main")
     )
     return markup
@@ -237,6 +238,10 @@ def handle_query(call):
         elif data == "mon_ssh":
             bot.answer_callback_query(call.id, "Mengambil data SSH...")
             bot.send_message(chat_id, api_req("monitor-ssh", "GET", chat_id=chat_id), parse_mode="Markdown")
+
+        elif data == "mon_bandwidth":
+            bot.answer_callback_query(call.id, "Mengambil data Bandwidth...")
+            bot.send_message(chat_id, api_req("bandwidth", "GET", chat_id=chat_id), parse_mode="Markdown")
         
         elif data == "sys_cek_status":
             bot.answer_callback_query(call.id, "Mengecek...")
