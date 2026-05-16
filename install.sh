@@ -658,4 +658,13 @@ echo "Untuk menghubungkan Node lain, gunakan API Key Default:"
 echo "SANGATRAHASIA123 (Ubah di menu 5 -> 5 jika perlu)"
 echo "======================================================"
 
-EOF
+echo -e "\n\e[33mTekan [ENTER] untuk menyelesaikan instalasi dan keluar dari terminal...\e[0m"
+read -p ""
+
+# ==========================================
+# AUTO DELETE SCRIPT (MEMBERSIHKAN JEJAK)
+# ==========================================
+if [[ -f "$0" ]]; then
+    rm -f "$0"
+fi
+rm -f /root/install.sh /root/install
