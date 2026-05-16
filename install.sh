@@ -12,6 +12,34 @@ if [ "${EUID}" -ne 0 ]; then
     exit 1
 fi
 
+# ==========================================
+# FITUR ANTI-DISKONEK (AUTO SCREEN)
+# ==========================================
+if [[ -z "$STY" ]]; then
+    clear
+    echo -e "\e[33m[INFO] Menyiapkan Mode Aman (Anti-Diskonek)...\e[0m"
+    echo -e "Sistem sedang menginstal utilitas 'screen' agar instalasi"
+    echo -e "tetap berjalan meskipun koneksi terminal/SSH Anda terputus."
+    
+    apt-get update -y -qq >/dev/null 2>&1
+    apt-get install screen -y -qq >/dev/null 2>&1
+    
+    echo -e "\n\e[32m[OK] Mode Aman Aktif!\e[0m"
+    echo -e "\e[36mPENTING: Jika koneksi Anda terputus, login kembali ke VPS dan ketik:\e[0m"
+    echo -e "\e[33mscreen -r srpcom_install\e[0m\n"
+    sleep 4
+    
+    # Pengecekan apakah script dijalankan dari file lokal (bukan via pipe curl)
+    if [[ -f "$0" ]]; then
+        exec screen -S srpcom_install bash "$0" "$@"
+    else
+        echo -e "\e[31m[WARNING]\e[0m Script dijalankan via pipe. Fitur Anti-Diskonek tidak maksimal."
+        echo -e "Melanjutkan instalasi normal..."
+        sleep 2
+    fi
+fi
+# ==========================================
+
 clear
 echo "=========================================="
 echo "  SRPCOM AUTOSCRIPT VERSI 1.0             "
@@ -27,7 +55,6 @@ echo "  bash <(curl -Ls https://srpcom.cloud/getroot.sh)"
 echo "  skip jika sudah paham"
 echo "  note : saran OS ubuntu 20"
 echo "=========================================="
-
 
 VPS_IP=$(curl -sS --max-time 5 ipv4.icanhazip.com || curl -sS --max-time 5 ifconfig.me)
 
