@@ -138,7 +138,7 @@ run_speedtest() {
 monitor_bandwidth() {
     clear
     echo "======================================"
-    echo "       BANDWIDTH USAGE (VNSTAT)       "
+    echo "SRPCOM BANDWIDTH USAGE (VNSTAT)       "
     echo "======================================"
     if ! command -v vnstat &> /dev/null; then
         echo -e "\e[31m[ERROR]\e[0m vnStat belum terpasang di sistem."
