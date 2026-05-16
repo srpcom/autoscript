@@ -35,3 +35,5 @@ dl.cvs.freefiremobile.com
 udemy.com
 suporte.garena.com
 api.waze.com
+freefiremobile.com
+www.freefiremobile.com
