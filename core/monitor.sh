@@ -135,6 +135,29 @@ run_speedtest() {
     pause
 }
 
+monitor_bandwidth() {
+    clear
+    echo "======================================"
+    echo "       BANDWIDTH USAGE (VNSTAT)       "
+    echo "======================================"
+    if ! command -v vnstat &> /dev/null; then
+        echo -e "\e[31m[ERROR]\e[0m vnStat belum terpasang di sistem."
+        echo "Coba jalankan ulang proses instalasi atau ketik manual:"
+        echo "apt install vnstat -y"
+    else
+        echo -e "\e[32m[ SUMMARY USAGE ]\e[0m"
+        vnstat
+        echo ""
+        echo -e "\e[32m[ DAILY USAGE ]\e[0m"
+        vnstat -d
+        echo ""
+        echo -e "\e[33mCatatan:\e[0m Jika data belum muncul, vnstat butuh waktu "
+        echo "sekitar 5-10 menit untuk mengumpulkan data jaringan baru."
+    fi
+    echo "======================================"
+    pause
+}
+
 menu_monitor() {
     while true; do
         clear
@@ -150,10 +173,11 @@ menu_monitor() {
         echo " 7. Caddy Proxy Log (Live Debug)"
         echo " 8. System Resource (CPU & RAM)"
         echo " 9. Speedtest Server"
+        echo " 10. Bandwidth Usage Server (vnstat)"
         echo "--------------------------------------"
         echo " 0/x. Kembali ke Menu Utama"
         echo "======================================"
-        read -p " Pilih Opsi [0-9 or x]: " opt
+        read -p " Pilih Opsi [0-10 or x]: " opt
         case $opt in
             1) monitor_ssh ;;
             2) monitor_xray ;;
@@ -181,6 +205,8 @@ menu_monitor() {
                 monitor_system ;;
             9)
                 run_speedtest ;;
+            10)
+                monitor_bandwidth ;;
             0|x|X) break ;;
             *) echo -e "\n=> Pilihan tidak valid!"; sleep 1 ;;
         esac
