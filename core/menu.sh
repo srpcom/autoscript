@@ -418,8 +418,7 @@ menu_bot_admin() {
 BOT_TOKEN="$new_token"
 ADMIN_ID="$new_id"
 EOF
-                    systemctl restart srpcom-bot
-                    echo -e "\n\e[32m=> Bot berhasil disetting!\e[0m"; sleep 2
+                    echo -e "\n\e[32m=> Bot berhasil disetting! (Silakan jalankan manual via opsi 1)\e[0m"; sleep 2
                 else
                     echo -e "\n=> Token/ID tidak boleh kosong!"; sleep 2
                 fi
