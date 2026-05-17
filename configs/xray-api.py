@@ -507,6 +507,7 @@ def renew_user(protocol):
         msg_tg = (
             f"🕑 Akun Diperpanjang\n\n"
             f"💻 Server: {DOMAIN}\n"
+            f"Type : {protocol.upper()} WS\n"
             f"🔑 Akun: `{user}`\n"
             f"⏳ Durasi: +{exp} hari\n"
             f"📅 Expired Baru: {dt_str} WIB"
@@ -608,6 +609,7 @@ def renew_ssh():
         msg_tg = (
             f"🕑 Akun Diperpanjang\n\n"
             f"💻 Server: {DOMAIN}\n"
+            f"Type : SSH & OVPN\n"
             f"🔑 Akun: `{user}`\n"
             f"⏳ Durasi: +{exp} hari\n"
             f"📅 Expired Baru: {dt_str} WIB"
@@ -793,6 +795,7 @@ def renew_l2tp():
         msg_tg = (
             f"🕑 Akun Diperpanjang\n\n"
             f"💻 Server: {DOMAIN}\n"
+            f"Type : L2TP IPsec\n"
             f"🔑 Akun: `{user}`\n"
             f"⏳ Durasi: +{exp} hari\n"
             f"📅 Expired Baru: {dt_str} WIB"
