@@ -3,10 +3,10 @@
 # menu.sh
 # MODULE: MAIN MENU (ROUTER)
 # Menampilkan antarmuka CLI utama dan perutean menu
-# Versi : 1.4 (Fitur: API Auth & Web Panel Update)
+# Versi : 1.5 (Fitur: API Auth & Web Panel Update)
 # ==========================================
 
-SCRIPT_VERSION="1.4 (1106 1005)"
+SCRIPT_VERSION="1.5 (1705 1009)"
 
 source /usr/local/etc/srpcom/env.conf 2>/dev/null
 source /usr/local/bin/srpcom/utils.sh 2>/dev/null
