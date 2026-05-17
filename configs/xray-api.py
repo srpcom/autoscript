@@ -85,7 +85,6 @@ def enforce_security():
             if not is_license_active():
                 return jsonify({"stdout": "❌ AKSES DITOLAK: Masa aktif Lisensi Autoscript untuk Node Server ini telah habis. Eksekusi dibatalkan."}), 403
 
-
 def load_json(p):
     if not os.path.exists(p): return {}
     with open(p, 'r') as f: return json.load(f)
@@ -98,18 +97,26 @@ def restart_l2tp(): subprocess.run(['systemctl', 'restart', 'ipsec', 'xl2tpd'])
 
 def send_telegram(text):
     try:
-        bot_token, chat_id, autosend = "", "", "OFF"
+        bot_token, admin_id, autosend = "", "", "OFF"
+        
+        # PERBAIKAN BUG: Ambil Token dan ID dari file yang benar
+        if os.path.exists('/usr/local/etc/xray/bot_admin.conf'):
+            with open('/usr/local/etc/xray/bot_admin.conf', 'r') as f:
+                for line in f:
+                    line = line.strip()
+                    if line.startswith('BOT_TOKEN='): bot_token = line.split('=', 1)[1].strip('"').strip("'")
+                    elif line.startswith('ADMIN_ID='): admin_id = line.split('=', 1)[1].strip('"').strip("'")
+        
+        # Ambil status Autosend
         if os.path.exists(BOT_CONF):
             with open(BOT_CONF, 'r') as f:
                 for line in f:
                     line = line.strip()
-                    if line.startswith('BOT_TOKEN='): bot_token = line.split('=', 1)[1].strip('"').strip("'")
-                    elif line.startswith('CHAT_ID='): chat_id = line.split('=', 1)[1].strip('"').strip("'")
-                    elif line.startswith('AUTOSEND_STATUS='): autosend = line.split('=', 1)[1].strip('"').strip("'")
+                    if line.startswith('AUTOSEND_STATUS='): autosend = line.split('=', 1)[1].strip('"').strip("'")
 
-        if autosend == "ON" and bot_token and chat_id:
+        if autosend == "ON" and bot_token and admin_id:
             url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
-            payload = {"chat_id": chat_id, "text": text, "parse_mode": "Markdown"}
+            payload = {"chat_id": admin_id, "text": text, "parse_mode": "Markdown"}
             req = urllib.request.Request(url, data=json.dumps(payload).encode('utf-8'), headers={'Content-Type': 'application/json'})
             urllib.request.urlopen(req, timeout=5)
     except: pass
@@ -270,7 +277,6 @@ def sys_resource():
 @app.route('/user_legend/speedtest', methods=['GET'])
 def run_speedtest():
     try:
-        # Menjalankan speedtest butuh waktu, berikan timeout lebih panjang
         out = subprocess.run(['speedtest', '--accept-license', '--accept-gdpr'], capture_output=True, text=True, timeout=40).stdout
         res = f"🚀 SPEEDTEST SERVER\n━━━━━━━━━━━━━━━━━━━━\n{out.strip()}"
         return jsonify({"stdout": res})
@@ -282,12 +288,9 @@ def run_speedtest():
 @app.route('/user_legend/bandwidth', methods=['GET'])
 def run_bandwidth():
     try:
-        # Pengecekan apakah vnstat terinstal
         check = subprocess.run(['which', 'vnstat'], capture_output=True, text=True)
         if not check.stdout.strip():
             return jsonify({"stdout": "❌ Error: vnStat belum terpasang di sistem. Jalankan 'apt install vnstat -y' terlebih dahulu."})
-
-        # Ambil data summary dan daily
         out_summary = subprocess.run(['vnstat'], capture_output=True, text=True).stdout
         out_daily = subprocess.run(['vnstat', '-d'], capture_output=True, text=True).stdout
         
@@ -361,7 +364,6 @@ def add_user(protocol):
     limit_ip, limit_quota = int(data.get('limit_ip', 0)), int(data.get('limit_quota', 0))
     if not user: return jsonify({"stdout": "Error: User required"}), 400
     
-    # Cek dan Auto-increment nama user langsung dari config.json
     original_user = user
     counter = 2
     def is_xray_user(u):
@@ -399,7 +401,6 @@ def add_user(protocol):
 @app.route('/user_legend/trial-<protocol>ws', methods=['POST'])
 def trial_user(protocol):
     data = request.json or {}
-    
     exp_min = 60 
     limit_ip = int(data.get('limit_ip', 1))
     
@@ -489,7 +490,6 @@ def renew_user(protocol):
                         curr_dt_str = line.strip().split(' ', 1)[1]
                         curr_dt = datetime.datetime.strptime(curr_dt_str, '%Y-%m-%d %H:%M:%S')
                         now = datetime.datetime.now()
-                        # Akumulasi jika belum expired, mulai dari 'now' jika sudah expired
                         if curr_dt > now:
                             dt = curr_dt + datetime.timedelta(days=exp)
                         else:
@@ -507,7 +507,7 @@ def renew_user(protocol):
 
 
 # ==========================================
-# SSH ENDPOINTS
+# SSH ENDPOINTS (UPDATED PREMIUM LAYOUT)
 # ==========================================
 @app.route('/user_legend/add-ssh', methods=['POST'])
 def add_ssh():
@@ -516,7 +516,6 @@ def add_ssh():
     limit_ip = int(data.get('limit_ip', 0))
     if not user: return jsonify({"stdout": "Error: User required"}), 400
     
-    # Cek dan Auto-increment nama user
     original_user = user
     counter = 2
     while subprocess.run(['id', user], capture_output=True).returncode == 0:
@@ -532,31 +531,26 @@ def add_ssh():
     with open(SSH_EXP, 'a') as f: f.write(f"{user} {password} {exp_date} {exp_time}\n")
     with open(SSH_LIMIT, 'a') as f: f.write(f"{user} {limit_ip}\n")
     
-    lim_str = f"{limit_ip} IP" if limit_ip > 0 else "Unlimited"
+    lim_str = f"{limit_ip} IP" if limit_ip > 0 else "Not Active (Unli)"
     
     msg_cli = (
-        f"━━━━━━━━━━━━━━━━━━━━\n❖ SSH & OVPN ACCOUNT ❖\n━━━━━━━━━━━━━━━━━━━━\n"
-        f"Remarks : {user}\nIP Address : {IP_ADD}\nDomain : {DOMAIN}\n"
-        f"Username : {user}\nPassword : {password}\n━━━━━━━━━━━━━━━━━━━━\n"
-        f"Port OpenSSH : 22\nPort Dropbear : 109, 143\n"
-        f"Port SSH-WS TLS : 443 (Path: /sshws)\nPort SSH-WS NTLS : 80 (Path: /sshws)\n"
-        f"Port UDP Custom : 7100, 7200, 7300\nPort OVPN UDP : 2200\nPort OVPN TCP : 1194\n"
-        f"━━━━━━━━━━━━━━━━━━━━\nLimit IP : {lim_str}\n━━━━━━━━━━━━━━━━━━━━\n"
-        f"LINK OVPN UDP : http://{DOMAIN}/ovpn/udp.ovpn\n"
-        f"LINK OVPN TCP : http://{DOMAIN}/ovpn/tcp.ovpn\n━━━━━━━━━━━━━━━━━━━━\n"
-        f"EXPIRED ON : {exp_date} {exp_time} WIB"
+        f"Akun Berhasil Dibuat!\n\n━━━━━━━━━━━━━━━━━━━━\nINFORMASI PREMIUM\nSSH & OVPN ACCOUNT\n━━━━━━━━━━━━━━━━━━━━\n"
+        f"IP-Address: {IP_ADD}\nHostname: {DOMAIN}\nUsername: {user}\nPassword: {password}\nLimit IP: {lim_str}\n━━━━━━━━━━━━━━━━━━━━\n"
+        f"Port OpenSSH: 22\nPort Dropbear: 109, 143\nPort SSH WS HTTPS (TLS): 443\nPort SSH WS HTTP (NTLS): 80\nPort BadVPN/UDPGW: 7100, 7200, 7300\n━━━━━━━━━━━━━━━━━━━━\n"
+        f"OPENVPN TCP (1194): http://{DOMAIN}/ovpn/tcp.ovpn\nOPENVPN UDP (2200): http://{DOMAIN}/ovpn/udp.ovpn\n━━━━━━━━━━━━━━━━━━━━\n"
+        f"Payload SSH WS: GET /sshws HTTP/1.1[crlf]Host: {DOMAIN}[crlf]Upgrade: websocket[crlf]Connection: Keep-Alive[crlf]User-Agent: [ua][crlf][crlf]\n━━━━━━━━━━━━━━━━━━━━\n"
+        f"Payload WS ENHANCED: PATCH / HTTP/1.1[crlf]Host: [host][crlf]Host: ISI_BUG_DISINI[crlf]Connection: Upgrade[crlf]User-Agent: [ua][crlf]Upgrade: websocket[crlf][crlf]\n━━━━━━━━━━━━━━━━━━━━\n"
+        f"Expired on: {exp_date} {exp_time} WIB ({exp} Hari)"
     )
+    
     msg_tg = (
-        f"━━━━━━━━━━━━━━━━━━━━\n❖ SSH & OVPN ACCOUNT ❖\n━━━━━━━━━━━━━━━━━━━━\n"
-        f"Remarks : `{user}`\nIP Address : {IP_ADD}\nDomain : {DOMAIN}\n"
-        f"Username : `{user}`\nPassword : `{password}`\n━━━━━━━━━━━━━━━━━━━━\n"
-        f"Port OpenSSH : 22\nPort Dropbear : 109, 143\n"
-        f"Port SSH-WS TLS : 443 (Path: /sshws)\nPort SSH-WS NTLS : 80 (Path: /sshws)\n"
-        f"Port UDP Custom : 7100, 7200, 7300\nPort OVPN UDP : 2200\nPort OVPN TCP : 1194\n"
-        f"━━━━━━━━━━━━━━━━━━━━\nLimit IP : {lim_str}\n━━━━━━━━━━━━━━━━━━━━\n"
-        f"LINK OVPN UDP : `http://{DOMAIN}/ovpn/udp.ovpn`\n"
-        f"LINK OVPN TCP : `http://{DOMAIN}/ovpn/tcp.ovpn`\n━━━━━━━━━━━━━━━━━━━━\n"
-        f"EXPIRED ON : {exp_date} {exp_time} WIB"
+        f"Akun Berhasil Dibuat!\n\n━━━━━━━━━━━━━━━━━━━━\nINFORMASI PREMIUM\nSSH & OVPN ACCOUNT\n━━━━━━━━━━━━━━━━━━━━\n"
+        f"IP-Address: {IP_ADD}\nHostname: {DOMAIN}\nUsername: `{user}`\nPassword: `{password}`\nLimit IP: {lim_str}\n━━━━━━━━━━━━━━━━━━━━\n"
+        f"Port OpenSSH: 22\nPort Dropbear: 109, 143\nPort SSH WS HTTPS (TLS): 443\nPort SSH WS HTTP (NTLS): 80\nPort BadVPN/UDPGW: 7100, 7200, 7300\n━━━━━━━━━━━━━━━━━━━━\n"
+        f"OPENVPN TCP (1194): `http://{DOMAIN}/ovpn/tcp.ovpn`\nOPENVPN UDP (2200): `http://{DOMAIN}/ovpn/udp.ovpn`\n━━━━━━━━━━━━━━━━━━━━\n"
+        f"Payload SSH WS: `GET /sshws HTTP/1.1[crlf]Host: {DOMAIN}[crlf]Upgrade: websocket[crlf]Connection: Keep-Alive[crlf]User-Agent: [ua][crlf][crlf]`\n━━━━━━━━━━━━━━━━━━━━\n"
+        f"Payload WS ENHANCED: `PATCH / HTTP/1.1[crlf]Host: [host][crlf]Host: ISI_BUG_DISINI[crlf]Connection: Upgrade[crlf]User-Agent: [ua][crlf]Upgrade: websocket[crlf][crlf]`\n━━━━━━━━━━━━━━━━━━━━\n"
+        f"Expired on: {exp_date} {exp_time} WIB ({exp} Hari)"
     )
     send_telegram(msg_tg)
     return jsonify({"stdout": msg_cli, "stdout_tg": msg_tg})
@@ -583,11 +577,9 @@ def renew_ssh():
                 if line.startswith(user + " "):
                     parts = line.strip().split()
                     pw = parts[1] if len(parts) > 1 else "123"
-                    
                     now = datetime.datetime.now()
                     try:
                         curr_dt = datetime.datetime.strptime(f"{parts[2]} {parts[3]}", '%Y-%m-%d %H:%M:%S')
-                        # Akumulasi jika belum expired, mulai dari 'now' jika sudah expired
                         if curr_dt > now:
                             dt = curr_dt + datetime.timedelta(days=exp)
                         else:
@@ -623,25 +615,26 @@ def detail_ssh():
                         with open(SSH_LIMIT, "r") as fl:
                             for ll in fl:
                                 if ll.startswith(user + " "): limit_ip = int(ll.strip().split()[1])
-                    lim_str = f"{limit_ip} IP" if limit_ip > 0 else "Unlimited"
+                    lim_str = f"{limit_ip} IP" if limit_ip > 0 else "Not Active (Unli)"
                     
                     msg_cli = (
-                        f"━━━━━━━━━━━━━━━━━━━━\n❖ SSH & OVPN ACCOUNT ❖\n━━━━━━━━━━━━━━━━━━━━\n"
-                        f"Remarks : {user}\nIP Address : {IP_ADD}\nDomain : {DOMAIN}\n"
-                        f"Username : {user}\nPassword : {pw}\n━━━━━━━━━━━━━━━━━━━━\n"
-                        f"Limit IP : {lim_str}\n━━━━━━━━━━━━━━━━━━━━\n"
-                        f"LINK OVPN UDP : http://{DOMAIN}/ovpn/udp.ovpn\n"
-                        f"LINK OVPN TCP : http://{DOMAIN}/ovpn/tcp.ovpn\n━━━━━━━━━━━━━━━━━━━━\n"
-                        f"EXPIRED ON : {dt_str} WIB"
+                        f"━━━━━━━━━━━━━━━━━━━━\nINFORMASI PREMIUM\nSSH & OVPN ACCOUNT\n━━━━━━━━━━━━━━━━━━━━\n"
+                        f"IP-Address: {IP_ADD}\nHostname: {DOMAIN}\nUsername: {user}\nPassword: {pw}\nLimit IP: {lim_str}\n━━━━━━━━━━━━━━━━━━━━\n"
+                        f"Port OpenSSH: 22\nPort Dropbear: 109, 143\nPort SSH WS HTTPS (TLS): 443\nPort SSH WS HTTP (NTLS): 80\nPort BadVPN/UDPGW: 7100, 7200, 7300\n━━━━━━━━━━━━━━━━━━━━\n"
+                        f"OPENVPN TCP (1194): http://{DOMAIN}/ovpn/tcp.ovpn\nOPENVPN UDP (2200): http://{DOMAIN}/ovpn/udp.ovpn\n━━━━━━━━━━━━━━━━━━━━\n"
+                        f"Payload SSH WS: GET /sshws HTTP/1.1[crlf]Host: {DOMAIN}[crlf]Upgrade: websocket[crlf]Connection: Keep-Alive[crlf]User-Agent: [ua][crlf][crlf]\n━━━━━━━━━━━━━━━━━━━━\n"
+                        f"Payload WS ENHANCED: PATCH / HTTP/1.1[crlf]Host: [host][crlf]Host: ISI_BUG_DISINI[crlf]Connection: Upgrade[crlf]User-Agent: [ua][crlf]Upgrade: websocket[crlf][crlf]\n━━━━━━━━━━━━━━━━━━━━\n"
+                        f"Expired on: {dt_str} WIB"
                     )
+                    
                     msg_tg = (
-                        f"━━━━━━━━━━━━━━━━━━━━\n❖ SSH & OVPN ACCOUNT ❖\n━━━━━━━━━━━━━━━━━━━━\n"
-                        f"Remarks : `{user}`\nIP Address : {IP_ADD}\nDomain : {DOMAIN}\n"
-                        f"Username : `{user}`\nPassword : `{pw}`\n━━━━━━━━━━━━━━━━━━━━\n"
-                        f"Limit IP : {lim_str}\n━━━━━━━━━━━━━━━━━━━━\n"
-                        f"LINK OVPN UDP : `http://{DOMAIN}/ovpn/udp.ovpn`\n"
-                        f"LINK OVPN TCP : `http://{DOMAIN}/ovpn/tcp.ovpn`\n━━━━━━━━━━━━━━━━━━━━\n"
-                        f"EXPIRED ON : {dt_str} WIB"
+                        f"━━━━━━━━━━━━━━━━━━━━\nINFORMASI PREMIUM\nSSH & OVPN ACCOUNT\n━━━━━━━━━━━━━━━━━━━━\n"
+                        f"IP-Address: {IP_ADD}\nHostname: {DOMAIN}\nUsername: `{user}`\nPassword: `{pw}`\nLimit IP: {lim_str}\n━━━━━━━━━━━━━━━━━━━━\n"
+                        f"Port OpenSSH: 22\nPort Dropbear: 109, 143\nPort SSH WS HTTPS (TLS): 443\nPort SSH WS HTTP (NTLS): 80\nPort BadVPN/UDPGW: 7100, 7200, 7300\n━━━━━━━━━━━━━━━━━━━━\n"
+                        f"OPENVPN TCP (1194): `http://{DOMAIN}/ovpn/tcp.ovpn`\nOPENVPN UDP (2200): `http://{DOMAIN}/ovpn/udp.ovpn`\n━━━━━━━━━━━━━━━━━━━━\n"
+                        f"Payload SSH WS: `GET /sshws HTTP/1.1[crlf]Host: {DOMAIN}[crlf]Upgrade: websocket[crlf]Connection: Keep-Alive[crlf]User-Agent: [ua][crlf][crlf]`\n━━━━━━━━━━━━━━━━━━━━\n"
+                        f"Payload WS ENHANCED: `PATCH / HTTP/1.1[crlf]Host: [host][crlf]Host: ISI_BUG_DISINI[crlf]Connection: Upgrade[crlf]User-Agent: [ua][crlf]Upgrade: websocket[crlf][crlf]`\n━━━━━━━━━━━━━━━━━━━━\n"
+                        f"Expired on: {dt_str} WIB"
                     )
                     found = True
                     break
@@ -650,13 +643,11 @@ def detail_ssh():
 @app.route('/user_legend/trial-ssh', methods=['POST'])
 def trial_ssh():
     data = request.json or {}
-    
     exp_min = 60 
     limit_ip = int(data.get('limit_ip', 1))
     
     rand_char = random.choice(string.ascii_lowercase)
     user = f"trialsrp-{datetime.datetime.now().strftime('%H%M%S')}{rand_char}"
-    
     password = "1"
     
     dt = datetime.datetime.now() + datetime.timedelta(minutes=exp_min)
@@ -669,18 +660,23 @@ def trial_ssh():
     with open(SSH_LIMIT, 'a') as f: f.write(f"{user} {limit_ip}\n")
     
     msg_cli = (
-        f"━━━━━━━━━━━━━━━━━━━━\n❖ TRIAL SSH & OVPN ❖\n━━━━━━━━━━━━━━━━━━━━\n"
-        f"Username : {user}\nPassword : {password}\n"
-        f"Domain : {DOMAIN}\nIP : {IP_ADD}\n━━━━━━━━━━━━━━━━━━━━\n"
-        f"Limit IP : {limit_ip} IP\n━━━━━━━━━━━━━━━━━━━━\n"
-        f"EXPIRED ON : {exp_date} {exp_time} WIB"
+        f"Akun Trial Dibuat!\n\n━━━━━━━━━━━━━━━━━━━━\nINFORMASI TRIAL\nSSH & OVPN ACCOUNT\n━━━━━━━━━━━━━━━━━━━━\n"
+        f"IP-Address: {IP_ADD}\nHostname: {DOMAIN}\nUsername: {user}\nPassword: {password}\nLimit IP: {limit_ip} IP\n━━━━━━━━━━━━━━━━━━━━\n"
+        f"Port OpenSSH: 22\nPort Dropbear: 109, 143\nPort SSH WS HTTPS (TLS): 443\nPort SSH WS HTTP (NTLS): 80\nPort BadVPN/UDPGW: 7100, 7200, 7300\n━━━━━━━━━━━━━━━━━━━━\n"
+        f"OPENVPN TCP (1194): http://{DOMAIN}/ovpn/tcp.ovpn\nOPENVPN UDP (2200): http://{DOMAIN}/ovpn/udp.ovpn\n━━━━━━━━━━━━━━━━━━━━\n"
+        f"Payload SSH WS: GET /sshws HTTP/1.1[crlf]Host: {DOMAIN}[crlf]Upgrade: websocket[crlf]Connection: Keep-Alive[crlf]User-Agent: [ua][crlf][crlf]\n━━━━━━━━━━━━━━━━━━━━\n"
+        f"Payload WS ENHANCED: PATCH / HTTP/1.1[crlf]Host: [host][crlf]Host: ISI_BUG_DISINI[crlf]Connection: Upgrade[crlf]User-Agent: [ua][crlf]Upgrade: websocket[crlf][crlf]\n━━━━━━━━━━━━━━━━━━━━\n"
+        f"Expired on: {exp_date} {exp_time} WIB (60 Menit)"
     )
+    
     msg_tg = (
-        f"━━━━━━━━━━━━━━━━━━━━\n❖ TRIAL SSH & OVPN ❖\n━━━━━━━━━━━━━━━━━━━━\n"
-        f"Username : `{user}`\nPassword : `{password}`\n"
-        f"Domain : {DOMAIN}\nIP : {IP_ADD}\n━━━━━━━━━━━━━━━━━━━━\n"
-        f"Limit IP : {limit_ip} IP\n━━━━━━━━━━━━━━━━━━━━\n"
-        f"EXPIRED ON : {exp_date} {exp_time} WIB"
+        f"Akun Trial Dibuat!\n\n━━━━━━━━━━━━━━━━━━━━\nINFORMASI TRIAL\nSSH & OVPN ACCOUNT\n━━━━━━━━━━━━━━━━━━━━\n"
+        f"IP-Address: {IP_ADD}\nHostname: {DOMAIN}\nUsername: `{user}`\nPassword: `{password}`\nLimit IP: {limit_ip} IP\n━━━━━━━━━━━━━━━━━━━━\n"
+        f"Port OpenSSH: 22\nPort Dropbear: 109, 143\nPort SSH WS HTTPS (TLS): 443\nPort SSH WS HTTP (NTLS): 80\nPort BadVPN/UDPGW: 7100, 7200, 7300\n━━━━━━━━━━━━━━━━━━━━\n"
+        f"OPENVPN TCP (1194): `http://{DOMAIN}/ovpn/tcp.ovpn`\nOPENVPN UDP (2200): `http://{DOMAIN}/ovpn/udp.ovpn`\n━━━━━━━━━━━━━━━━━━━━\n"
+        f"Payload SSH WS: `GET /sshws HTTP/1.1[crlf]Host: {DOMAIN}[crlf]Upgrade: websocket[crlf]Connection: Keep-Alive[crlf]User-Agent: [ua][crlf][crlf]`\n━━━━━━━━━━━━━━━━━━━━\n"
+        f"Payload WS ENHANCED: `PATCH / HTTP/1.1[crlf]Host: [host][crlf]Host: ISI_BUG_DISINI[crlf]Connection: Upgrade[crlf]User-Agent: [ua][crlf]Upgrade: websocket[crlf][crlf]`\n━━━━━━━━━━━━━━━━━━━━\n"
+        f"Expired on: {exp_date} {exp_time} WIB (60 Menit)"
     )
     send_telegram(msg_tg)
     return jsonify({"stdout": msg_cli, "stdout_tg": msg_tg})
@@ -694,7 +690,6 @@ def add_l2tp():
     user, password, exp = data.get('user'), data.get('password', '123'), int(data.get('exp', 30))
     if not user: return jsonify({"stdout": "Error: User required"}), 400
     
-    # Cek dan Auto-increment nama user
     original_user = user
     counter = 2
     def is_l2tp_user(u):
@@ -759,11 +754,9 @@ def renew_l2tp():
                 if line.startswith(user + " "):
                     parts = line.strip().split()
                     pw = parts[1] if len(parts) > 1 else "123"
-                    
                     now = datetime.datetime.now()
                     try:
                         curr_dt = datetime.datetime.strptime(f"{parts[2]} {parts[3]}", '%Y-%m-%d %H:%M:%S')
-                        # Akumulasi jika belum expired, mulai dari 'now' jika sudah expired
                         if curr_dt > now:
                             dt = curr_dt + datetime.timedelta(days=exp)
                         else:
@@ -815,7 +808,7 @@ def trial_l2tp():
     return jsonify({"stdout": "L2TP Trial created (Demo via API)"})
 
 # ==========================================
-# LOCK ENDPOINTS (AUTOKILL)
+# LOCK & UTILITY ENDPOINTS
 # ==========================================
 @app.route('/user_legend/lock-ssh', methods=['POST'])
 def lock_ssh():
@@ -827,7 +820,6 @@ def lock_ssh():
 def lock_xray():
     user = (request.json or {}).get('user') if request.method == 'POST' else request.args.get('user')
     if not user and request.json: user = request.json.get('user')
-    
     if user:
         locked = {}
         if os.path.exists(LOCKED_FILE):
@@ -843,6 +835,9 @@ def cek_xray():
     out = subprocess.run(['systemctl', 'is-active', 'xray'], capture_output=True, text=True).stdout.strip()
     return jsonify({"stdout": f"Xray status: {out}, Domain: {DOMAIN}"})
 
+# ==========================================
+# CHANGE UUID API (WITH AUTO TELEGRAM NOTIF)
+# ==========================================
 @app.route('/user_legend/change-uuid', methods=['POST'])
 def change_uuid():
     data = request.json or {}
@@ -852,22 +847,62 @@ def change_uuid():
     
     cfg = load_json(XRAY_CONF)
     found = False
+    target_user = None
+    target_protocol = None
+    
     for ib in cfg.get('inbounds', []):
         if ib.get('protocol') in ['vmess', 'vless']:
             for c in ib['settings'].get('clients', []):
                 if c.get('id') == old_uuid:
                     c['id'] = new_uuid
+                    target_user = c.get('email')
+                    target_protocol = ib.get('protocol')
                     found = True
         elif ib.get('protocol') == 'trojan':
             for c in ib['settings'].get('clients', []):
                 if c.get('password') == old_uuid:
                     c['password'] = new_uuid
+                    target_user = c.get('email')
+                    target_protocol = ib.get('protocol')
                     found = True
                     
     if found:
         save_json(XRAY_CONF, cfg)
         restart_xray()
-        return jsonify({"stdout": f"✅ UUID berhasil diganti menjadi {new_uuid}."})
+        
+        # Ambil masa aktif dan limit
+        exp_date_str = "Lifetime / No Exp"
+        if os.path.exists(EXP_FILE):
+            with open(EXP_FILE, 'r') as f:
+                for line in f:
+                    if line.startswith(target_user + ' '):
+                        exp_date_str = line.strip().split(' ', 1)[1]
+                        break
+                        
+        limit_ip, limit_quota = 0, 0
+        if os.path.exists(LIMIT_FILE):
+            with open(LIMIT_FILE, 'r') as f:
+                for line in f:
+                    if line.startswith(target_user + ' '):
+                        p = line.strip().split()
+                        if len(p) >= 3:
+                            limit_ip, limit_quota = int(p[1]), int(p[2])
+                        break
+                        
+        # Ekstrak notifikasi detail menggunakan fungsi generate_account_detail yang sudah ada
+        msg_cli, msg_tg = generate_account_detail(target_protocol, target_user, new_uuid, exp_date_str, False, limit_ip, limit_quota)
+        
+        # Ganti Judul agar menjadi penanda bahwa ini adalah (UPDATE)
+        msg_tg = msg_tg.replace(f"❖ XRAY/{target_protocol.upper()} WS ❖", f"❖ XRAY/{target_protocol.upper()} WS (UPDATE) ❖")
+        
+        # Trigger Notifikasi Telegram
+        send_telegram(msg_tg)
+        
+        return jsonify({
+            "stdout": f"✅ UUID untuk akun '{target_user}' berhasil diganti menjadi {new_uuid}.",
+            "stdout_tg": msg_tg
+        })
+        
     return jsonify({"stdout": f"❌ UUID lama '{old_uuid}' tidak ditemukan di sistem."})
 
 if __name__ == '__main__':
