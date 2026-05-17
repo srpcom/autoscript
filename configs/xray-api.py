@@ -93,13 +93,15 @@ def restart_l2tp(): subprocess.run(['systemctl', 'restart', 'ipsec', 'xl2tpd'])
 
 def send_telegram(text):
     try:
-        bot_token, admin_id, autosend = "", "", "OFF"
-        if os.path.exists('/usr/local/etc/xray/bot_admin.conf'):
-            with open('/usr/local/etc/xray/bot_admin.conf', 'r') as f:
+        bot_token, notif_chat_id, autosend = "", "", "OFF"
+        
+        # PERUBAHAN: Membaca dari bot_notif.conf untuk pengiriman pesan searah (Push Notif)
+        if os.path.exists('/usr/local/etc/xray/bot_notif.conf'):
+            with open('/usr/local/etc/xray/bot_notif.conf', 'r') as f:
                 for line in f:
                     line = line.strip()
-                    if line.startswith('BOT_TOKEN='): bot_token = line.split('=', 1)[1].strip('"').strip("'")
-                    elif line.startswith('ADMIN_ID='): admin_id = line.split('=', 1)[1].strip('"').strip("'")
+                    if line.startswith('NOTIF_BOT_TOKEN='): bot_token = line.split('=', 1)[1].strip('"').strip("'")
+                    elif line.startswith('NOTIF_CHAT_ID='): notif_chat_id = line.split('=', 1)[1].strip('"').strip("'")
         
         if os.path.exists(BOT_CONF):
             with open(BOT_CONF, 'r') as f:
@@ -107,9 +109,9 @@ def send_telegram(text):
                     line = line.strip()
                     if line.startswith('AUTOSEND_STATUS='): autosend = line.split('=', 1)[1].strip('"').strip("'")
 
-        if autosend == "ON" and bot_token and admin_id:
+        if autosend == "ON" and bot_token and notif_chat_id:
             url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
-            payload = {"chat_id": admin_id, "text": text, "parse_mode": "Markdown"}
+            payload = {"chat_id": notif_chat_id, "text": text, "parse_mode": "Markdown"}
             req = urllib.request.Request(url, data=json.dumps(payload).encode('utf-8'), headers={'Content-Type': 'application/json'})
             urllib.request.urlopen(req, timeout=5)
     except: pass
