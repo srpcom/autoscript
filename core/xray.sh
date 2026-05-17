@@ -522,6 +522,19 @@ change_protocol_uuid() {
     if [[ "$acc_opt" == "0" ]]; then menu_change_uuid; return
     elif [[ "$acc_opt" -gt 0 && "$acc_opt" -le "${#users[@]}" ]]; then
         selected_user="${users[$((acc_opt-1))]}"
+        
+        # --- PERUBAHAN: Menampilkan Username dan Old UUID ---
+        echo "$selected_user"
+        
+        if [[ "$prot" == "vmess" || "$prot" == "vless" ]]; then
+            old_uuid=$(jq -r '.inbounds[] | select(.protocol=="'$prot'") | .settings.clients[] | select(.email=="'$selected_user'") | .id' /usr/local/etc/xray/config.json 2>/dev/null)
+        elif [[ "$prot" == "trojan" ]]; then
+            old_uuid=$(jq -r '.inbounds[] | select(.protocol=="'$prot'") | .settings.clients[] | select(.email=="'$selected_user'") | .password' /usr/local/etc/xray/config.json 2>/dev/null)
+        fi
+        
+        echo "old UUID : $old_uuid"
+        # ----------------------------------------------------
+        
         read -p "New UUID/Pass (Kosong = Auto): " new_uuid
         if [ -z "$new_uuid" ]; then new_uuid=$(uuidgen); fi
         
