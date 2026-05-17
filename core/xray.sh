@@ -549,6 +549,28 @@ change_protocol_uuid() {
             systemctl restart xray
             echo -e "\n=> UUID/Pass '$selected_user' diganti!"
             sleep 2
+            
+            # --- START TELEGRAM AUTOSEND LOGIC ---
+            if [[ "$prot" == "vmess" ]]; then
+                tls_json="{\"v\":\"2\",\"ps\":\"${selected_user}\",\"add\":\"${DOMAIN}\",\"port\":\"443\",\"id\":\"${new_uuid}\",\"aid\":\"0\",\"scy\":\"auto\",\"net\":\"ws\",\"type\":\"none\",\"host\":\"${DOMAIN}\",\"path\":\"/vmessws\",\"tls\":\"tls\",\"sni\":\"${DOMAIN}\"}"
+                none_tls_json="{\"v\":\"2\",\"ps\":\"${selected_user}\",\"add\":\"${DOMAIN}\",\"port\":\"80\",\"id\":\"${new_uuid}\",\"aid\":\"0\",\"scy\":\"auto\",\"net\":\"ws\",\"type\":\"none\",\"host\":\"${DOMAIN}\",\"path\":\"/vmessws\",\"tls\":\"\",\"sni\":\"\"}"
+                link_tls="vmess://$(echo -n "$tls_json" | jq -c . | base64 -w 0)"
+                link_none_tls="vmess://$(echo -n "$none_tls_json" | jq -c . | base64 -w 0)"
+            elif [[ "$prot" == "vless" ]]; then
+                link_tls="vless://${new_uuid}@${DOMAIN}:443?path=/vlessws&security=tls&encryption=none&host=${DOMAIN}&type=ws&sni=${DOMAIN}#${selected_user}"
+                link_none_tls="vless://${new_uuid}@${DOMAIN}:80?path=/vlessws&security=none&encryption=none&host=${DOMAIN}&type=ws#${selected_user}"
+            elif [[ "$prot" == "trojan" ]]; then
+                link_tls="trojan://${new_uuid}@${DOMAIN}:443?path=/trojanws&security=tls&host=${DOMAIN}&type=ws&sni=${DOMAIN}#${selected_user}"
+                link_none_tls="trojan://${new_uuid}@${DOMAIN}:80?path=/trojanws&security=none&host=${DOMAIN}&type=ws#${selected_user}"
+            fi
+
+            exp_date=$(grep "^$selected_user " /usr/local/etc/xray/expiry.txt | cut -d' ' -f2-)
+            if [ -z "$exp_date" ]; then exp_date="Lifetime / No Exp"; else exp_date="$exp_date WIB"; fi
+
+            msg_tg=$(echo -e "━━━━━━━━━━━━━━━━━━━━\n❖ XRAY/${prot^^} WS (UPDATE) ❖\n━━━━━━━━━━━━━━━━━━━━\nRemarks : \`${selected_user}\`\nIP Address : ${IP_ADD}\nDomain : ${DOMAIN}\nPort TLS : 443\nPort NONE-TLS : 80\nID/Password : \`${new_uuid}\`\nNetwork : Websocket\nWebsocket Path : /${prot}ws\n━━━━━━━━━━━━━━━━━━━━\nLINK WS TLS : \`${link_tls}\`\n━━━━━━━━━━━━━━━━━━━━\nLINK WS NONE-TLS : \`${link_none_tls}\`\n━━━━━━━━━━━━━━━━━━━━\nEXPIRED ON : ${exp_date}")
+            send_telegram "$msg_tg"
+            # --- END TELEGRAM AUTOSEND LOGIC ---
+            
             show_detail "$prot" "$selected_user" "change_uuid"
         else
             echo -e "\n\e[31m[ERROR]\e[0m Gagal memproses JSON."
