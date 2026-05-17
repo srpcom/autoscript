@@ -193,6 +193,12 @@ renew_ssh() {
         
         echo -e "\n\e[32m=> Akun SSH '$user' diperpanjang $masaaktif Hari!\e[0m"
         echo "=> Expired Baru: $new_exp_date $new_exp_time WIB"
+        
+        # --- TELEGRAM NOTIF RENEW ---
+        msg_tg=$(echo -e "🕑 Akun Diperpanjang\n\n💻 Server: ${DOMAIN}\nType : SSH & OVPN\n🔑 Akun: \`${user}\`\n⏳ Durasi: +${masaaktif} hari\n📅 Expired Baru: ${new_exp_date} ${new_exp_time} WIB")
+        send_telegram "$msg_tg"
+        # ----------------------------
+        
         sleep 2
     else
         echo -e "\n=> Pilihan tidak valid!"; sleep 1; renew_ssh
