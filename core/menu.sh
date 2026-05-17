@@ -3,10 +3,10 @@
 # menu.sh
 # MODULE: MAIN MENU (ROUTER)
 # Menampilkan antarmuka CLI utama dan perutean menu
-# Versi : 1.5 (Fitur: API Auth & Web Panel Update)
+# Versi : 1.5 (Fitur: Dual Bot Architecture)
 # ==========================================
 
-SCRIPT_VERSION="1.5 (1705 1009)"
+SCRIPT_VERSION="1.5 (Dual Bot Arch)"
 
 source /usr/local/etc/srpcom/env.conf 2>/dev/null
 source /usr/local/bin/srpcom/utils.sh 2>/dev/null
@@ -132,6 +132,7 @@ EOFSC
     build_sc "set-sni" "menu_extra_domain"
     build_sc "set-apikey" "menu_api_key"
     build_sc "set-bot" "menu_bot_admin"
+    build_sc "set-notif" "menu_bot_notif"
     build_sc "set-node" "menu_node_server"
     build_sc "set-autokill" "menu_autokill"
     build_sc "set-autoexp" "menu_auto_expired"
@@ -183,7 +184,8 @@ echo " set-domain  : Ganti domain VPS"
 echo " set-sni     : Manajemen Bug/SNI"
 echo " set-apikey  : Ganti API Key Node"
 echo " set-node    : Manajemen Bot Master"
-echo " set-bot     : Setting Telegram Bot"
+echo " set-bot     : Setting Telegram Bot Admin"
+echo " set-notif   : Setting Telegram Bot Notif"
 echo " set-autokill: Daemon Auto-Kill"
 echo " set-autoexp : Daemon Auto-Expired"
 echo " set-banner  : Rubah Banner SSH/VPN"
@@ -424,6 +426,46 @@ EOF
                 fi
                 ;;
             3) systemctl stop srpcom-bot; echo -e "\n=> Bot dihentikan!"; sleep 2 ;;
+            0|x|X) break ;;
+            *) echo -e "\n=> Pilihan tidak valid!"; sleep 1 ;;
+        esac
+    done
+}
+
+menu_bot_notif() {
+    while true; do
+        clear
+        echo "======================================"
+        echo "     SETTING TELEGRAM NOTIF BOT       "
+        echo "======================================"
+        local notif_token=$(grep "^NOTIF_BOT_TOKEN=" /usr/local/etc/xray/bot_notif.conf 2>/dev/null | cut -d'=' -f2 | tr -d '"')
+        local notif_id=$(grep "^NOTIF_CHAT_ID=" /usr/local/etc/xray/bot_notif.conf 2>/dev/null | cut -d'=' -f2 | tr -d '"')
+        
+        echo "Bot ini khusus untuk Push Notif Akun & Backup."
+        echo "Mendukung ID Channel/Grup (Angka Negatif)."
+        echo "--------------------------------------"
+        echo "Token Notif : ${notif_token:-Belum disetting}"
+        echo "Chat/Grup ID: ${notif_id:-Belum disetting}"
+        echo "======================================"
+        echo " 1. Ubah Token & ID Bot Notifikasi"
+        echo " 0. Kembali"
+        echo "======================================"
+        read -p " Pilih opsi [0-1]: " opt
+        case $opt in
+            1)
+                echo ""
+                read -p "Masukkan TOKEN BOT NOTIFIKASI : " new_token
+                read -p "Masukkan CHAT/GRUP ID TUJUAN  : " new_id
+                if [[ -n "$new_token" && -n "$new_id" ]]; then
+                    cat > /usr/local/etc/xray/bot_notif.conf << EOF
+NOTIF_BOT_TOKEN="$new_token"
+NOTIF_CHAT_ID="$new_id"
+EOF
+                    echo -e "\n\e[32m=> Bot Notifikasi berhasil disetting!\e[0m"; sleep 2
+                else
+                    echo -e "\n=> Token/ID tidak boleh kosong!"; sleep 2
+                fi
+                ;;
             0|x|X) break ;;
             *) echo -e "\n=> Pilihan tidak valid!"; sleep 1 ;;
         esac
@@ -759,7 +801,6 @@ change_banner() {
         case $opt in
             1)
                 echo -e "\n=> Menerapkan Template TUBAN.STORE..."
-                # Tidak menggunakan kutip tunggal pada EOF agar variabel bash terbaca
                 cat > /etc/issue.net << EOF
 <font color="#00FF00">======================================</font><br>
 <font color="#00FFFF"><b>WELCOME TO SRPCOM SCRIPT</b></font><br>
@@ -789,14 +830,12 @@ EOF
 
     echo -e "\n=> Mengonfigurasi Dropbear & OpenSSH..."
     
-    # Dropbear config integration
     if grep -q "^DROPBEAR_BANNER=" /etc/default/dropbear 2>/dev/null; then
         sed -i 's|^DROPBEAR_BANNER=.*|DROPBEAR_BANNER="/etc/issue.net"|g' /etc/default/dropbear
     else
         echo 'DROPBEAR_BANNER="/etc/issue.net"' >> /etc/default/dropbear
     fi
     
-    # OpenSSH config integration
     if grep -q "^Banner" /etc/ssh/sshd_config 2>/dev/null; then
         sed -i 's|^Banner.*|Banner /etc/issue.net|g' /etc/ssh/sshd_config
     elif grep -q "^#Banner" /etc/ssh/sshd_config 2>/dev/null; then
@@ -872,7 +911,6 @@ restore_data() {
     mkdir -p /tmp/restore_temp
     tar -xzf /tmp/backup-ready.tar.gz -C /tmp/restore_temp 2>/dev/null
     
-    # VALIDASI TANDA PENGENAL (SIGNATURE)
     if [ "$(cat /tmp/restore_temp/usr/local/etc/srpcom/backup_sign.txt 2>/dev/null)" != "SRPCOM_V5_VALID" ]; then
         echo -e "\n\e[31m[ERROR]\e[0m Validasi Gagal! File ini bukan file backup resmi dari sistem SRPCOM V5."
         rm -rf /tmp/restore_temp "$target_file" /tmp/backup-ready.tar.gz
@@ -938,7 +976,6 @@ menu_api_key() {
         current_key=$(cat /usr/local/etc/xray/api_key.conf 2>/dev/null)
         auth_status=$(cat /usr/local/etc/xray/api_auth.conf 2>/dev/null)
 
-        # Jika file belum ada, anggap OFF
         if [[ -z "$auth_status" ]]; then auth_status="OFF"; fi
 
         if [[ "$auth_status" == "ON" ]]; then
@@ -967,7 +1004,6 @@ menu_api_key() {
                     echo "ON" > /usr/local/etc/xray/api_auth.conf
                     echo -e "\n=> API Authentication DIAKTIFKAN!"
                 fi
-                # Restart API agar langsung membaca status baru
                 systemctl restart xray-api
                 sleep 2
                 ;;
@@ -1055,13 +1091,14 @@ menu_settings() {
         echo " 7. Setting Auto-Kill"
         echo " 8. Setting Auto-Expired"
         echo " 9. Setting Telegram Admin Bot"
-        echo " 10. Manajemen Bug / SNI"
-        echo " 11. Manajemen Node Server"
-        echo " 12. Rubah Banner Login SSH/VPN"
+        echo " 10. Setting Telegram Notif Bot"
+        echo " 11. Manajemen Bug / SNI"
+        echo " 12. Manajemen Node Server"
+        echo " 13. Rubah Banner Login SSH/VPN"
         echo "--------------------------------------"
         echo " 0/x. Kembali ke Menu Utama"
         echo "======================================"
-        read -p " Pilih opsi [0-12 or x]: " opt
+        read -p " Pilih opsi [0-13 or x]: " opt
         case $opt in
             1) menu_autobackup ;;
             2) menu_autosend ;;
@@ -1072,9 +1109,10 @@ menu_settings() {
             7) menu_autokill ;;
             8) menu_auto_expired ;;
             9) menu_bot_admin ;;
-            10) menu_extra_domain ;;
-            11) menu_node_server ;;
-            12) change_banner ;;
+            10) menu_bot_notif ;;
+            11) menu_extra_domain ;;
+            12) menu_node_server ;;
+            13) change_banner ;;
             0|x|X) break ;;
             *) echo "Pilihan tidak valid!"; sleep 1 ;;
         esac
