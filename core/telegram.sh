@@ -13,9 +13,9 @@ source /usr/local/etc/srpcom/env.conf
 send_telegram() {
     local msg="$1"
     
-    # Ambil Token dan ID dari file bot_admin (Disetting dari Menu 9)
-    local token=$(grep "^BOT_TOKEN=" /usr/local/etc/xray/bot_admin.conf 2>/dev/null | cut -d'=' -f2 | tr -d '"' | tr -d "'")
-    local chat_id=$(grep "^ADMIN_ID=" /usr/local/etc/xray/bot_admin.conf 2>/dev/null | cut -d'=' -f2 | tr -d '"' | tr -d "'")
+    # PERUBAHAN: Mengambil Token dan ID dari file bot_notif (Disetting dari Menu 10)
+    local token=$(grep "^NOTIF_BOT_TOKEN=" /usr/local/etc/xray/bot_notif.conf 2>/dev/null | cut -d'=' -f2 | tr -d '"' | tr -d "'")
+    local chat_id=$(grep "^NOTIF_CHAT_ID=" /usr/local/etc/xray/bot_notif.conf 2>/dev/null | cut -d'=' -f2 | tr -d '"' | tr -d "'")
     
     # Cek status izin pengiriman (Autosend)
     local autosend=$(grep "^AUTOSEND_STATUS=" /usr/local/etc/xray/bot_setting.conf 2>/dev/null | cut -d'=' -f2 | tr -d '"' | tr -d "'")
@@ -33,8 +33,9 @@ send_telegram() {
 # FUNGSI BACKUP (DIPANGGIL DARI CRONJOB)
 # ==========================================
 run_autobackup() {
-    local token=$(grep "^BOT_TOKEN=" /usr/local/etc/xray/bot_admin.conf 2>/dev/null | cut -d'=' -f2 | tr -d '"' | tr -d "'")
-    local chat_id=$(grep "^ADMIN_ID=" /usr/local/etc/xray/bot_admin.conf 2>/dev/null | cut -d'=' -f2 | tr -d '"' | tr -d "'")
+    # PERUBAHAN: Mengambil Token dan ID dari file bot_notif
+    local token=$(grep "^NOTIF_BOT_TOKEN=" /usr/local/etc/xray/bot_notif.conf 2>/dev/null | cut -d'=' -f2 | tr -d '"' | tr -d "'")
+    local chat_id=$(grep "^NOTIF_CHAT_ID=" /usr/local/etc/xray/bot_notif.conf 2>/dev/null | cut -d'=' -f2 | tr -d '"' | tr -d "'")
     
     local send_tg=true
     if [[ -z "$token" || -z "$chat_id" ]]; then send_tg=false; fi
@@ -44,29 +45,22 @@ run_autobackup() {
     local enc_backup="/tmp/srpcom-backup-latest.tar.gz.enc"
     local final_local="/root/srpcom-backup-${date_str}.tar.gz.enc"
     
-    # 1. Gunakan Password Hardcode Superadmin
     local BACKUP_PASS="Suruan646$"
     
-    # 2. Buat Tanda Pengenal Backup SRPCOM V5
     echo "SRPCOM_V5_VALID" > /usr/local/etc/srpcom/backup_sign.txt
     
-    # Mengompresi HANYA file database akun (Xray, SSH, L2TP) tanpa settingan sistem
     local valid_files="/usr/local/etc/srpcom/backup_sign.txt"
     for f in /usr/local/etc/xray/config.json /usr/local/etc/xray/expiry.txt /usr/local/etc/xray/limit.txt /usr/local/etc/srpcom/l2tp_expiry.txt /usr/local/etc/srpcom/ssh_expiry.txt /usr/local/etc/srpcom/ssh_limit.txt /etc/ppp/chap-secrets; do
         if [ -f "$f" ]; then valid_files="$valid_files $f"; fi
     done
     tar -czf "$tmp_backup" $valid_files 2>/dev/null
     
-    # Enkripsi dengan AES-256
     openssl enc -aes-256-cbc -salt -in "$tmp_backup" -out "$enc_backup" -pass pass:"$BACKUP_PASS" -pbkdf2
     
-    # Eksekusi 3 Jalur
-    # Jalur 1: Local VPS
     rm -f /root/srpcom-backup-*.tar.gz.enc
     cp "$enc_backup" "$final_local"
     local stat_local="✅ Sukses"
 
-    # Jalur 2: Bashupload
     local bashupload_res=$(curl -s -H "X-Expiration-Seconds: 86400" -T "$enc_backup" bashupload.app)
     local bashupload_link=$(echo "$bashupload_res" | grep -oE 'https?://[a-zA-Z0-9./?=_-]+' | head -n 1)
     local stat_cloud="❌ Gagal"
@@ -75,7 +69,6 @@ run_autobackup() {
     local stat_tg="❌ Dilewati"
     if [[ "$send_tg" == true ]]; then stat_tg="✅ Sukses"; fi
     
-    # MENGGUNAKAN FORMAT HTML AGAR UNDERSCORE (_) PADA NAMA FILE TIDAK ERROR
     local caption="📦 <b>AUTO BACKUP HARIAN</b>
 🔒 Status Enkripsi: AMAN (Password Protected)
 ━━━━━━━━━━━━━━━━━━━━
@@ -90,7 +83,6 @@ Tanggal : $(date +"%Y-%m-%d %H:%M:%S")
 ━━━━━━━━━━━━━━━━━━━━"
     
     if [[ "$send_tg" == true ]]; then
-        # Mengirim file ke Telegram dengan parse_mode HTML
         curl -s -X POST "https://api.telegram.org/bot${token}/sendDocument" \
             -F chat_id="${chat_id}" \
             -F document=@"${enc_backup}" \
@@ -109,12 +101,13 @@ manual_backup_telegram() {
     echo "======================================"
     echo "             BACKUP DATA              "
     echo "======================================"
-    local token=$(grep "^BOT_TOKEN=" /usr/local/etc/xray/bot_admin.conf 2>/dev/null | cut -d'=' -f2 | tr -d '"' | tr -d "'")
-    local chat_id=$(grep "^ADMIN_ID=" /usr/local/etc/xray/bot_admin.conf 2>/dev/null | cut -d'=' -f2 | tr -d '"' | tr -d "'")
+    # PERUBAHAN: Mengambil Token dan ID dari file bot_notif
+    local token=$(grep "^NOTIF_BOT_TOKEN=" /usr/local/etc/xray/bot_notif.conf 2>/dev/null | cut -d'=' -f2 | tr -d '"' | tr -d "'")
+    local chat_id=$(grep "^NOTIF_CHAT_ID=" /usr/local/etc/xray/bot_notif.conf 2>/dev/null | cut -d'=' -f2 | tr -d '"' | tr -d "'")
     
     local send_tg=true
     if [[ -z "$token" || -z "$chat_id" ]]; then
-        echo -e "\e[33m[WARNING]\e[0m Bot Token atau Admin ID belum disetting! Notifikasi Telegram akan dilewati."
+        echo -e "\e[33m[WARNING]\e[0m Token Bot Notif atau Chat ID belum disetting! Notifikasi Telegram akan dilewati."
         send_tg=false
     fi
     
@@ -124,44 +117,34 @@ manual_backup_telegram() {
     local enc_backup="/tmp/srpcom-backup-latest.tar.gz.enc"
     local final_local="/root/srpcom-backup-${date_str}.tar.gz.enc"
     
-    # 1. Gunakan Password Hardcode Superadmin
     local BACKUP_PASS="Suruan646$"
     
-    # 2. Buat Tanda Pengenal Backup SRPCOM V5
     echo "SRPCOM_V5_VALID" > /usr/local/etc/srpcom/backup_sign.txt
     
-    # Mengompresi HANYA file database akun (Xray, SSH, L2TP) tanpa settingan sistem
     local valid_files="/usr/local/etc/srpcom/backup_sign.txt"
     for f in /usr/local/etc/xray/config.json /usr/local/etc/xray/expiry.txt /usr/local/etc/xray/limit.txt /usr/local/etc/srpcom/l2tp_expiry.txt /usr/local/etc/srpcom/ssh_expiry.txt /usr/local/etc/srpcom/ssh_limit.txt /etc/ppp/chap-secrets; do
         if [ -f "$f" ]; then valid_files="$valid_files $f"; fi
     done
     tar -czf "$tmp_backup" $valid_files 2>/dev/null
     
-    # Enkripsi dengan AES-256
     openssl enc -aes-256-cbc -salt -in "$tmp_backup" -out "$enc_backup" -pass pass:"$BACKUP_PASS" -pbkdf2
     
-    # Eksekusi 3 Jalur
-    # Jalur 1: Local VPS
     rm -f /root/srpcom-backup-*.tar.gz.enc
     cp "$enc_backup" "$final_local"
     local stat_local="✅ Sukses"
 
-    # Jalur 2: Bashupload
     echo "=> Mengunggah ke Cloud (Bashupload)..."
     local bashupload_res=$(curl -s -H "X-Expiration-Seconds: 86400" -T "$enc_backup" bashupload.app)
-    # Penyesuaian grep agar lebih kuat menangkap URL
     local bashupload_link=$(echo "$bashupload_res" | grep -oE 'https?://[a-zA-Z0-9./?=_-]+' | head -n 1)
     local stat_cloud="❌ Gagal"
     if [ -n "$bashupload_link" ]; then stat_cloud="✅ Sukses"; fi
     
-    # Tampilkan status local dan cloud terlebih dahulu agar selalu muncul
     echo -e "\n\e[32m[SUCCESS]\e[0m Backup berhasil diproses ke VPS dan Cloud."
     echo -e "Link bash upload : ${bashupload_link:-Gagal mendapatkan link bashupload}"
     
     local stat_tg="❌ Dilewati"
     if [[ "$send_tg" == true ]]; then stat_tg="✅ Sukses"; fi
     
-    # MENGGUNAKAN FORMAT HTML AGAR UNDERSCORE (_) PADA NAMA FILE TIDAK ERROR
     local caption="📦 <b>MANUAL BACKUP VPS</b>
 🔒 Status Enkripsi: AMAN (Password Protected)
 ━━━━━━━━━━━━━━━━━━━━
@@ -176,7 +159,7 @@ Tanggal : $(date +"%Y-%m-%d %H:%M:%S")
 ━━━━━━━━━━━━━━━━━━━━"
     
     if [[ "$send_tg" == true ]]; then
-        echo -e "\n=> Mengirim file ke Telegram Anda..."
+        echo -e "\n=> Mengirim file ke Telegram Bot Notifikasi Anda..."
         res=$(curl -s -X POST "https://api.telegram.org/bot${token}/sendDocument" \
             -F chat_id="${chat_id}" \
             -F document=@"${enc_backup}" \
@@ -184,13 +167,11 @@ Tanggal : $(date +"%Y-%m-%d %H:%M:%S")
             -F parse_mode="HTML")
             
         if echo "$res" | grep -q '"ok":true'; then
-            echo -e "\e[32m[SUCCESS]\e[0m Laporan Backup berhasil dikirim ke Bot Telegram Anda!"
+            echo -e "\e[32m[SUCCESS]\e[0m Laporan Backup berhasil dikirim!"
         else
-            # Mengekstrak alasan kegagalan langsung dari API Telegram
             local err_desc=$(echo "$res" | grep -o '"description":"[^"]*' | cut -d'"' -f4)
             echo -e "\e[31m[ERROR]\e[0m Gagal mengirim backup ke Telegram."
             echo -e "Alasan  : \e[33m${err_desc:-Token/ID tidak valid atau koneksi bermasalah}\e[0m"
-            echo "Pastikan Bot Token benar dan Anda sudah mengirim '/start' ke bot tersebut."
         fi
     fi
     
@@ -209,7 +190,6 @@ menu_autobackup() {
         
         if [[ "$status" == "ON" ]]; then 
             st="\e[32m[ ON ]\e[0m"
-            # Mengecek frekuensi dari file cron
             if grep -q "0 \*/12" /etc/cron.d/xray_autobackup 2>/dev/null; then freq_info="(Setiap 12 Jam / 2x Sehari)"
             elif grep -q "0 \*/6" /etc/cron.d/xray_autobackup 2>/dev/null; then freq_info="(Setiap 6 Jam / 4x Sehari)"
             elif grep -q "0 \*/4" /etc/cron.d/xray_autobackup 2>/dev/null; then freq_info="(Setiap 4 Jam / 6x Sehari)"
@@ -291,7 +271,7 @@ menu_autosend() {
         echo "Jika ON, setiap kali Anda membuat akun"
         echo "melalui terminal VPS (CLI) atau panel,"
         echo "detail link VPN akan otomatis terkirim"
-        echo "ke chat Telegram Admin."
+        echo "ke chat Telegram Notifikasi."
         echo "======================================"
         echo "1. Turn ON Auto Send Notif"
         echo "2. Turn OFF Auto Send Notif"
@@ -314,7 +294,6 @@ menu_autosend() {
 # ==========================================
 # CRONJOB TRIGGER HANDLER
 # ==========================================
-# Jika script ini dipanggil dengan parameter 'run_autobackup' dari crontab
 if [[ "$1" == "run_autobackup" ]]; then
     run_autobackup
     exit 0
