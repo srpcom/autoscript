@@ -58,11 +58,9 @@ def is_license_active():
 # ==========================================
 @app.before_request
 def enforce_security():
-    # Hanya lindungi rute API kita
     if not request.path.startswith('/user_legend/'):
         return
         
-    # 1. CEK STATUS API (ON/OFF)
     auth_status = "OFF"
     try:
         if os.path.exists(API_AUTH_FILE):
@@ -74,11 +72,9 @@ def enforce_security():
     if auth_status == "OFF":
         return jsonify({"stdout": "❌ AKSES DITOLAK: Fitur API Website sedang di-OFF-kan dari Terminal VPS. Akses Web Panel & Remote API diblokir."}), 403
         
-    # 2. CEK VALIDITAS API KEY
     if request.headers.get('x-api-key') != get_api_key():
         return jsonify({"stdout": "❌ Unauthorized: API Key tidak valid atau kosong."}), 401
         
-    # 3. CEK LISENSI UNTUK AKSI CRUD (MODIFIKASI DATA)
     if request.method in ['POST', 'DELETE']:
         mutating_paths = ['/add-', '/del-', '/renew-', '/trial-', '/lock-', '/change-uuid']
         if any(p in request.path for p in mutating_paths):
@@ -99,7 +95,6 @@ def send_telegram(text):
     try:
         bot_token, admin_id, autosend = "", "", "OFF"
         
-        # PERBAIKAN BUG: Ambil Token dan ID dari file yang benar
         if os.path.exists('/usr/local/etc/xray/bot_admin.conf'):
             with open('/usr/local/etc/xray/bot_admin.conf', 'r') as f:
                 for line in f:
@@ -107,7 +102,6 @@ def send_telegram(text):
                     if line.startswith('BOT_TOKEN='): bot_token = line.split('=', 1)[1].strip('"').strip("'")
                     elif line.startswith('ADMIN_ID='): admin_id = line.split('=', 1)[1].strip('"').strip("'")
         
-        # Ambil status Autosend
         if os.path.exists(BOT_CONF):
             with open(BOT_CONF, 'r') as f:
                 for line in f:
@@ -538,7 +532,7 @@ def add_ssh():
         f"IP-Address: {IP_ADD}\nHostname: {DOMAIN}\nUsername: {user}\nPassword: {password}\nLimit IP: {lim_str}\n━━━━━━━━━━━━━━━━━━━━\n"
         f"Port OpenSSH: 22\nPort Dropbear: 109, 143\nPort SSH WS HTTPS (TLS): 443\nPort SSH WS HTTP (NTLS): 80\nPort BadVPN/UDPGW: 7100, 7200, 7300\n━━━━━━━━━━━━━━━━━━━━\n"
         f"OPENVPN TCP (1194): http://{DOMAIN}/ovpn/tcp.ovpn\nOPENVPN UDP (2200): http://{DOMAIN}/ovpn/udp.ovpn\n━━━━━━━━━━━━━━━━━━━━\n"
-        f"Payload SSH WS: GET /sshws HTTP/1.1[crlf]Host: {DOMAIN}[crlf]Upgrade: websocket[crlf]Connection: Keep-Alive[crlf]User-Agent: [ua][crlf][crlf]\n━━━━━━━━━━━━━━━━━━━━\n"
+        f"Payload SSH WS: GET wss://{DOMAIN}/sshws HTTP/1.1[crlf]Host: {DOMAIN}[crlf]Upgrade: websocket[crlf]Connection: Upgrade[crlf]User-Agent: [ua][crlf][crlf]\n━━━━━━━━━━━━━━━━━━━━\n"
         f"Payload WS ENHANCED: PATCH / HTTP/1.1[crlf]Host: [host][crlf]Host: ISI_BUG_DISINI[crlf]Connection: Upgrade[crlf]User-Agent: [ua][crlf]Upgrade: websocket[crlf][crlf]\n━━━━━━━━━━━━━━━━━━━━\n"
         f"Expired on: {exp_date} {exp_time} WIB ({exp} Hari)"
     )
@@ -548,7 +542,7 @@ def add_ssh():
         f"IP-Address: {IP_ADD}\nHostname: {DOMAIN}\nUsername: `{user}`\nPassword: `{password}`\nLimit IP: {lim_str}\n━━━━━━━━━━━━━━━━━━━━\n"
         f"Port OpenSSH: 22\nPort Dropbear: 109, 143\nPort SSH WS HTTPS (TLS): 443\nPort SSH WS HTTP (NTLS): 80\nPort BadVPN/UDPGW: 7100, 7200, 7300\n━━━━━━━━━━━━━━━━━━━━\n"
         f"OPENVPN TCP (1194): `http://{DOMAIN}/ovpn/tcp.ovpn`\nOPENVPN UDP (2200): `http://{DOMAIN}/ovpn/udp.ovpn`\n━━━━━━━━━━━━━━━━━━━━\n"
-        f"Payload SSH WS: `GET /sshws HTTP/1.1[crlf]Host: {DOMAIN}[crlf]Upgrade: websocket[crlf]Connection: Keep-Alive[crlf]User-Agent: [ua][crlf][crlf]`\n━━━━━━━━━━━━━━━━━━━━\n"
+        f"Payload SSH WS: `GET wss://{DOMAIN}/sshws HTTP/1.1[crlf]Host: {DOMAIN}[crlf]Upgrade: websocket[crlf]Connection: Upgrade[crlf]User-Agent: [ua][crlf][crlf]`\n━━━━━━━━━━━━━━━━━━━━\n"
         f"Payload WS ENHANCED: `PATCH / HTTP/1.1[crlf]Host: [host][crlf]Host: ISI_BUG_DISINI[crlf]Connection: Upgrade[crlf]User-Agent: [ua][crlf]Upgrade: websocket[crlf][crlf]`\n━━━━━━━━━━━━━━━━━━━━\n"
         f"Expired on: {exp_date} {exp_time} WIB ({exp} Hari)"
     )
@@ -622,7 +616,7 @@ def detail_ssh():
                         f"IP-Address: {IP_ADD}\nHostname: {DOMAIN}\nUsername: {user}\nPassword: {pw}\nLimit IP: {lim_str}\n━━━━━━━━━━━━━━━━━━━━\n"
                         f"Port OpenSSH: 22\nPort Dropbear: 109, 143\nPort SSH WS HTTPS (TLS): 443\nPort SSH WS HTTP (NTLS): 80\nPort BadVPN/UDPGW: 7100, 7200, 7300\n━━━━━━━━━━━━━━━━━━━━\n"
                         f"OPENVPN TCP (1194): http://{DOMAIN}/ovpn/tcp.ovpn\nOPENVPN UDP (2200): http://{DOMAIN}/ovpn/udp.ovpn\n━━━━━━━━━━━━━━━━━━━━\n"
-                        f"Payload SSH WS: GET /sshws HTTP/1.1[crlf]Host: {DOMAIN}[crlf]Upgrade: websocket[crlf]Connection: Keep-Alive[crlf]User-Agent: [ua][crlf][crlf]\n━━━━━━━━━━━━━━━━━━━━\n"
+                        f"Payload SSH WS: GET wss://{DOMAIN}/sshws HTTP/1.1[crlf]Host: {DOMAIN}[crlf]Upgrade: websocket[crlf]Connection: Upgrade[crlf]User-Agent: [ua][crlf][crlf]\n━━━━━━━━━━━━━━━━━━━━\n"
                         f"Payload WS ENHANCED: PATCH / HTTP/1.1[crlf]Host: [host][crlf]Host: ISI_BUG_DISINI[crlf]Connection: Upgrade[crlf]User-Agent: [ua][crlf]Upgrade: websocket[crlf][crlf]\n━━━━━━━━━━━━━━━━━━━━\n"
                         f"Expired on: {dt_str} WIB"
                     )
@@ -632,7 +626,7 @@ def detail_ssh():
                         f"IP-Address: {IP_ADD}\nHostname: {DOMAIN}\nUsername: `{user}`\nPassword: `{pw}`\nLimit IP: {lim_str}\n━━━━━━━━━━━━━━━━━━━━\n"
                         f"Port OpenSSH: 22\nPort Dropbear: 109, 143\nPort SSH WS HTTPS (TLS): 443\nPort SSH WS HTTP (NTLS): 80\nPort BadVPN/UDPGW: 7100, 7200, 7300\n━━━━━━━━━━━━━━━━━━━━\n"
                         f"OPENVPN TCP (1194): `http://{DOMAIN}/ovpn/tcp.ovpn`\nOPENVPN UDP (2200): `http://{DOMAIN}/ovpn/udp.ovpn`\n━━━━━━━━━━━━━━━━━━━━\n"
-                        f"Payload SSH WS: `GET /sshws HTTP/1.1[crlf]Host: {DOMAIN}[crlf]Upgrade: websocket[crlf]Connection: Keep-Alive[crlf]User-Agent: [ua][crlf][crlf]`\n━━━━━━━━━━━━━━━━━━━━\n"
+                        f"Payload SSH WS: `GET wss://{DOMAIN}/sshws HTTP/1.1[crlf]Host: {DOMAIN}[crlf]Upgrade: websocket[crlf]Connection: Upgrade[crlf]User-Agent: [ua][crlf][crlf]`\n━━━━━━━━━━━━━━━━━━━━\n"
                         f"Payload WS ENHANCED: `PATCH / HTTP/1.1[crlf]Host: [host][crlf]Host: ISI_BUG_DISINI[crlf]Connection: Upgrade[crlf]User-Agent: [ua][crlf]Upgrade: websocket[crlf][crlf]`\n━━━━━━━━━━━━━━━━━━━━\n"
                         f"Expired on: {dt_str} WIB"
                     )
@@ -664,7 +658,7 @@ def trial_ssh():
         f"IP-Address: {IP_ADD}\nHostname: {DOMAIN}\nUsername: {user}\nPassword: {password}\nLimit IP: {limit_ip} IP\n━━━━━━━━━━━━━━━━━━━━\n"
         f"Port OpenSSH: 22\nPort Dropbear: 109, 143\nPort SSH WS HTTPS (TLS): 443\nPort SSH WS HTTP (NTLS): 80\nPort BadVPN/UDPGW: 7100, 7200, 7300\n━━━━━━━━━━━━━━━━━━━━\n"
         f"OPENVPN TCP (1194): http://{DOMAIN}/ovpn/tcp.ovpn\nOPENVPN UDP (2200): http://{DOMAIN}/ovpn/udp.ovpn\n━━━━━━━━━━━━━━━━━━━━\n"
-        f"Payload SSH WS: GET /sshws HTTP/1.1[crlf]Host: {DOMAIN}[crlf]Upgrade: websocket[crlf]Connection: Keep-Alive[crlf]User-Agent: [ua][crlf][crlf]\n━━━━━━━━━━━━━━━━━━━━\n"
+        f"Payload SSH WS: GET wss://{DOMAIN}/sshws HTTP/1.1[crlf]Host: {DOMAIN}[crlf]Upgrade: websocket[crlf]Connection: Upgrade[crlf]User-Agent: [ua][crlf][crlf]\n━━━━━━━━━━━━━━━━━━━━\n"
         f"Payload WS ENHANCED: PATCH / HTTP/1.1[crlf]Host: [host][crlf]Host: ISI_BUG_DISINI[crlf]Connection: Upgrade[crlf]User-Agent: [ua][crlf]Upgrade: websocket[crlf][crlf]\n━━━━━━━━━━━━━━━━━━━━\n"
         f"Expired on: {exp_date} {exp_time} WIB (60 Menit)"
     )
@@ -674,7 +668,7 @@ def trial_ssh():
         f"IP-Address: {IP_ADD}\nHostname: {DOMAIN}\nUsername: `{user}`\nPassword: `{password}`\nLimit IP: {limit_ip} IP\n━━━━━━━━━━━━━━━━━━━━\n"
         f"Port OpenSSH: 22\nPort Dropbear: 109, 143\nPort SSH WS HTTPS (TLS): 443\nPort SSH WS HTTP (NTLS): 80\nPort BadVPN/UDPGW: 7100, 7200, 7300\n━━━━━━━━━━━━━━━━━━━━\n"
         f"OPENVPN TCP (1194): `http://{DOMAIN}/ovpn/tcp.ovpn`\nOPENVPN UDP (2200): `http://{DOMAIN}/ovpn/udp.ovpn`\n━━━━━━━━━━━━━━━━━━━━\n"
-        f"Payload SSH WS: `GET /sshws HTTP/1.1[crlf]Host: {DOMAIN}[crlf]Upgrade: websocket[crlf]Connection: Keep-Alive[crlf]User-Agent: [ua][crlf][crlf]`\n━━━━━━━━━━━━━━━━━━━━\n"
+        f"Payload SSH WS: `GET wss://{DOMAIN}/sshws HTTP/1.1[crlf]Host: {DOMAIN}[crlf]Upgrade: websocket[crlf]Connection: Upgrade[crlf]User-Agent: [ua][crlf][crlf]`\n━━━━━━━━━━━━━━━━━━━━\n"
         f"Payload WS ENHANCED: `PATCH / HTTP/1.1[crlf]Host: [host][crlf]Host: ISI_BUG_DISINI[crlf]Connection: Upgrade[crlf]User-Agent: [ua][crlf]Upgrade: websocket[crlf][crlf]`\n━━━━━━━━━━━━━━━━━━━━\n"
         f"Expired on: {exp_date} {exp_time} WIB (60 Menit)"
     )
@@ -870,7 +864,6 @@ def change_uuid():
         save_json(XRAY_CONF, cfg)
         restart_xray()
         
-        # Ambil masa aktif dan limit
         exp_date_str = "Lifetime / No Exp"
         if os.path.exists(EXP_FILE):
             with open(EXP_FILE, 'r') as f:
@@ -889,13 +882,9 @@ def change_uuid():
                             limit_ip, limit_quota = int(p[1]), int(p[2])
                         break
                         
-        # Ekstrak notifikasi detail menggunakan fungsi generate_account_detail yang sudah ada
         msg_cli, msg_tg = generate_account_detail(target_protocol, target_user, new_uuid, exp_date_str, False, limit_ip, limit_quota)
         
-        # Ganti Judul agar menjadi penanda bahwa ini adalah (UPDATE)
         msg_tg = msg_tg.replace(f"❖ XRAY/{target_protocol.upper()} WS ❖", f"❖ XRAY/{target_protocol.upper()} WS (UPDATE) ❖")
-        
-        # Trigger Notifikasi Telegram
         send_telegram(msg_tg)
         
         return jsonify({
