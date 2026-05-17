@@ -364,8 +364,13 @@ renew_xray() {
         echo -e "\n\e[32m=> Akun '$user' diperpanjang $masaaktif Hari!\e[0m"
         echo "=> Expired Baru: $new_exp_date $new_exp_time WIB"
         
+        # Ambil tipe protokol secara otomatis dari config.json
+        user_prot=$(jq -r '.inbounds[] | select(.settings.clients[]?.email == "'$user'") | .protocol' /usr/local/etc/xray/config.json 2>/dev/null | head -1)
+        user_prot_up=${user_prot^^}
+        if [ -z "$user_prot_up" ]; then user_prot_up="XRAY"; fi
+        
         # --- TELEGRAM NOTIF RENEW ---
-        msg_tg=$(echo -e "🕑 Akun Diperpanjang\n\n💻 Server: ${DOMAIN}\n🔑 Akun: \`${user}\`\n⏳ Durasi: +${masaaktif} hari\n📅 Expired Baru: ${new_exp_date} ${new_exp_time} WIB")
+        msg_tg=$(echo -e "🕑 Akun Diperpanjang\n\n💻 Server: ${DOMAIN}\nType : ${user_prot_up} WS\n🔑 Akun: \`${user}\`\n⏳ Durasi: +${masaaktif} hari\n📅 Expired Baru: ${new_exp_date} ${new_exp_time} WIB")
         send_telegram "$msg_tg"
         # ----------------------------
         
