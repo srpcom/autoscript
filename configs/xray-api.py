@@ -95,7 +95,6 @@ def send_telegram(text):
     try:
         bot_token, notif_chat_id, autosend = "", "", "OFF"
         
-        # PERUBAHAN: Membaca dari bot_notif.conf untuk pengiriman pesan searah (Push Notif)
         if os.path.exists('/usr/local/etc/xray/bot_notif.conf'):
             with open('/usr/local/etc/xray/bot_notif.conf', 'r') as f:
                 for line in f:
@@ -313,6 +312,8 @@ def sys_backup():
 # ==========================================
 def generate_account_detail(protocol, user, uid, exp_date_str, is_trial=False, limit_ip=0, limit_quota=0):
     trial_txt = " TRIAL" if is_trial else ""
+    header_txt = "Pembuatan akun trial berhasil" if is_trial else "Pembuatan akun baru berhasil"
+    
     lim_ip_str = f"{limit_ip} IP" if limit_ip > 0 else "Unlimited"
     lim_q_str = f"{limit_quota} GB" if limit_quota > 0 else "Unlimited"
     
@@ -329,7 +330,7 @@ def generate_account_detail(protocol, user, uid, exp_date_str, is_trial=False, l
         link_none = f"trojan://{uid}@{DOMAIN}:80?path=/trojanws&security=none&host={DOMAIN}&type=ws#{user}"
 
     msg_cli = (
-        f"━━━━━━━━━━━━━━━━━━━━\n❖ XRAY/{protocol.upper()} WS{trial_txt} ❖\n━━━━━━━━━━━━━━━━━━━━\n"
+        f"{header_txt}\n\n━━━━━━━━━━━━━━━━━━━━\n❖ XRAY/{protocol.upper()} WS{trial_txt} ❖\n━━━━━━━━━━━━━━━━━━━━\n"
         f"Remarks : {user}\nIP Address : {IP_ADD}\nDomain : {DOMAIN}\n"
         f"Port TLS : 443\nPort NONE-TLS : 80\n{'Password' if protocol == 'trojan' else 'ID'} : {uid}\n"
         f"Network : Websocket\nWebsocket Path : /{protocol}ws\n━━━━━━━━━━━━━━━━━━━━\n"
@@ -340,7 +341,7 @@ def generate_account_detail(protocol, user, uid, exp_date_str, is_trial=False, l
     )
 
     msg_tg = (
-        f"━━━━━━━━━━━━━━━━━━━━\n❖ XRAY/{protocol.upper()} WS{trial_txt} ❖\n━━━━━━━━━━━━━━━━━━━━\n"
+        f"{header_txt}\n\n━━━━━━━━━━━━━━━━━━━━\n❖ XRAY/{protocol.upper()} WS{trial_txt} ❖\n━━━━━━━━━━━━━━━━━━━━\n"
         f"Remarks : `{user}`\nIP Address : {IP_ADD}\nDomain : {DOMAIN}\n"
         f"Port TLS : 443\nPort NONE-TLS : 80\n{'Password' if protocol == 'trojan' else 'ID'} : `{uid}`\n"
         f"Network : Websocket\nWebsocket Path : /{protocol}ws\n━━━━━━━━━━━━━━━━━━━━\n"
@@ -448,6 +449,11 @@ def detail_user(protocol):
                         if len(p) >= 3: limit_ip, limit_q = int(p[1]), int(p[2]); break
                         
         msg_cli, msg_tg = generate_account_detail(protocol, user, uid, exp_date_str, False, limit_ip, limit_q)
+        
+        # Hapus Header Pembuatan agar tidak membingungkan di Menu Detail
+        msg_cli = msg_cli.replace("Pembuatan akun baru berhasil\n\n", "")
+        msg_tg = msg_tg.replace("Pembuatan akun baru berhasil\n\n", "")
+        
         return jsonify({"stdout": msg_cli, "stdout_tg": msg_tg})
     return jsonify({"stdout": f"Error: User {user} tidak ditemukan!"})
 
@@ -497,12 +503,22 @@ def renew_user(protocol):
                     found = True
                 else: f.write(line)
     if found:
-        return jsonify({"stdout": f"✅ Akun '{user}' berhasil diperpanjang!\nExpired baru: {dt_str} WIB"})
+        # PUSH NOTIFIKASI TELEGRAM SAAT RENEW
+        msg_tg = (
+            f"🕑 Akun Diperpanjang\n\n"
+            f"💻 Server: {DOMAIN}\n"
+            f"🔑 Akun: `{user}`\n"
+            f"⏳ Durasi: +{exp} hari\n"
+            f"📅 Expired Baru: {dt_str} WIB"
+        )
+        send_telegram(msg_tg)
+        
+        return jsonify({"stdout": f"✅ Akun '{user}' berhasil diperpanjang!\nExpired baru: {dt_str} WIB", "stdout_tg": msg_tg})
     return jsonify({"stdout": f"❌ Gagal: Akun '{user}' tidak ditemukan di sistem Xray."})
 
 
 # ==========================================
-# SSH ENDPOINTS (UPDATED PREMIUM LAYOUT)
+# SSH ENDPOINTS
 # ==========================================
 @app.route('/user_legend/add-ssh', methods=['POST'])
 def add_ssh():
@@ -529,7 +545,7 @@ def add_ssh():
     lim_str = f"{limit_ip} IP" if limit_ip > 0 else "Not Active (Unli)"
     
     msg_cli = (
-        f"Akun Berhasil Dibuat!\n\n━━━━━━━━━━━━━━━━━━━━\nINFORMASI PREMIUM\nSSH & OVPN ACCOUNT\n━━━━━━━━━━━━━━━━━━━━\n"
+        f"Pembuatan akun baru berhasil\n\n━━━━━━━━━━━━━━━━━━━━\nINFORMASI PREMIUM\nSSH & OVPN ACCOUNT\n━━━━━━━━━━━━━━━━━━━━\n"
         f"IP-Address: {IP_ADD}\nHostname: {DOMAIN}\nUsername: {user}\nPassword: {password}\nLimit IP: {lim_str}\n━━━━━━━━━━━━━━━━━━━━\n"
         f"Port OpenSSH: 22\nPort Dropbear: 109, 143\nPort SSH WS HTTPS (TLS): 443\nPort SSH WS HTTP (NTLS): 80\nPort BadVPN/UDPGW: 7100, 7200, 7300\n━━━━━━━━━━━━━━━━━━━━\n"
         f"OPENVPN TCP (1194): http://{DOMAIN}/ovpn/tcp.ovpn\nOPENVPN UDP (2200): http://{DOMAIN}/ovpn/udp.ovpn\n━━━━━━━━━━━━━━━━━━━━\n"
@@ -539,7 +555,7 @@ def add_ssh():
     )
     
     msg_tg = (
-        f"Akun Berhasil Dibuat!\n\n━━━━━━━━━━━━━━━━━━━━\nINFORMASI PREMIUM\nSSH & OVPN ACCOUNT\n━━━━━━━━━━━━━━━━━━━━\n"
+        f"Pembuatan akun baru berhasil\n\n━━━━━━━━━━━━━━━━━━━━\nINFORMASI PREMIUM\nSSH & OVPN ACCOUNT\n━━━━━━━━━━━━━━━━━━━━\n"
         f"IP-Address: {IP_ADD}\nHostname: {DOMAIN}\nUsername: `{user}`\nPassword: `{password}`\nLimit IP: {lim_str}\n━━━━━━━━━━━━━━━━━━━━\n"
         f"Port OpenSSH: 22\nPort Dropbear: 109, 143\nPort SSH WS HTTPS (TLS): 443\nPort SSH WS HTTP (NTLS): 80\nPort BadVPN/UDPGW: 7100, 7200, 7300\n━━━━━━━━━━━━━━━━━━━━\n"
         f"OPENVPN TCP (1194): `http://{DOMAIN}/ovpn/tcp.ovpn`\nOPENVPN UDP (2200): `http://{DOMAIN}/ovpn/udp.ovpn`\n━━━━━━━━━━━━━━━━━━━━\n"
@@ -588,7 +604,16 @@ def renew_ssh():
                     dt_str = f"{exp_date} {exp_time}"
                     found = True
                 else: f.write(line)
-    if found: return jsonify({"stdout": f"✅ Akun SSH '{user}' diperpanjang!\nExpired baru: {dt_str} WIB"})
+    if found:
+        msg_tg = (
+            f"🕑 Akun Diperpanjang\n\n"
+            f"💻 Server: {DOMAIN}\n"
+            f"🔑 Akun: `{user}`\n"
+            f"⏳ Durasi: +{exp} hari\n"
+            f"📅 Expired Baru: {dt_str} WIB"
+        )
+        send_telegram(msg_tg)
+        return jsonify({"stdout": f"✅ Akun SSH '{user}' diperpanjang!\nExpired baru: {dt_str} WIB", "stdout_tg": msg_tg})
     return jsonify({"stdout": f"❌ Gagal: Akun SSH '{user}' tidak ditemukan."})
 
 @app.route('/user_legend/detail-ssh', methods=['GET', 'POST'])
@@ -655,7 +680,7 @@ def trial_ssh():
     with open(SSH_LIMIT, 'a') as f: f.write(f"{user} {limit_ip}\n")
     
     msg_cli = (
-        f"Akun Trial Dibuat!\n\n━━━━━━━━━━━━━━━━━━━━\nINFORMASI TRIAL\nSSH & OVPN ACCOUNT\n━━━━━━━━━━━━━━━━━━━━\n"
+        f"Pembuatan akun trial berhasil\n\n━━━━━━━━━━━━━━━━━━━━\nINFORMASI TRIAL\nSSH & OVPN ACCOUNT\n━━━━━━━━━━━━━━━━━━━━\n"
         f"IP-Address: {IP_ADD}\nHostname: {DOMAIN}\nUsername: {user}\nPassword: {password}\nLimit IP: {limit_ip} IP\n━━━━━━━━━━━━━━━━━━━━\n"
         f"Port OpenSSH: 22\nPort Dropbear: 109, 143\nPort SSH WS HTTPS (TLS): 443\nPort SSH WS HTTP (NTLS): 80\nPort BadVPN/UDPGW: 7100, 7200, 7300\n━━━━━━━━━━━━━━━━━━━━\n"
         f"OPENVPN TCP (1194): http://{DOMAIN}/ovpn/tcp.ovpn\nOPENVPN UDP (2200): http://{DOMAIN}/ovpn/udp.ovpn\n━━━━━━━━━━━━━━━━━━━━\n"
@@ -665,7 +690,7 @@ def trial_ssh():
     )
     
     msg_tg = (
-        f"Akun Trial Dibuat!\n\n━━━━━━━━━━━━━━━━━━━━\nINFORMASI TRIAL\nSSH & OVPN ACCOUNT\n━━━━━━━━━━━━━━━━━━━━\n"
+        f"Pembuatan akun trial berhasil\n\n━━━━━━━━━━━━━━━━━━━━\nINFORMASI TRIAL\nSSH & OVPN ACCOUNT\n━━━━━━━━━━━━━━━━━━━━\n"
         f"IP-Address: {IP_ADD}\nHostname: {DOMAIN}\nUsername: `{user}`\nPassword: `{password}`\nLimit IP: {limit_ip} IP\n━━━━━━━━━━━━━━━━━━━━\n"
         f"Port OpenSSH: 22\nPort Dropbear: 109, 143\nPort SSH WS HTTPS (TLS): 443\nPort SSH WS HTTP (NTLS): 80\nPort BadVPN/UDPGW: 7100, 7200, 7300\n━━━━━━━━━━━━━━━━━━━━\n"
         f"OPENVPN TCP (1194): `http://{DOMAIN}/ovpn/tcp.ovpn`\nOPENVPN UDP (2200): `http://{DOMAIN}/ovpn/udp.ovpn`\n━━━━━━━━━━━━━━━━━━━━\n"
@@ -704,13 +729,13 @@ def add_l2tp():
     restart_l2tp()
     
     msg_cli = (
-        f"━━━━━━━━━━━━━━━━━━━━\n❖ L2TP / IPsec VPN ❖\n━━━━━━━━━━━━━━━━━━━━\n"
+        f"Pembuatan akun baru berhasil\n\n━━━━━━━━━━━━━━━━━━━━\n❖ L2TP / IPsec VPN ❖\n━━━━━━━━━━━━━━━━━━━━\n"
         f"Remarks : {user}\nIP Address : {IP_ADD}\nDomain : {DOMAIN}\n"
         f"IPsec PSK : srpcom_vpn\nUsername : {user}\nPassword : {password}\n"
         f"━━━━━━━━━━━━━━━━━━━━\nEXPIRED ON : {exp_date} {exp_time} WIB"
     )
     msg_tg = (
-        f"━━━━━━━━━━━━━━━━━━━━\n❖ L2TP / IPsec VPN ❖\n━━━━━━━━━━━━━━━━━━━━\n"
+        f"Pembuatan akun baru berhasil\n\n━━━━━━━━━━━━━━━━━━━━\n❖ L2TP / IPsec VPN ❖\n━━━━━━━━━━━━━━━━━━━━\n"
         f"Remarks : `{user}`\nIP Address : {IP_ADD}\nDomain : {DOMAIN}\n"
         f"IPsec PSK : `srpcom_vpn`\nUsername : `{user}`\nPassword : `{password}`\n"
         f"━━━━━━━━━━━━━━━━━━━━\nEXPIRED ON : {exp_date} {exp_time} WIB"
@@ -764,7 +789,16 @@ def renew_l2tp():
                     dt_str = f"{exp_date} {exp_time}"
                     found = True
                 else: f.write(line)
-    if found: return jsonify({"stdout": f"✅ Akun L2TP '{user}' diperpanjang!\nExpired baru: {dt_str} WIB"})
+    if found:
+        msg_tg = (
+            f"🕑 Akun Diperpanjang\n\n"
+            f"💻 Server: {DOMAIN}\n"
+            f"🔑 Akun: `{user}`\n"
+            f"⏳ Durasi: +{exp} hari\n"
+            f"📅 Expired Baru: {dt_str} WIB"
+        )
+        send_telegram(msg_tg)
+        return jsonify({"stdout": f"✅ Akun L2TP '{user}' diperpanjang!\nExpired baru: {dt_str} WIB", "stdout_tg": msg_tg})
     return jsonify({"stdout": f"❌ Gagal: Akun L2TP '{user}' tidak ditemukan."})
 
 @app.route('/user_legend/detail-l2tp', methods=['GET', 'POST'])
@@ -885,7 +919,10 @@ def change_uuid():
                         
         msg_cli, msg_tg = generate_account_detail(target_protocol, target_user, new_uuid, exp_date_str, False, limit_ip, limit_quota)
         
+        # Ganti Judul
+        msg_tg = msg_tg.replace("Pembuatan akun baru berhasil", "Update UUID/Password berhasil")
         msg_tg = msg_tg.replace(f"❖ XRAY/{target_protocol.upper()} WS ❖", f"❖ XRAY/{target_protocol.upper()} WS (UPDATE) ❖")
+        
         send_telegram(msg_tg)
         
         return jsonify({
