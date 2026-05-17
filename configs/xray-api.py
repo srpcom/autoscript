@@ -94,7 +94,6 @@ def restart_l2tp(): subprocess.run(['systemctl', 'restart', 'ipsec', 'xl2tpd'])
 def send_telegram(text):
     try:
         bot_token, admin_id, autosend = "", "", "OFF"
-        
         if os.path.exists('/usr/local/etc/xray/bot_admin.conf'):
             with open('/usr/local/etc/xray/bot_admin.conf', 'r') as f:
                 for line in f:
@@ -532,8 +531,8 @@ def add_ssh():
         f"IP-Address: {IP_ADD}\nHostname: {DOMAIN}\nUsername: {user}\nPassword: {password}\nLimit IP: {lim_str}\n━━━━━━━━━━━━━━━━━━━━\n"
         f"Port OpenSSH: 22\nPort Dropbear: 109, 143\nPort SSH WS HTTPS (TLS): 443\nPort SSH WS HTTP (NTLS): 80\nPort BadVPN/UDPGW: 7100, 7200, 7300\n━━━━━━━━━━━━━━━━━━━━\n"
         f"OPENVPN TCP (1194): http://{DOMAIN}/ovpn/tcp.ovpn\nOPENVPN UDP (2200): http://{DOMAIN}/ovpn/udp.ovpn\n━━━━━━━━━━━━━━━━━━━━\n"
-        f"Payload SSH WS: GET wss://{DOMAIN}/sshws HTTP/1.1[crlf]Host: {DOMAIN}[crlf]Upgrade: websocket[crlf]Connection: Upgrade[crlf]User-Agent: [ua][crlf][crlf]\n━━━━━━━━━━━━━━━━━━━━\n"
-        f"Payload WS ENHANCED: PATCH / HTTP/1.1[crlf]Host: [host][crlf]Host: ISI_BUG_DISINI[crlf]Connection: Upgrade[crlf]User-Agent: [ua][crlf]Upgrade: websocket[crlf][crlf]\n━━━━━━━━━━━━━━━━━━━━\n"
+        f"Payload SSH WS: GET /sshws HTTP/1.1[crlf]Host: {DOMAIN}[crlf]Upgrade: websocket[crlf]Connection: Upgrade[crlf]User-Agent: [ua][crlf][crlf]\n━━━━━━━━━━━━━━━━━━━━\n"
+        f"Payload WS ENHANCED: GET /sshws HTTP/1.1[crlf]Host: ISI_BUG_DISINI[crlf]Upgrade: websocket[crlf]Connection: Upgrade[crlf]User-Agent: [ua][crlf][crlf]\n━━━━━━━━━━━━━━━━━━━━\n"
         f"Expired on: {exp_date} {exp_time} WIB ({exp} Hari)"
     )
     
@@ -542,8 +541,8 @@ def add_ssh():
         f"IP-Address: {IP_ADD}\nHostname: {DOMAIN}\nUsername: `{user}`\nPassword: `{password}`\nLimit IP: {lim_str}\n━━━━━━━━━━━━━━━━━━━━\n"
         f"Port OpenSSH: 22\nPort Dropbear: 109, 143\nPort SSH WS HTTPS (TLS): 443\nPort SSH WS HTTP (NTLS): 80\nPort BadVPN/UDPGW: 7100, 7200, 7300\n━━━━━━━━━━━━━━━━━━━━\n"
         f"OPENVPN TCP (1194): `http://{DOMAIN}/ovpn/tcp.ovpn`\nOPENVPN UDP (2200): `http://{DOMAIN}/ovpn/udp.ovpn`\n━━━━━━━━━━━━━━━━━━━━\n"
-        f"Payload SSH WS: `GET wss://{DOMAIN}/sshws HTTP/1.1[crlf]Host: {DOMAIN}[crlf]Upgrade: websocket[crlf]Connection: Upgrade[crlf]User-Agent: [ua][crlf][crlf]`\n━━━━━━━━━━━━━━━━━━━━\n"
-        f"Payload WS ENHANCED: `PATCH / HTTP/1.1[crlf]Host: [host][crlf]Host: ISI_BUG_DISINI[crlf]Connection: Upgrade[crlf]User-Agent: [ua][crlf]Upgrade: websocket[crlf][crlf]`\n━━━━━━━━━━━━━━━━━━━━\n"
+        f"Payload SSH WS: `GET /sshws HTTP/1.1[crlf]Host: {DOMAIN}[crlf]Upgrade: websocket[crlf]Connection: Upgrade[crlf]User-Agent: [ua][crlf][crlf]`\n━━━━━━━━━━━━━━━━━━━━\n"
+        f"Payload WS ENHANCED: `GET /sshws HTTP/1.1[crlf]Host: ISI_BUG_DISINI[crlf]Upgrade: websocket[crlf]Connection: Upgrade[crlf]User-Agent: [ua][crlf][crlf]`\n━━━━━━━━━━━━━━━━━━━━\n"
         f"Expired on: {exp_date} {exp_time} WIB ({exp} Hari)"
     )
     send_telegram(msg_tg)
@@ -616,8 +615,8 @@ def detail_ssh():
                         f"IP-Address: {IP_ADD}\nHostname: {DOMAIN}\nUsername: {user}\nPassword: {pw}\nLimit IP: {lim_str}\n━━━━━━━━━━━━━━━━━━━━\n"
                         f"Port OpenSSH: 22\nPort Dropbear: 109, 143\nPort SSH WS HTTPS (TLS): 443\nPort SSH WS HTTP (NTLS): 80\nPort BadVPN/UDPGW: 7100, 7200, 7300\n━━━━━━━━━━━━━━━━━━━━\n"
                         f"OPENVPN TCP (1194): http://{DOMAIN}/ovpn/tcp.ovpn\nOPENVPN UDP (2200): http://{DOMAIN}/ovpn/udp.ovpn\n━━━━━━━━━━━━━━━━━━━━\n"
-                        f"Payload SSH WS: GET wss://{DOMAIN}/sshws HTTP/1.1[crlf]Host: {DOMAIN}[crlf]Upgrade: websocket[crlf]Connection: Upgrade[crlf]User-Agent: [ua][crlf][crlf]\n━━━━━━━━━━━━━━━━━━━━\n"
-                        f"Payload WS ENHANCED: PATCH / HTTP/1.1[crlf]Host: [host][crlf]Host: ISI_BUG_DISINI[crlf]Connection: Upgrade[crlf]User-Agent: [ua][crlf]Upgrade: websocket[crlf][crlf]\n━━━━━━━━━━━━━━━━━━━━\n"
+                        f"Payload SSH WS: GET /sshws HTTP/1.1[crlf]Host: {DOMAIN}[crlf]Upgrade: websocket[crlf]Connection: Upgrade[crlf]User-Agent: [ua][crlf][crlf]\n━━━━━━━━━━━━━━━━━━━━\n"
+                        f"Payload WS ENHANCED: GET /sshws HTTP/1.1[crlf]Host: ISI_BUG_DISINI[crlf]Upgrade: websocket[crlf]Connection: Upgrade[crlf]User-Agent: [ua][crlf][crlf]\n━━━━━━━━━━━━━━━━━━━━\n"
                         f"Expired on: {dt_str} WIB"
                     )
                     
@@ -626,8 +625,8 @@ def detail_ssh():
                         f"IP-Address: {IP_ADD}\nHostname: {DOMAIN}\nUsername: `{user}`\nPassword: `{pw}`\nLimit IP: {lim_str}\n━━━━━━━━━━━━━━━━━━━━\n"
                         f"Port OpenSSH: 22\nPort Dropbear: 109, 143\nPort SSH WS HTTPS (TLS): 443\nPort SSH WS HTTP (NTLS): 80\nPort BadVPN/UDPGW: 7100, 7200, 7300\n━━━━━━━━━━━━━━━━━━━━\n"
                         f"OPENVPN TCP (1194): `http://{DOMAIN}/ovpn/tcp.ovpn`\nOPENVPN UDP (2200): `http://{DOMAIN}/ovpn/udp.ovpn`\n━━━━━━━━━━━━━━━━━━━━\n"
-                        f"Payload SSH WS: `GET wss://{DOMAIN}/sshws HTTP/1.1[crlf]Host: {DOMAIN}[crlf]Upgrade: websocket[crlf]Connection: Upgrade[crlf]User-Agent: [ua][crlf][crlf]`\n━━━━━━━━━━━━━━━━━━━━\n"
-                        f"Payload WS ENHANCED: `PATCH / HTTP/1.1[crlf]Host: [host][crlf]Host: ISI_BUG_DISINI[crlf]Connection: Upgrade[crlf]User-Agent: [ua][crlf]Upgrade: websocket[crlf][crlf]`\n━━━━━━━━━━━━━━━━━━━━\n"
+                        f"Payload SSH WS: `GET /sshws HTTP/1.1[crlf]Host: {DOMAIN}[crlf]Upgrade: websocket[crlf]Connection: Upgrade[crlf]User-Agent: [ua][crlf][crlf]`\n━━━━━━━━━━━━━━━━━━━━\n"
+                        f"Payload WS ENHANCED: `GET /sshws HTTP/1.1[crlf]Host: ISI_BUG_DISINI[crlf]Upgrade: websocket[crlf]Connection: Upgrade[crlf]User-Agent: [ua][crlf][crlf]`\n━━━━━━━━━━━━━━━━━━━━\n"
                         f"Expired on: {dt_str} WIB"
                     )
                     found = True
@@ -658,8 +657,8 @@ def trial_ssh():
         f"IP-Address: {IP_ADD}\nHostname: {DOMAIN}\nUsername: {user}\nPassword: {password}\nLimit IP: {limit_ip} IP\n━━━━━━━━━━━━━━━━━━━━\n"
         f"Port OpenSSH: 22\nPort Dropbear: 109, 143\nPort SSH WS HTTPS (TLS): 443\nPort SSH WS HTTP (NTLS): 80\nPort BadVPN/UDPGW: 7100, 7200, 7300\n━━━━━━━━━━━━━━━━━━━━\n"
         f"OPENVPN TCP (1194): http://{DOMAIN}/ovpn/tcp.ovpn\nOPENVPN UDP (2200): http://{DOMAIN}/ovpn/udp.ovpn\n━━━━━━━━━━━━━━━━━━━━\n"
-        f"Payload SSH WS: GET wss://{DOMAIN}/sshws HTTP/1.1[crlf]Host: {DOMAIN}[crlf]Upgrade: websocket[crlf]Connection: Upgrade[crlf]User-Agent: [ua][crlf][crlf]\n━━━━━━━━━━━━━━━━━━━━\n"
-        f"Payload WS ENHANCED: PATCH / HTTP/1.1[crlf]Host: [host][crlf]Host: ISI_BUG_DISINI[crlf]Connection: Upgrade[crlf]User-Agent: [ua][crlf]Upgrade: websocket[crlf][crlf]\n━━━━━━━━━━━━━━━━━━━━\n"
+        f"Payload SSH WS: GET /sshws HTTP/1.1[crlf]Host: {DOMAIN}[crlf]Upgrade: websocket[crlf]Connection: Upgrade[crlf]User-Agent: [ua][crlf][crlf]\n━━━━━━━━━━━━━━━━━━━━\n"
+        f"Payload WS ENHANCED: GET /sshws HTTP/1.1[crlf]Host: ISI_BUG_DISINI[crlf]Upgrade: websocket[crlf]Connection: Upgrade[crlf]User-Agent: [ua][crlf][crlf]\n━━━━━━━━━━━━━━━━━━━━\n"
         f"Expired on: {exp_date} {exp_time} WIB (60 Menit)"
     )
     
@@ -668,8 +667,8 @@ def trial_ssh():
         f"IP-Address: {IP_ADD}\nHostname: {DOMAIN}\nUsername: `{user}`\nPassword: `{password}`\nLimit IP: {limit_ip} IP\n━━━━━━━━━━━━━━━━━━━━\n"
         f"Port OpenSSH: 22\nPort Dropbear: 109, 143\nPort SSH WS HTTPS (TLS): 443\nPort SSH WS HTTP (NTLS): 80\nPort BadVPN/UDPGW: 7100, 7200, 7300\n━━━━━━━━━━━━━━━━━━━━\n"
         f"OPENVPN TCP (1194): `http://{DOMAIN}/ovpn/tcp.ovpn`\nOPENVPN UDP (2200): `http://{DOMAIN}/ovpn/udp.ovpn`\n━━━━━━━━━━━━━━━━━━━━\n"
-        f"Payload SSH WS: `GET wss://{DOMAIN}/sshws HTTP/1.1[crlf]Host: {DOMAIN}[crlf]Upgrade: websocket[crlf]Connection: Upgrade[crlf]User-Agent: [ua][crlf][crlf]`\n━━━━━━━━━━━━━━━━━━━━\n"
-        f"Payload WS ENHANCED: `PATCH / HTTP/1.1[crlf]Host: [host][crlf]Host: ISI_BUG_DISINI[crlf]Connection: Upgrade[crlf]User-Agent: [ua][crlf]Upgrade: websocket[crlf][crlf]`\n━━━━━━━━━━━━━━━━━━━━\n"
+        f"Payload SSH WS: `GET /sshws HTTP/1.1[crlf]Host: {DOMAIN}[crlf]Upgrade: websocket[crlf]Connection: Upgrade[crlf]User-Agent: [ua][crlf][crlf]`\n━━━━━━━━━━━━━━━━━━━━\n"
+        f"Payload WS ENHANCED: `GET /sshws HTTP/1.1[crlf]Host: ISI_BUG_DISINI[crlf]Upgrade: websocket[crlf]Connection: Upgrade[crlf]User-Agent: [ua][crlf][crlf]`\n━━━━━━━━━━━━━━━━━━━━\n"
         f"Expired on: {exp_date} {exp_time} WIB (60 Menit)"
     )
     send_telegram(msg_tg)
