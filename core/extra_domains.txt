@@ -37,3 +37,4 @@ suporte.garena.com
 api.waze.com
 freefiremobile.com
 www.freefiremobile.com
+vplay.iflix.com
