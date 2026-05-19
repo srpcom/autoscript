@@ -768,31 +768,34 @@ import_bug_murni() {
     echo "======================================"
     echo "Fitur ini akan mengimpor daftar Bug Murni"
     echo "(Tanpa embel-embel domain VPS) dari GitHub."
-    echo "Pastikan URL berformat RAW (Raw Content)."
-    echo "--------------------------------------"
-    read -p "Masukkan URL Raw GitHub: " github_url
+    echo "======================================"
+    echo "=> Sedang mengambil data dari GitHub..."
 
-    if [[ -z "$github_url" ]]; then
-        echo -e "\n\e[31m[ERROR]\e[0m URL tidak boleh kosong!"
-        sleep 2
-        return
-    fi
-
-    echo -e "\n\e[33mMengunduh daftar bug dari GitHub...\e[0m"
-    temp_file="/tmp/bug_murni_temp.txt"
-    curl -sS -L "$github_url" -o "$temp_file"
+    local temp_file="/tmp/bug_murni_temp.txt"
+    wget -q -O "$temp_file" "$GITHUB_RAW/core/extra_domains.txt"
 
     if [[ ! -s "$temp_file" ]]; then
-        echo -e "\e[31m[ERROR]\e[0m Gagal mengunduh URL atau file kosong!"
+        echo -e "\e[31m[ERROR]\e[0m Gagal mengambil data dari GitHub!"
         rm -f "$temp_file"
         sleep 2
         return
     fi
 
-    echo -e "\e[32m[OK]\e[0m File berhasil diunduh. Memproses data...\n"
+    echo -e "\n\e[36m[ DAFTAR BUG MURNI DI GITHUB ]\e[0m"
+    awk '{print "- " $1}' "$temp_file"
+    echo "======================================"
+    read -p "Import data di atas sebagai Bug Murni? (y/n): " confirm
+    if [[ "$confirm" != "y" && "$confirm" != "Y" ]]; then
+        echo "Batal."
+        rm -f "$temp_file"
+        sleep 1
+        return
+    fi
+
+    echo -e "\n=> Memproses import..."
     
-    target_file="/usr/local/etc/srpcom/extra_domains.txt"
-    count=0
+    local target_file="/usr/local/etc/srpcom/extra_domains.txt"
+    local count=0
 
     # Membaca file baris per baris
     while IFS= read -r bug || [[ -n "$bug" ]]; do
@@ -806,11 +809,11 @@ import_bug_murni() {
 
         # Cek apakah bug sudah ada di dalam database agar tidak duplikat
         if grep -q "^${bug}$" "$target_file"; then
-            echo -e "- $bug \e[33m(Sudah ada, dilewati)\e[0m"
+            echo -e " \e[33m[SKIP]\e[0m $bug (Sudah ada)"
         else
-            # INJEKSI MURNI: Masukkan nama bug apa adanya, TANPA $DOMAIN
+            # INJEKSI MURNI: Masukkan nama bug apa adanya, TANPA validasi IP & domain
             echo "$bug" >> "$target_file"
-            echo -e "- $bug \e[32m(Berhasil ditambahkan)\e[0m"
+            echo -e " \e[32m[ OK ]\e[0m $bug"
             ((count++))
         fi
     done < "$temp_file"
@@ -822,11 +825,11 @@ import_bug_murni() {
         rebuild_caddyfile
         echo -e "\e[32m[SUCCESS]\e[0m $count Bug Murni berhasil diimpor & diaktifkan!"
     else
-        echo -e "\n\e[33mTidak ada Bug Murni baru yang ditambahkan.\e[0m"
+        echo -e "\n\e[33m[INFO]\e[0m Tidak ada Bug Murni baru yang ditambahkan."
     fi
 
-    echo ""
-    read -p "Tekan [ENTER] untuk kembali..."
+    echo "======================================"
+    pause
 }
 
 menu_extra_domain() {
