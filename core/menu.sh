@@ -3,7 +3,7 @@
 # menu.sh
 # MODULE: MAIN MENU (ROUTER)
 # Menampilkan antarmuka CLI utama dan perutean menu
-# Versi : 1.5 (Fitur: Dual Bot Architecture)
+# Versi : 1.5 (Fitur: Dual Bot Architecture + Bug Murni)
 # ==========================================
 
 SCRIPT_VERSION="1.5 (Dual Bot Arch)"
@@ -761,6 +761,74 @@ import_github_domain() {
     pause
 }
 
+import_bug_murni() {
+    clear
+    echo "======================================"
+    echo "      IMPORT BUG/SNI MURNI GITHUB     "
+    echo "======================================"
+    echo "Fitur ini akan mengimpor daftar Bug Murni"
+    echo "(Tanpa embel-embel domain VPS) dari GitHub."
+    echo "Pastikan URL berformat RAW (Raw Content)."
+    echo "--------------------------------------"
+    read -p "Masukkan URL Raw GitHub: " github_url
+
+    if [[ -z "$github_url" ]]; then
+        echo -e "\n\e[31m[ERROR]\e[0m URL tidak boleh kosong!"
+        sleep 2
+        return
+    fi
+
+    echo -e "\n\e[33mMengunduh daftar bug dari GitHub...\e[0m"
+    temp_file="/tmp/bug_murni_temp.txt"
+    curl -sS -L "$github_url" -o "$temp_file"
+
+    if [[ ! -s "$temp_file" ]]; then
+        echo -e "\e[31m[ERROR]\e[0m Gagal mengunduh URL atau file kosong!"
+        rm -f "$temp_file"
+        sleep 2
+        return
+    fi
+
+    echo -e "\e[32m[OK]\e[0m File berhasil diunduh. Memproses data...\n"
+    
+    target_file="/usr/local/etc/srpcom/extra_domains.txt"
+    count=0
+
+    # Membaca file baris per baris
+    while IFS= read -r bug || [[ -n "$bug" ]]; do
+        # Bersihkan spasi berlebih dan karakter Windows (Carriage Return / \r)
+        bug=$(echo "$bug" | tr -d '\r' | xargs)
+        
+        # Lewati baris kosong atau baris komentar (berawalan #)
+        if [[ -z "$bug" || "$bug" == \#* ]]; then
+            continue
+        fi
+
+        # Cek apakah bug sudah ada di dalam database agar tidak duplikat
+        if grep -q "^${bug}$" "$target_file"; then
+            echo -e "- $bug \e[33m(Sudah ada, dilewati)\e[0m"
+        else
+            # INJEKSI MURNI: Masukkan nama bug apa adanya, TANPA $DOMAIN
+            echo "$bug" >> "$target_file"
+            echo -e "- $bug \e[32m(Berhasil ditambahkan)\e[0m"
+            ((count++))
+        fi
+    done < "$temp_file"
+
+    rm -f "$temp_file"
+
+    if [[ $count -gt 0 ]]; then
+        echo -e "\n\e[33mMemperbarui konfigurasi Caddy Server...\e[0m"
+        rebuild_caddyfile
+        echo -e "\e[32m[SUCCESS]\e[0m $count Bug Murni berhasil diimpor & diaktifkan!"
+    else
+        echo -e "\n\e[33mTidak ada Bug Murni baru yang ditambahkan.\e[0m"
+    fi
+
+    echo ""
+    read -p "Tekan [ENTER] untuk kembali..."
+}
+
 menu_extra_domain() {
     while true; do
         clear
@@ -770,16 +838,18 @@ menu_extra_domain() {
         echo " 1. Tambah Subdomain Baru"
         echo " 2. Hapus Subdomain"
         echo " 3. Lihat Daftar Subdomain"
-        echo " 4. Import dari GitHub"
+        echo " 4. Import dari GitHub (WC)"
+        echo " 5. Import dari Github (bug murni)"
         echo "--------------------------------------"
         echo " 0/x. Kembali"
         echo "======================================"
-        read -p " Pilih opsi [0-4 or x]: " opt
+        read -p " Pilih opsi [0-5 or x]: " opt
         case $opt in
             1) add_extra_domain ;;
             2) del_extra_domain ;;
             3) list_extra_domain ;;
             4) import_github_domain ;;
+            5) import_bug_murni ;;
             0|x|X) break ;;
             *) echo -e "\n=> Pilihan tidak valid!"; sleep 1 ;;
         esac
