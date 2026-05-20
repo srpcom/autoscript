@@ -264,7 +264,64 @@ def sys_resource():
         cpu = subprocess.run(['top', '-bn1'], capture_output=True, text=True).stdout.split('\n')[:5]
         cpu_str = '\n'.join(cpu)
         res = f"💻 SYSTEM RESOURCES (CPU, RAM, DISK)\n━━━━━━━━━━━━━━━━━━━━\n{cpu_str}\n\n[RAM USAGE]\n{ram}\n[DISK USAGE]\n{disk}"
-        return jsonify({"stdout": res.strip()})
+        
+        # Calculate raw metrics
+        import shutil
+        import time
+        
+        # Disk usage
+        disk_percent = 0
+        try:
+            total_d, used_d, free_d = shutil.disk_usage('/')
+            disk_percent = round((used_d / total_d) * 100, 1) if total_d > 0 else 0
+        except:
+            pass
+            
+        # RAM usage using free -m and parsing the 'Mem:' line
+        ram_percent = 0
+        try:
+            free_out = subprocess.run(['free', '-m'], capture_output=True, text=True).stdout
+            lines_r = free_out.strip().split('\n')
+            for l in lines_r:
+                if 'Mem:' in l:
+                    parts = l.split()
+                    if len(parts) >= 3:
+                        total_r = int(parts[1])
+                        used_r = int(parts[2])
+                        ram_percent = round((used_r / total_r) * 100, 1) if total_r > 0 else 0
+                        break
+        except:
+            pass
+            
+        # CPU usage using /proc/stat with 0.1s delta
+        cpu_percent = 0
+        try:
+            with open('/proc/stat', 'r') as f:
+                line = f.readline()
+            parts = list(map(int, line.split()[1:5]))
+            total1 = sum(parts)
+            idle1 = parts[3]
+            time.sleep(0.1)
+            with open('/proc/stat', 'r') as f:
+                line = f.readline()
+            parts = list(map(int, line.split()[1:5]))
+            total2 = sum(parts)
+            idle2 = parts[3]
+            total_diff = total2 - total1
+            idle_diff = idle2 - idle1
+            if total_diff > 0:
+                cpu_percent = round((total_diff - idle_diff) / total_diff * 100, 1)
+        except:
+            pass
+            
+        return jsonify({
+            "stdout": res.strip(),
+            "metrics": {
+                "cpu": cpu_percent,
+                "ram": ram_percent,
+                "disk": disk_percent
+            }
+        })
     except Exception as e:
         return jsonify({"stdout": f"Error: {e}"})
 
