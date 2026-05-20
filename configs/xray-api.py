@@ -226,9 +226,8 @@ def list_accounts(protocol):
         )
         cards_html.append(item_html)
         
-        # Generate interactive Telegram command by replacing special characters with underscores
-        cmd_user = u.replace('-', '_').replace('.', '_').replace(' ', '_')
-        tg_lines.append(f"• /det_{api_ep}_{cmd_user} - `{u}` (Exp: {exp_text})")
+        # Add to Telegram list (using backticks so username is tap-to-copy)
+        tg_lines.append(f"• `{u}` (Exp: {exp_text})")
         
     if protocol in ['vmess', 'vless', 'trojan']:
         icon_class = "fa-bolt text-yellow-400 bg-yellow-500/10 border border-yellow-500/20"
