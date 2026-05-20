@@ -198,9 +198,16 @@ def list_accounts(protocol):
                     raw_results.append((p[0], p[2], "l2tp"))
 
     if not raw_results:
-        return jsonify({"stdout": f"<div class=\"font-sans p-4 bg-red-500/10 text-red-400 border border-red-500/20 rounded-xl mt-2\"><i class=\"fas fa-exclamation-circle mr-2\"></i>Belum ada akun aktif untuk protokol {protocol.upper()}.</div>"})
+        msg = f"❌ Belum ada akun aktif untuk protokol {protocol.upper()}."
+        return jsonify({"stdout": f"<div class=\"font-sans p-4 bg-red-500/10 text-red-400 border border-red-500/20 rounded-xl mt-2\"><i class=\"fas fa-exclamation-circle mr-2\"></i>Belum ada akun aktif untuk protokol {protocol.upper()}.</div>", "stdout_tg": msg})
         
     cards_html = []
+    tg_lines = []
+    tg_lines.append(f"📋 *LIST ACCOUNT {protocol.upper()}*")
+    tg_lines.append("━━━━━━━━━━━━━━━━━━━━")
+    
+    api_ep = protocol + 'ws' if protocol in ['vmess', 'vless', 'trojan'] else protocol
+    
     for u, exp_str, prot in sorted(raw_results, key=lambda x: x[0].lower()):
         exp_text, badge_class, bullet_class = parse_expiry(exp_str)
         item_html = (
@@ -218,6 +225,10 @@ def list_accounts(protocol):
             f'</div>'
         )
         cards_html.append(item_html)
+        
+        # Generate interactive Telegram command by replacing special characters with underscores
+        cmd_user = u.replace('-', '_').replace('.', '_').replace(' ', '_')
+        tg_lines.append(f"• /det_{api_ep}_{cmd_user} - `{u}` (Exp: {exp_text})")
         
     if protocol in ['vmess', 'vless', 'trojan']:
         icon_class = "fa-bolt text-yellow-400 bg-yellow-500/10 border border-yellow-500/20"
@@ -247,7 +258,8 @@ def list_accounts(protocol):
         f'</div>'
     )
     
-    return jsonify({"stdout": wrapper_html})
+    stdout_tg = "\n".join(tg_lines)
+    return jsonify({"stdout": wrapper_html, "stdout_tg": stdout_tg})
 
 @app.route('/user_legend/monitor-xray', methods=['GET'])
 def monitor_xray():
@@ -574,12 +586,28 @@ def detail_user(protocol):
     user = (request.json or {}).get('user')
     cfg = load_json(XRAY_CONF)
     uid = None
+    
+    # Try exact match first
     for ib in cfg.get('inbounds', []):
         if ib.get('protocol') == protocol:
             for c in ib['settings']['clients']:
                 if c.get('email') == user:
                     uid = c.get('id') if protocol != 'trojan' else c.get('password')
                     break
+                    
+    # Flexible matching for Telegram command with replaced special characters
+    if not uid and user:
+        for ib in cfg.get('inbounds', []):
+            if ib.get('protocol') == protocol:
+                for c in ib['settings']['clients']:
+                    email = c.get('email')
+                    if email and email.replace('-', '_').replace('.', '_').replace(' ', '_') == user.replace('-', '_').replace('.', '_').replace(' ', '_'):
+                        user = email
+                        uid = c.get('id') if protocol != 'trojan' else c.get('password')
+                        break
+                if uid:
+                    break
+                    
     if uid:
         exp_date_str, limit_ip, limit_q = "Lifetime", 0, 0
         if os.path.exists(EXP_FILE):
@@ -767,11 +795,25 @@ def renew_ssh():
 def detail_ssh():
     user = (request.json or {}).get('user')
     
+    # Flexible match for Telegram command containing underscores
+    matched_user = None
+    if os.path.exists(SSH_EXP) and user:
+        with open(SSH_EXP, "r") as f:
+            for line in f:
+                parts = line.strip().split()
+                if parts:
+                    p_user = parts[0]
+                    if p_user == user or p_user.replace('-', '_').replace('.', '_').replace(' ', '_') == user.replace('-', '_').replace('.', '_').replace(' ', '_'):
+                        matched_user = p_user
+                        break
+        if matched_user:
+            user = matched_user
+
     found = False
     msg_cli = f"❌ Akun SSH '{user}' tidak ditemukan."
     msg_tg = msg_cli
     
-    if os.path.exists(SSH_EXP):
+    if os.path.exists(SSH_EXP) and matched_user:
         with open(SSH_EXP, "r") as f:
             for line in f:
                 if line.startswith(user + " "):
@@ -953,11 +995,25 @@ def renew_l2tp():
 def detail_l2tp():
     user = (request.json or {}).get('user')
     
+    # Flexible match for Telegram command containing underscores
+    matched_user = None
+    if os.path.exists(L2TP_EXP) and user:
+        with open(L2TP_EXP, "r") as f:
+            for line in f:
+                parts = line.strip().split()
+                if parts:
+                    p_user = parts[0]
+                    if p_user == user or p_user.replace('-', '_').replace('.', '_').replace(' ', '_') == user.replace('-', '_').replace('.', '_').replace(' ', '_'):
+                        matched_user = p_user
+                        break
+        if matched_user:
+            user = matched_user
+
     found = False
     msg_cli = f"❌ Akun L2TP '{user}' tidak ditemukan."
     msg_tg = msg_cli
     
-    if os.path.exists(L2TP_EXP):
+    if os.path.exists(L2TP_EXP) and matched_user:
         with open(L2TP_EXP, "r") as f:
             for line in f:
                 if line.startswith(user + " "):
