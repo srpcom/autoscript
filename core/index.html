@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>SRPCOM V5.1 - Web Panel</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <script>
         tailwind.config = {
@@ -144,6 +145,58 @@
                             <div class="h-8 w-px bg-slate-700"></div>
                             <div class="flex items-center justify-center w-8 h-8 rounded-full bg-green-500/10 border border-green-500/20" title="Server Online">
                                 <span class="w-2.5 h-2.5 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.8)] animate-pulse"></span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Real-Time Metrics Dashboard (Hanya muncul di Mode Monitor) -->
+                    <div id="metrics-container" class="hidden shrink-0 grid grid-cols-1 md:grid-cols-3 gap-6 bg-slate-800 rounded-2xl p-6 border border-slate-700 shadow-xl relative overflow-hidden transition-all duration-300">
+                        <!-- CPU Card -->
+                        <div class="bg-slate-900/60 p-4 rounded-xl border border-slate-700/50 flex flex-col justify-between">
+                            <div>
+                                <div class="flex justify-between items-center w-full mb-3">
+                                    <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">CPU Usage</span>
+                                    <span id="cpu-percent" class="text-sm font-mono text-blue-400 font-bold">0.0%</span>
+                                </div>
+                                <div class="w-full bg-slate-850 rounded-full h-2 mb-3 overflow-hidden border border-slate-700">
+                                    <div id="cpu-bar" class="bg-blue-500 h-full rounded-full transition-all duration-300" style="width: 0%"></div>
+                                </div>
+                            </div>
+                            <div class="w-full h-16">
+                                <canvas id="cpuChart"></canvas>
+                            </div>
+                        </div>
+
+                        <!-- RAM Card -->
+                        <div class="bg-slate-900/60 p-4 rounded-xl border border-slate-700/50 flex flex-col justify-between">
+                            <div>
+                                <div class="flex justify-between items-center w-full mb-3">
+                                    <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">RAM Usage</span>
+                                    <span id="ram-percent" class="text-sm font-mono text-emerald-400 font-bold">0.0%</span>
+                                </div>
+                                <div class="w-full bg-slate-850 rounded-full h-2 mb-3 overflow-hidden border border-slate-700">
+                                    <div id="ram-bar" class="bg-emerald-500 h-full rounded-full transition-all duration-300" style="width: 0%"></div>
+                                </div>
+                            </div>
+                            <div class="w-full h-16">
+                                <canvas id="ramChart"></canvas>
+                            </div>
+                        </div>
+
+                        <!-- Disk Card -->
+                        <div class="bg-slate-900/60 p-4 rounded-xl border border-slate-700/50 flex flex-col justify-between">
+                            <div>
+                                <div class="flex justify-between items-center w-full mb-3">
+                                    <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">Disk Storage (/)</span>
+                                    <span id="disk-percent" class="text-sm font-mono text-purple-400 font-bold">0.0%</span>
+                                </div>
+                                <div class="w-full bg-slate-850 rounded-full h-2 mb-3 overflow-hidden border border-slate-700">
+                                    <div id="disk-bar" class="bg-purple-500 h-full rounded-full transition-all duration-300" style="width: 0%"></div>
+                                </div>
+                            </div>
+                            <div class="flex items-center gap-3 bg-slate-950/40 p-2.5 rounded-lg border border-slate-800/80">
+                                <i class="fas fa-hdd text-xl text-purple-400/80"></i>
+                                <div class="text-[11px] text-slate-400 leading-normal font-medium">Sistem penyimpanan aktif pada direktori root (/).</div>
                             </div>
                         </div>
                     </div>
@@ -324,6 +377,117 @@
 
     <script>
         let currentMode = '';
+        let cpuChart = null;
+        let ramChart = null;
+        let metricsInterval = null;
+        const maxDataPoints = 15;
+        const cpuData = Array(maxDataPoints).fill(0);
+        const ramData = Array(maxDataPoints).fill(0);
+        const chartLabels = Array(maxDataPoints).fill('');
+
+        function initCharts() {
+            if (cpuChart && ramChart) return;
+
+            const chartConfig = (label, data, color) => ({
+                type: 'line',
+                data: {
+                    labels: chartLabels,
+                    datasets: [{
+                        label: label,
+                        data: data,
+                        borderColor: color,
+                        backgroundColor: color + '15',
+                        fill: true,
+                        tension: 0.4,
+                        borderWidth: 1.5,
+                        pointRadius: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: { enabled: false }
+                    },
+                    scales: {
+                        x: { display: false },
+                        y: {
+                            min: 0,
+                            max: 100,
+                            ticks: { display: false },
+                            grid: { display: false }
+                        }
+                    }
+                }
+            });
+
+            try {
+                const ctxCpu = document.getElementById('cpuChart').getContext('2d');
+                cpuChart = new Chart(ctxCpu, chartConfig('CPU', cpuData, '#3b82f6'));
+
+                const ctxRam = document.getElementById('ramChart').getContext('2d');
+                ramChart = new Chart(ctxRam, chartConfig('RAM', ramData, '#10b981'));
+            } catch (err) {
+                console.error("Gagal menginisialisasi Chart.js:", err);
+            }
+        }
+
+        function updateCharts(cpuVal, ramVal) {
+            if (!cpuChart || !ramChart) return;
+            
+            cpuData.shift();
+            cpuData.push(cpuVal);
+            
+            ramData.shift();
+            ramData.push(ramVal);
+            
+            cpuChart.update('none');
+            ramChart.update('none');
+        }
+
+        function startMetricsUpdater() {
+            stopMetricsUpdater();
+            fetchMetrics();
+            metricsInterval = setInterval(fetchMetrics, 4000);
+        }
+
+        function stopMetricsUpdater() {
+            if (metricsInterval) {
+                clearInterval(metricsInterval);
+                metricsInterval = null;
+            }
+        }
+
+        async function fetchMetrics() {
+            try {
+                const key = localStorage.getItem('srpcom_api_key');
+                if (!key) return;
+                const res = await fetch('/user_legend/sys-resource', {
+                    headers: { 'Content-Type': 'application/json', 'x-api-key': key }
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data.metrics) {
+                        const cpu = data.metrics.cpu || 0;
+                        const ram = data.metrics.ram || 0;
+                        const disk = data.metrics.disk || 0;
+                        
+                        document.getElementById('cpu-percent').innerText = cpu + '%';
+                        document.getElementById('ram-percent').innerText = ram + '%';
+                        document.getElementById('disk-percent').innerText = disk + '%';
+                        
+                        document.getElementById('cpu-bar').style.width = cpu + '%';
+                        document.getElementById('ram-bar').style.width = ram + '%';
+                        document.getElementById('disk-bar').style.width = disk + '%';
+                        
+                        updateCharts(cpu, ram);
+                    }
+                }
+            } catch(err) {
+                console.error("Gagal mengambil live metrics:", err);
+            }
+        }
 
         function showToast(message, type = 'success') {
             const container = document.getElementById('toast-container');
@@ -520,6 +684,18 @@
         function setMode(mode) {
             currentMode = mode;
             updateActiveNav(mode);
+            
+            const metricsContainer = document.getElementById('metrics-container');
+            if (metricsContainer) {
+                if (mode === 'monitor') {
+                    metricsContainer.classList.remove('hidden');
+                    initCharts();
+                    startMetricsUpdater();
+                } else {
+                    metricsContainer.classList.add('hidden');
+                    stopMetricsUpdater();
+                }
+            }
             
             const container = document.getElementById('form-container');
             container.classList.remove('hidden');
