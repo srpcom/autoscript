@@ -8,12 +8,28 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <script>
+        // Apply saved theme early to prevent screen flash
+        (function() {
+            const savedTheme = localStorage.getItem('srpcom_theme');
+            if (savedTheme === 'light') {
+                document.documentElement.classList.add('light-theme');
+            }
+        })();
+
         tailwind.config = {
             theme: {
                 extend: {
                     colors: {
                         slate: {
-                            850: '#151f32',
+                            900: 'rgb(var(--bg-body) / <alpha-value>)',
+                            850: 'rgb(var(--bg-sidebar-header) / <alpha-value>)',
+                            800: 'rgb(var(--bg-card) / <alpha-value>)',
+                            700: 'rgb(var(--border-color) / <alpha-value>)',
+                            600: 'rgb(var(--border-color) / <alpha-value>)',
+                            500: 'rgb(var(--text-muted) / <alpha-value>)',
+                            400: 'rgb(var(--text-muted) / <alpha-value>)',
+                            300: 'rgb(var(--text-main) / <alpha-value>)',
+                            200: 'rgb(var(--text-main) / <alpha-value>)',
                         }
                     }
                 }
@@ -21,6 +37,82 @@
         }
     </script>
     <style>
+        /* CSS Variables for Sleek Dark / Light Modes (RGB format for Tailwind opacity support) */
+        :root {
+            --bg-body: 15 23 42;             /* #0f172a */
+            --bg-card: 30 41 59;             /* #1e293b */
+            --bg-sidebar-header: 21 31 50;   /* #151f32 */
+            --border-color: 51 65 85;        /* #334155 */
+            --text-main: 226 232 240;        /* #e2e8f0 */
+            --text-muted: 148 163 184;       /* #94a3b8 */
+            --text-white: 255 255 255;       /* #ffffff */
+        }
+        
+        html.light-theme {
+            --bg-body: 248 250 252;          /* #f8fafc */
+            --bg-card: 255 255 255;          /* #ffffff */
+            --bg-sidebar-header: 241 245 249;/* #f1f5f9 */
+            --border-color: 203 213 225;     /* #cbd5e1 */
+            --text-main: 51 65 85;           /* #334155 */
+            --text-muted: 100 116 139;       /* #64748b */
+            --text-white: 15 23 42;          /* #0f172a */
+        }
+
+        /* Global Transitions for Luxurious Feel */
+        body, aside, main, header, nav, div, input, select, button {
+            transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        /* Light Theme Overrides */
+        html.light-theme body {
+            background-color: rgb(var(--bg-body)) !important;
+            color: rgb(var(--text-main)) !important;
+        }
+        
+        html.light-theme h1,
+        html.light-theme h2,
+        html.light-theme h3,
+        html.light-theme h4 {
+            color: rgb(var(--text-white)) !important;
+        }
+        
+        html.light-theme input,
+        html.light-theme select {
+            background-color: rgb(var(--bg-sidebar-header)) !important;
+            border-color: rgb(var(--border-color)) !important;
+            color: rgb(var(--text-white)) !important;
+        }
+        
+        html.light-theme input::placeholder {
+            color: rgb(var(--text-muted)) !important;
+        }
+        
+        html.light-theme .text-slate-300,
+        html.light-theme .text-slate-200 {
+            color: rgb(var(--text-main)) !important;
+        }
+
+        /* Prevent white-on-light-grey text inside active/hover navigation links */
+        html.light-theme .nav-btn.bg-slate-700 {
+            background-color: rgb(var(--border-color)) !important;
+            color: rgb(var(--text-white)) !important;
+        }
+        
+        html.light-theme .nav-btn:hover {
+            background-color: rgb(var(--bg-sidebar-header)) !important;
+            color: rgb(var(--text-white)) !important;
+        }
+        
+        html.light-theme ::-webkit-scrollbar-track {
+            background: rgb(var(--bg-sidebar-header));
+        }
+        html.light-theme ::-webkit-scrollbar-thumb {
+            background: rgb(var(--border-color));
+        }
+        html.light-theme ::-webkit-scrollbar-thumb:hover {
+            background: rgb(var(--text-muted));
+        }
+
         /* Custom Scrollbar for Terminal */
         ::-webkit-scrollbar { width: 8px; height: 8px; }
         ::-webkit-scrollbar-track { background: #0f1419; }
@@ -77,11 +169,17 @@
     <div id="app-container" class="flex h-full w-full hidden opacity-0 transition-opacity duration-500">
         <!-- Sidebar Desktop -->
         <aside class="w-64 bg-slate-800 border-r border-slate-700 flex-col hidden md:flex z-20 shadow-xl">
-            <div class="h-16 flex items-center px-6 border-b border-slate-700 bg-slate-850 pt-safe">
-                <div class="w-8 h-8 bg-blue-500/20 rounded-lg flex items-center justify-center text-blue-400 mr-3">
-                    <i class="fas fa-server"></i>
+            <div class="h-16 flex items-center justify-between px-6 border-b border-slate-700 bg-slate-850 pt-safe">
+                <div class="flex items-center">
+                    <div class="w-8 h-8 bg-blue-500/20 rounded-lg flex items-center justify-center text-blue-400 mr-3">
+                        <i class="fas fa-server"></i>
+                    </div>
+                    <h1 class="text-lg font-bold text-white tracking-wide">SRPCOM <span class="text-blue-500">V5</span></h1>
                 </div>
-                <h1 class="text-lg font-bold text-white tracking-wide">SRPCOM <span class="text-blue-500">V5</span></h1>
+                <!-- Tombol Tema Desktop -->
+                <button onclick="toggleTheme()" class="w-8 h-8 rounded-lg bg-slate-700/50 hover:bg-slate-700 border border-slate-600/30 text-slate-300 hover:text-white transition-all flex items-center justify-center" title="Ganti Tema">
+                    <i class="fas fa-sun text-sm theme-toggle-icon"></i>
+                </button>
             </div>
             <nav class="flex-1 overflow-y-auto py-6 px-4 space-y-1">
                 <p class="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-3 px-2">Layanan VPN</p>
@@ -123,7 +221,13 @@
                     </div>
                     <h1 class="text-lg font-bold text-white">SRPCOM <span class="text-blue-500">V5</span></h1>
                 </div>
-                <button onclick="performLogout()" class="text-slate-400 hover:text-red-400 transition bg-slate-700/50 p-2 rounded-lg"><i class="fas fa-sign-out-alt"></i></button>
+                <div class="flex items-center gap-2">
+                    <!-- Tombol Tema Mobile -->
+                    <button onclick="toggleTheme()" class="w-9 h-9 rounded-lg bg-slate-700/50 text-slate-300 hover:text-white transition flex items-center justify-center border border-slate-600/30" title="Ganti Tema">
+                        <i class="fas fa-sun text-sm theme-toggle-icon"></i>
+                    </button>
+                    <button onclick="performLogout()" class="text-slate-400 hover:text-red-400 transition bg-slate-700/50 p-2 rounded-lg"><i class="fas fa-sign-out-alt"></i></button>
+                </div>
             </header>
 
             <!-- Scrollable Content Area -->
@@ -142,6 +246,10 @@
                                 <p class="text-[10px] text-slate-500 uppercase font-bold tracking-widest mb-0.5">Host Domain</p>
                                 <p class="font-mono text-blue-400 text-sm font-medium" id="display-domain">Memuat...</p>
                             </div>
+                            <div class="h-8 w-px bg-slate-700"></div>
+                            <button onclick="toggleTheme()" class="w-8 h-8 rounded-full bg-slate-800 hover:bg-slate-700/80 border border-slate-600/50 text-slate-300 hover:text-white transition flex items-center justify-center" id="theme-toggle-btn" title="Ganti Tema">
+                                <i class="fas fa-sun text-sm theme-toggle-icon"></i>
+                            </button>
                             <div class="h-8 w-px bg-slate-700"></div>
                             <div class="flex items-center justify-center w-8 h-8 rounded-full bg-green-500/10 border border-green-500/20" title="Server Online">
                                 <span class="w-2.5 h-2.5 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.8)] animate-pulse"></span>
@@ -405,6 +513,27 @@
             submitAction();
         }
 
+        function toggleTheme() {
+            const html = document.documentElement;
+            const icons = document.querySelectorAll('.theme-toggle-icon');
+            
+            if (html.classList.contains('light-theme')) {
+                html.classList.remove('light-theme');
+                localStorage.setItem('srpcom_theme', 'dark');
+                icons.forEach(icon => {
+                    icon.className = 'fas fa-sun text-sm theme-toggle-icon';
+                });
+                showToast('Sleek Dark Mode Aktif', 'info');
+            } else {
+                html.classList.add('light-theme');
+                localStorage.setItem('srpcom_theme', 'light');
+                icons.forEach(icon => {
+                    icon.className = 'fas fa-moon text-sm theme-toggle-icon';
+                });
+                showToast('Clean Light Mode Aktif', 'info');
+            }
+        }
+
         let cpuChart = null;
         let ramChart = null;
         let metricsInterval = null;
@@ -536,6 +665,16 @@
         }
 
         function initApp() {
+            // Setup theme toggle state based on localStorage
+            const savedTheme = localStorage.getItem('srpcom_theme');
+            const icons = document.querySelectorAll('.theme-toggle-icon');
+            icons.forEach(icon => {
+                if (savedTheme === 'light') {
+                    icon.className = 'fas fa-moon text-sm theme-toggle-icon';
+                } else {
+                    icon.className = 'fas fa-sun text-sm theme-toggle-icon';
+                }
+            });
             const key = localStorage.getItem('srpcom_api_key');
             if(key) verifyKey(key);
         }
