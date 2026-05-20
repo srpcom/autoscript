@@ -127,7 +127,37 @@ def remove_from_txt(filepath, user):
 # ==========================================
 @app.route('/user_legend/list-accounts/<protocol>', methods=['GET'])
 def list_accounts(protocol):
-    result = []
+    raw_results = []
+    
+    def parse_expiry(exp_str):
+        if not exp_str or exp_str.lower() in ["lifetime", "no exp", "lifetime / no exp"]:
+            return "Lifetime", "bg-blue-500/10 text-blue-400 border border-blue-500/20", "bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.8)]"
+            
+        try:
+            exp_dt = datetime.datetime.strptime(exp_str, "%Y-%m-%d %H:%M:%S")
+        except:
+            try:
+                exp_dt = datetime.datetime.strptime(exp_str, "%Y-%m-%d")
+                exp_dt = exp_dt.replace(hour=23, minute=59, second=59)
+            except:
+                return exp_str, "bg-slate-500/10 text-slate-400 border border-slate-500/20", "bg-slate-500"
+                
+        now = datetime.datetime.now()
+        diff = exp_dt - now
+        
+        formatted_date = exp_dt.strftime("%Y-%m-%d %H:%M:%S")
+        
+        if diff.total_seconds() < 0:
+            return f"{formatted_date} (Expired)", "bg-red-500/10 text-red-400 border border-red-500/20", "bg-red-500"
+        elif diff.days < 3:
+            hours = int(diff.total_seconds() / 3600)
+            if hours < 24:
+                return f"{formatted_date} ({hours} Jam lagi)", "bg-amber-500/10 text-amber-400 border border-amber-500/20 font-bold", "bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.8)] animate-pulse"
+            else:
+                return f"{formatted_date} ({diff.days} Hari lagi)", "bg-amber-500/10 text-amber-400 border border-amber-500/20 font-bold", "bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.8)] animate-pulse"
+        else:
+            return f"{formatted_date} ({diff.days} Hari)", "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20", "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)] animate-pulse"
+
     if protocol in ['vmess', 'vless', 'trojan']:
         cfg = load_json(XRAY_CONF)
         target_users = []
@@ -141,25 +171,83 @@ def list_accounts(protocol):
             with open(EXP_FILE, 'r') as f:
                 for line in f:
                     p = line.strip().split()
-                    if len(p) >= 2: exp_data[p[0]] = p[1]
+                    if len(p) >= 3:
+                        exp_data[p[0]] = f"{p[1]} {p[2]}"
+                    elif len(p) == 2:
+                        exp_data[p[0]] = p[1]
         for u in target_users:
             exp = exp_data.get(u, "Lifetime")
-            result.append(f"• `{u}` (Exp: {exp})")
+            raw_results.append((u, exp, protocol))
+            
     elif protocol == 'ssh' and os.path.exists(SSH_EXP):
         with open(SSH_EXP, 'r') as f:
             for line in f:
                 p = line.strip().split()
-                if len(p) >= 3: result.append(f"• `{p[0]}` (Exp: {p[2]})")
+                if len(p) >= 4:
+                    raw_results.append((p[0], f"{p[2]} {p[3]}", "ssh"))
+                elif len(p) >= 3:
+                    raw_results.append((p[0], p[2], "ssh"))
+                    
     elif protocol == 'l2tp' and os.path.exists(L2TP_EXP):
         with open(L2TP_EXP, 'r') as f:
             for line in f:
                 p = line.strip().split()
-                if len(p) >= 3: result.append(f"• `{p[0]}` (Exp: {p[2]})")
+                if len(p) >= 4:
+                    raw_results.append((p[0], f"{p[2]} {p[3]}", "l2tp"))
+                elif len(p) >= 3:
+                    raw_results.append((p[0], p[2], "l2tp"))
 
-    if not result:
-        return jsonify({"stdout": f"Belum ada akun aktif untuk protokol {protocol.upper()}."})
-    text = f"📋 *LIST ACCOUNT {protocol.upper()}*\n━━━━━━━━━━━━━━━━━━━━\n" + "\n".join(result)
-    return jsonify({"stdout": text})
+    if not raw_results:
+        return jsonify({"stdout": f"<div class=\"font-sans p-4 bg-red-500/10 text-red-400 border border-red-500/20 rounded-xl mt-2\"><i class=\"fas fa-exclamation-circle mr-2\"></i>Belum ada akun aktif untuk protokol {protocol.upper()}.</div>"})
+        
+    cards_html = []
+    for u, exp_str, prot in sorted(raw_results, key=lambda x: x[0].lower()):
+        exp_text, badge_class, bullet_class = parse_expiry(exp_str)
+        item_html = (
+            f'<div class="flex flex-col sm:flex-row sm:items-center justify-between p-3.5 bg-slate-800/40 hover:bg-slate-800/80 border border-slate-700/50 hover:border-blue-500/40 rounded-xl transition duration-200 gap-3">'
+            f'  <div class="flex items-center gap-3">'
+            f'    <div class="w-2.5 h-2.5 rounded-full {bullet_class}"></div>'
+            f'    <span onclick="checkAccountDetail(\'{u}\', \'{prot}\')" class="text-sm font-semibold text-blue-400 hover:text-blue-300 underline cursor-pointer transition duration-150">{u}</span>'
+            f'  </div>'
+            f'  <div class="flex items-center justify-between sm:justify-end gap-3 w-full sm:w-auto">'
+            f'    <span class="text-[11px] px-2.5 py-1 rounded-full {badge_class} font-mono">{exp_text}</span>'
+            f'    <button onclick="checkAccountDetail(\'{u}\', \'{prot}\')" class="px-3 py-1.5 text-[11px] bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 text-white rounded-lg transition-all duration-150 flex items-center gap-1.5 font-sans font-semibold shadow-md shadow-blue-900/20">'
+            f'      <i class="fas fa-search text-[9px]"></i> Detail'
+            f'    </button>'
+            f'  </div>'
+            f'</div>'
+        )
+        cards_html.append(item_html)
+        
+    if protocol in ['vmess', 'vless', 'trojan']:
+        icon_class = "fa-bolt text-yellow-400 bg-yellow-500/10 border border-yellow-500/20"
+    elif protocol == 'ssh':
+        icon_class = "fa-shield-alt text-green-400 bg-green-500/10 border border-green-500/20"
+    else:
+        icon_class = "fa-network-wired text-purple-400 bg-purple-500/10 border border-purple-500/20"
+        
+    wrapper_html = (
+        f'<div class="font-sans text-slate-200 w-full mt-2 select-text">'
+        f'  <div class="flex items-center gap-3 mb-5 bg-gradient-to-r from-slate-800 to-slate-850 p-4 rounded-xl border border-slate-700 shadow-lg">'
+        f'    <div class="w-10 h-10 rounded-xl {icon_class.split()[2]} flex items-center justify-center text-lg shrink-0">'
+        f'      <i class="fas {icon_class.split()[0]} {icon_class.split()[1]}"></i>'
+        f'    </div>'
+        f'    <div>'
+        f'      <h4 class="text-sm font-bold text-white uppercase tracking-wider">Daftar Akun {protocol.upper()}</h4>'
+        f'      <p class="text-[11px] text-slate-400">Total: <span class="text-blue-400 font-bold font-mono">{len(raw_results)}</span> akun aktif di server</p>'
+        f'    </div>'
+        f'  </div>'
+        f'  <div class="flex flex-col gap-2.5">'
+        f'    {"".join(cards_html)}'
+        f'  </div>'
+        f'  <div class="mt-5 flex items-center gap-2 bg-blue-500/10 p-3 rounded-lg border border-blue-500/20 text-xs text-blue-300">'
+        f'    <i class="fas fa-info-circle"></i>'
+        f'    <span>Klik pada nama akun atau tombol <b>Detail</b> untuk menampilkan konfigurasi lengkap secara instan.</span>'
+        f'  </div>'
+        f'</div>'
+    )
+    
+    return jsonify({"stdout": wrapper_html})
 
 @app.route('/user_legend/monitor-xray', methods=['GET'])
 def monitor_xray():
