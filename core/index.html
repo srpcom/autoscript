@@ -377,6 +377,34 @@
 
     <script>
         let currentMode = '';
+
+        async function checkAccountDetail(username, protocol) {
+            let mode = 'xray';
+            if (protocol === 'ssh') mode = 'ssh';
+            else if (protocol === 'l2tp') mode = 'l2tp';
+            
+            // Pindahkan ke mode yang sesuai
+            setMode(mode);
+            
+            // Isi kolom input username
+            document.getElementById('inp-user').value = username;
+            
+            // Set action ke detail
+            document.getElementById('action-type').value = 'detail';
+            updateFormVisibility();
+            
+            // Set select option protocol
+            const protSelect = document.getElementById('protocol-type');
+            let selectValue = protocol;
+            if (protocol === 'vmess' || protocol === 'vless' || protocol === 'trojan') {
+                selectValue = protocol + 'ws';
+            }
+            protSelect.value = selectValue;
+            
+            // Eksekusi secara otomatis
+            submitAction();
+        }
+
         let cpuChart = null;
         let ramChart = null;
         let metricsInterval = null;
@@ -919,7 +947,13 @@
             else if (type === 'warning') colorClass = 'text-yellow-400';
             else if (type === 'success') colorClass = 'text-teal-300'; 
 
-            const formattedText = `<span class="${colorClass}">${textWithLinks}</span>`;
+            let formattedText;
+            if (text.trim().startsWith('<div')) {
+                formattedText = textWithLinks;
+            } else {
+                formattedText = `<span class="${colorClass}">${textWithLinks}</span>`;
+            }
+            
             const prefix = term.innerHTML === '' ? '' : '\n';
             term.innerHTML += `${prefix}${formattedText}`;
             term.scrollTop = term.scrollHeight; 
