@@ -59,6 +59,18 @@ PROT_MAP = {'vmess': 'vmessws', 'vless': 'vlessws', 'trojan': 'trojanws', 'ssh':
 def is_admin(message):
     return str(message.chat.id) == ADMIN_ID
 
+def send_safe_message(chat_id, text, parse_mode="Markdown", reply_markup=None):
+    if not text:
+        return
+    if len(text) > 4000:
+        from telebot.util import split_string
+        chunks = split_string(text, 4000)
+        for i, chunk in enumerate(chunks):
+            markup = reply_markup if i == len(chunks) - 1 else None
+            bot.send_message(chat_id, chunk, parse_mode=parse_mode, reply_markup=markup)
+    else:
+        bot.send_message(chat_id, text, parse_mode=parse_mode, reply_markup=reply_markup)
+
 def get_default_server():
     return {"name": "💻 Local Server", "domain": "127.0.0.1:5000", "api_key": get_api_key()}
 
@@ -192,6 +204,27 @@ def send_welcome(message):
         return
     bot.send_message(message.chat.id, "👋 *PILIH NODE SERVER UNTUK DIKELOLA*\nSilakan daftarkan node tambahan melalui terminal VPS Anda.", reply_markup=server_selection_keyboard(), parse_mode="Markdown")
 
+@bot.message_handler(func=lambda msg: msg.text and msg.text.startswith('/det_'))
+def handle_detail_command(message):
+    if not is_admin(message):
+        bot.reply_to(message, "⛔ Akses Ditolak!")
+        return
+    try:
+        # Command format: /det_{protocol}_{username} (special chars replaced by underscores)
+        parts = message.text.split('_', 2)
+        if len(parts) < 3:
+            bot.reply_to(message, "❌ Format command tidak valid! Gunakan `/det_{protocol}_{username}`", parse_mode="Markdown")
+            return
+            
+        api_ep = parts[1]
+        user = parts[2]
+        
+        bot.send_message(message.chat.id, "⏳ Sedang mengambil detail akun...", parse_mode="Markdown")
+        response = api_req(f"detail-{api_ep}", "POST", {"user": user}, chat_id=message.chat.id)
+        send_safe_message(message.chat.id, response, parse_mode="Markdown")
+    except Exception as e:
+        bot.send_message(message.chat.id, f"❌ Gagal mengambil detail: {e}")
+
 @bot.callback_query_handler(func=lambda call: True)
 def handle_query(call):
     if not is_admin(call.message):
@@ -233,19 +266,19 @@ def handle_query(call):
 
         elif data == "mon_xray":
             bot.answer_callback_query(call.id, "Mengambil data Xray...")
-            bot.send_message(chat_id, api_req("monitor-xray", "GET", chat_id=chat_id), parse_mode="Markdown")
+            send_safe_message(chat_id, api_req("monitor-xray", "GET", chat_id=chat_id), parse_mode="Markdown")
 
         elif data == "mon_ssh":
             bot.answer_callback_query(call.id, "Mengambil data SSH...")
-            bot.send_message(chat_id, api_req("monitor-ssh", "GET", chat_id=chat_id), parse_mode="Markdown")
+            send_safe_message(chat_id, api_req("monitor-ssh", "GET", chat_id=chat_id), parse_mode="Markdown")
 
         elif data == "mon_bandwidth":
             bot.answer_callback_query(call.id, "Mengambil data Bandwidth...")
-            bot.send_message(chat_id, api_req("bandwidth", "GET", chat_id=chat_id), parse_mode="Markdown")
+            send_safe_message(chat_id, api_req("bandwidth", "GET", chat_id=chat_id), parse_mode="Markdown")
         
         elif data == "sys_cek_status":
             bot.answer_callback_query(call.id, "Mengecek...")
-            bot.send_message(chat_id, f"💻 *STATUS SERVER:*\n{api_req('cek-xray', 'GET', chat_id=chat_id)}", parse_mode="Markdown")
+            send_safe_message(chat_id, f"💻 *STATUS SERVER:*\n{api_req('cek-xray', 'GET', chat_id=chat_id)}", parse_mode="Markdown")
         
         elif data == "sys_backup":
             bot.answer_callback_query(call.id, "Memproses Data Backup...")
@@ -263,12 +296,12 @@ def handle_query(call):
             
             if act == "list":
                 bot.answer_callback_query(call.id, "Mengambil daftar akun...")
-                bot.send_message(chat_id, api_req(f"list-accounts/{prot}", "GET", chat_id=chat_id), parse_mode="Markdown")
+                send_safe_message(chat_id, api_req(f"list-accounts/{prot}", "GET", chat_id=chat_id), parse_mode="Markdown")
                 
             elif act == "trial":
                 bot.answer_callback_query(call.id, "Membuat trial...")
                 payload = {"exp": 60, "limit_ip": 1} if prot == "ssh" else {"exp": 60, "limit_ip": 1, "limit_quota": 1}
-                bot.send_message(chat_id, api_req(f"trial-{api_ep}", "POST", payload, chat_id), parse_mode="Markdown")
+                send_safe_message(chat_id, api_req(f"trial-{api_ep}", "POST", payload, chat_id), parse_mode="Markdown")
                 
             else:
                 # MULAI STEP-BY-STEP INPUT
@@ -371,7 +404,7 @@ def execute_api(message, act, api_ep, data):
     method = "POST" 
     
     response = api_req(endpoint, method, data, chat_id=message.chat.id)
-    bot.send_message(message.chat.id, response, parse_mode="Markdown")
+    send_safe_message(message.chat.id, response, parse_mode="Markdown")
 
 if __name__ == '__main__':
     print("Bot Master Node Panel sedang berjalan...")
