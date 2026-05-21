@@ -155,7 +155,7 @@
             <div class="space-y-5">
                 <div class="relative">
                     <i class="fas fa-key absolute left-4 top-3.5 text-slate-500"></i>
-                    <input type="password" id="inp-apikey" class="w-full bg-slate-900 border border-slate-600 text-slate-200 rounded-lg py-3 pl-10 pr-4 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/50 transition-all font-mono placeholder:font-sans placeholder:tracking-normal tracking-widest" placeholder="Masukkan API Key">
+                    <input type="password" id="inp-apikey" onkeydown="if(event.key === 'Enter') performLogin()" class="w-full bg-slate-900 border border-slate-600 text-slate-200 rounded-lg py-3 pl-10 pr-4 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/50 transition-all font-mono placeholder:font-sans placeholder:tracking-normal tracking-widest" placeholder="Masukkan API Key">
                 </div>
                 <button onclick="performLogin()" id="btn-login" class="w-full bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 text-white font-bold py-3 rounded-lg transition duration-200 shadow-lg shadow-blue-900/40 flex items-center justify-center">
                     <span>Akses Sistem</span> <i class="fas fa-arrow-right ml-2 text-sm"></i>
