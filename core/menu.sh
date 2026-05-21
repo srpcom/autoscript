@@ -369,10 +369,11 @@ menu_update() {
                 echo -e "\n=> Mengunduh update UI Web Panel dari GitHub..."
                 mkdir -p /usr/local/etc/srpcom/panel
                 wget -q -O /usr/local/etc/srpcom/panel/index.html "$GITHUB_RAW/core/index.html"
+                wget -q -O /usr/local/etc/srpcom/panel/api-docs.html "$GITHUB_RAW/core/api-docs.html"
                 if [ -s /usr/local/etc/srpcom/panel/index.html ]; then
-                    echo -e "\e[32m[SUCCESS]\e[0m Web Panel berhasil diperbarui!"
+                    echo -e "\e[32m[SUCCESS]\e[0m Web Panel & Dokumentasi API berhasil diperbarui!"
                 else
-                    echo -e "\e[31m[ERROR]\e[0m Gagal mengunduh Web Panel!"
+                    echo -e "\e[31m[ERROR]\e[0m Gagal mengunduh file Web Panel!"
                 fi
                 sleep 1.5 ;;
             0|x|X) exec menu ;;

@@ -634,8 +634,9 @@ sed -i '/net.ipv4.ip_forward/s/^#//g' /etc/sysctl.conf
 sysctl -p
 
 
-echo -e "\n[10/12] Mendownload WEB PANEL HTML..."
+echo -e "\n[10/12] Mendownload WEB PANEL & DOKUMENTASI API..."
 wget -q -O /usr/local/etc/srpcom/panel/index.html "$GITHUB_RAW/core/index.html"
+wget -q -O /usr/local/etc/srpcom/panel/api-docs.html "$GITHUB_RAW/core/api-docs.html"
 if [ ! -s "/usr/local/etc/srpcom/panel/index.html" ]; then
     echo -e "\e[33m[WARNING]\e[0m Gagal mengunduh index.html Web Panel. Akan dibuat template dasar."
     echo "<h1>Web Panel Sedang Maintenance</h1>" > /usr/local/etc/srpcom/panel/index.html

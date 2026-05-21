@@ -1,0 +1,1793 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SRPCOM V5 - Dokumentasi API Developer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Fira+Code:wght@400;500;600&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['"Plus Jakarta Sans"', 'sans-serif'],
+                        mono: ['"Fira Code"', 'monospace'],
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            background: linear-gradient(135deg, #070d16 0%, #0d1726 100%);
+            color: #cbd5e1;
+        }
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #070d16;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #1e293b;
+            border-radius: 3px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #3882f6;
+        }
+        .endpoint-badge {
+            font-size: 0.7rem;
+            font-weight: 800;
+            padding: 0.25rem 0.6rem;
+            border-radius: 0.375rem;
+            letter-spacing: 0.05em;
+        }
+        .badge-post { background-color: rgba(16, 185, 129, 0.1); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.2); }
+        .badge-get { background-color: rgba(59, 130, 246, 0.1); color: #3b82f6; border: 1px solid rgba(59, 130, 246, 0.2); }
+        .badge-delete { background-color: rgba(239, 68, 68, 0.1); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.2); }
+        
+        .code-container {
+            position: relative;
+            background: #0a1120 !important;
+            border: 1px solid #334155 !important; /* Prominent slate-700 border */
+            box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.05), 0 8px 16px -4px rgba(0, 0, 0, 0.6);
+            transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .code-container:hover {
+            border-color: #475569 !important; /* Brightens on hover to slate-600 */
+            box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.08), 0 12px 24px -4px rgba(59, 130, 246, 0.15);
+            background: #0d172e !important;
+        }
+        .copy-btn {
+            position: absolute;
+            top: 0.5rem;
+            right: 0.5rem;
+            background-color: rgba(15, 23, 42, 0.85);
+            border: 1px solid rgba(71, 85, 105, 0.4);
+            transition: all 0.2s;
+            cursor: pointer;
+            z-index: 10;
+        }
+        .copy-btn:hover {
+            background-color: rgba(59, 130, 246, 0.25);
+            border-color: #3b82f6;
+            color: #ffffff;
+            transform: scale(1.03);
+        }
+        .glass-panel {
+            background: rgba(13, 22, 38, 0.45);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.08); /* Distinct border */
+            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.25);
+            transition: all 0.3s ease;
+        }
+        .glass-panel:hover {
+            border-color: rgba(59, 130, 246, 0.25);
+            box-shadow: 0 10px 45px -10px rgba(59, 130, 246, 0.12);
+            background: rgba(13, 22, 38, 0.55);
+        }
+        .glow-blue {
+            box-shadow: 0 0 50px -15px rgba(59, 130, 246, 0.2);
+        }
+        .glow-green {
+            box-shadow: 0 0 50px -15px rgba(16, 185, 129, 0.2);
+        }
+        .glow-purple {
+            box-shadow: 0 0 50px -15px rgba(139, 92, 246, 0.2);
+        }
+        html {
+            scroll-behavior: smooth;
+        }
+    </style>
+</head>
+<body class="font-sans antialiased selection:bg-blue-500/30 selection:text-blue-200">
+
+    <!-- Header / Navbar -->
+    <header class="sticky top-0 z-40 w-full border-b border-slate-800 bg-[#070d16]/85 backdrop-blur-md">
+        <div class="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div class="w-9 h-9 bg-blue-600/20 rounded-xl flex items-center justify-center text-blue-500 border border-blue-500/20 shadow-[0_0_15px_rgba(59,130,246,0.3)]">
+                    <i class="fas fa-code-branch animate-pulse"></i>
+                </div>
+                <div>
+                    <span class="text-sm font-bold text-white tracking-wide uppercase">SRPCOM <span class="text-blue-500">V5</span></span>
+                    <span class="ml-2 text-[10px] bg-slate-800 text-slate-350 font-semibold px-2.5 py-0.5 rounded-full border border-slate-700">Developer API portal</span>
+                </div>
+            </div>
+            <div class="flex items-center gap-4">
+                <a href="#quickstart" class="text-xs font-semibold text-slate-400 hover:text-white transition">Quick Start</a>
+                <span class="text-slate-700">|</span>
+                <span class="text-xs text-green-400 font-medium flex items-center gap-1.5 bg-green-500/5 px-2.5 py-1 rounded-full border border-green-500/10">
+                    <span class="w-1.5 h-1.5 rounded-full bg-green-500 shadow-[0_0_8px_#22c55e]"></span> API Active
+                </span>
+                <!-- Mobile Navigation Trigger -->
+                <button onclick="toggleMobileSidebar()" class="lg:hidden p-2 text-slate-450 hover:text-white transition">
+                    <i id="mobile-menu-icon" class="fas fa-bars text-lg"></i>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <div class="max-w-7xl mx-auto px-6 py-8 flex flex-col lg:flex-row gap-8 relative">
+        
+        <!-- Left Sidebar Navigation -->
+        <aside id="sidebar-container" class="hidden lg:block w-full lg:w-72 shrink-0 lg:sticky lg:top-24 h-fit max-h-[calc(100vh-8rem)] overflow-y-auto pr-3 z-30 bg-[#070d16] lg:bg-transparent p-6 lg:p-0 rounded-2xl border border-slate-800 lg:border-none fixed lg:static top-20 left-0 right-0 max-h-[85vh]">
+            <!-- Interactive Search Box -->
+            <div class="mb-6 relative">
+                <i class="fas fa-search absolute left-3 top-3 text-slate-500 text-xs"></i>
+                <input type="text" id="sidebar-search" placeholder="Cari endpoint..." class="w-full bg-slate-900/60 border border-slate-800 rounded-xl py-2 pl-9 pr-4 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-blue-500/60 focus:ring-1 focus:ring-blue-500/60 transition">
+            </div>
+
+            <div class="space-y-6">
+                <div>
+                    <h3 class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-3 px-2">Memulai</h3>
+                    <div class="space-y-1">
+                        <a href="#quickstart" class="sidebar-link block px-3 py-2 text-xs rounded-lg text-blue-400 font-medium bg-blue-500/5 border-l-4 border-blue-500 hover:text-white transition flex items-center gap-2">
+                            <i class="fas fa-rocket w-4 text-center"></i> Pengenalan API
+                        </a>
+                        <a href="#auth" class="sidebar-link block px-3 py-2 text-xs rounded-lg text-slate-400 hover:text-white transition flex items-center gap-2">
+                            <i class="fas fa-lock w-4 text-center text-slate-500"></i> Autentikasi Keamanan
+                        </a>
+                        <a href="#hud" class="sidebar-link block px-3 py-2 text-xs rounded-lg text-slate-400 hover:text-white transition flex items-center gap-2">
+                            <i class="fas fa-sliders-h w-4 text-center text-slate-500"></i> Konfigurasi Global HUD
+                        </a>
+                    </div>
+                </div>
+
+                <div>
+                    <h3 class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-3 px-2">Xray Core (VMESS, VLESS, TROJAN)</h3>
+                    <div class="space-y-1">
+                        <a href="#add-xray" class="sidebar-link block px-3 py-2 text-xs rounded-lg text-slate-400 hover:text-white transition flex items-center gap-2">
+                            <i class="fas fa-plus-circle w-4 text-center text-emerald-500"></i> Buat Akun Xray
+                        </a>
+                        <a href="#trial-xray" class="sidebar-link block px-3 py-2 text-xs rounded-lg text-slate-400 hover:text-white transition flex items-center gap-2">
+                            <i class="fas fa-stopwatch w-4 text-center text-emerald-450"></i> Buat Akun Trial
+                        </a>
+                        <a href="#detail-xray" class="sidebar-link block px-3 py-2 text-xs rounded-lg text-slate-400 hover:text-white transition flex items-center gap-2">
+                            <i class="fas fa-search w-4 text-center text-blue-400"></i> Detail Akun
+                        </a>
+                        <a href="#renew-xray" class="sidebar-link block px-3 py-2 text-xs rounded-lg text-slate-400 hover:text-white transition flex items-center gap-2">
+                            <i class="fas fa-sync-alt w-4 text-center text-yellow-500"></i> Perpanjang Akun
+                        </a>
+                        <a href="#del-xray" class="sidebar-link block px-3 py-2 text-xs rounded-lg text-slate-400 hover:text-white transition flex items-center gap-2">
+                            <i class="fas fa-trash-alt w-4 text-center text-red-500"></i> Hapus Akun
+                        </a>
+                        <a href="#change-uuid" class="sidebar-link block px-3 py-2 text-xs rounded-lg text-slate-400 hover:text-white transition flex items-center gap-2">
+                            <i class="fas fa-key w-4 text-center text-purple-400"></i> Ganti UUID/Password
+                        </a>
+                        <a href="#lock-xray" class="sidebar-link block px-3 py-2 text-xs rounded-lg text-slate-400 hover:text-white transition flex items-center gap-2">
+                            <i class="fas fa-ban w-4 text-center text-amber-500"></i> Kunci Akun (Lock)
+                        </a>
+                        <a href="#cek-xray" class="sidebar-link block px-3 py-2 text-xs rounded-lg text-slate-400 hover:text-white transition flex items-center gap-2">
+                            <i class="fas fa-check-double w-4 text-center text-teal-400"></i> Cek Status Xray Core
+                        </a>
+                    </div>
+                </div>
+
+                <div>
+                    <h3 class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-3 px-2">SSH & OpenVPN</h3>
+                    <div class="space-y-1">
+                        <a href="#add-ssh" class="sidebar-link block px-3 py-2 text-xs rounded-lg text-slate-400 hover:text-white transition flex items-center gap-2">
+                            <i class="fas fa-user-plus w-4 text-center text-emerald-500"></i> Buat Akun SSH
+                        </a>
+                        <a href="#trial-ssh" class="sidebar-link block px-3 py-2 text-xs rounded-lg text-slate-400 hover:text-white transition flex items-center gap-2">
+                            <i class="fas fa-hourglass-start w-4 text-center text-emerald-450"></i> Buat SSH Trial
+                        </a>
+                        <a href="#detail-ssh" class="sidebar-link block px-3 py-2 text-xs rounded-lg text-slate-400 hover:text-white transition flex items-center gap-2">
+                            <i class="fas fa-address-card w-4 text-center text-blue-400"></i> Detail Akun SSH
+                        </a>
+                        <a href="#renew-ssh" class="sidebar-link block px-3 py-2 text-xs rounded-lg text-slate-400 hover:text-white transition flex items-center gap-2">
+                            <i class="fas fa-history w-4 text-center text-yellow-500"></i> Perpanjang SSH
+                        </a>
+                        <a href="#del-ssh" class="sidebar-link block px-3 py-2 text-xs rounded-lg text-slate-400 hover:text-white transition flex items-center gap-2">
+                            <i class="fas fa-user-minus w-4 text-center text-red-500"></i> Hapus Akun SSH
+                        </a>
+                        <a href="#lock-ssh" class="sidebar-link block px-3 py-2 text-xs rounded-lg text-slate-400 hover:text-white transition flex items-center gap-2">
+                            <i class="fas fa-user-lock w-4 text-center text-amber-500"></i> Kunci SSH (Lock)
+                        </a>
+                    </div>
+                </div>
+
+                <div>
+                    <h3 class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-3 px-2">L2TP IPsec VPN</h3>
+                    <div class="space-y-1">
+                        <a href="#add-l2tp" class="sidebar-link block px-3 py-2 text-xs rounded-lg text-slate-400 hover:text-white transition flex items-center gap-2">
+                            <i class="fas fa-plus-square w-4 text-center text-emerald-500"></i> Buat Akun L2TP
+                        </a>
+                        <a href="#trial-l2tp" class="sidebar-link block px-3 py-2 text-xs rounded-lg text-slate-400 hover:text-white transition flex items-center gap-2">
+                            <i class="fas fa-stopwatch w-4 text-center text-emerald-450"></i> Buat L2TP Trial
+                        </a>
+                        <a href="#detail-l2tp" class="sidebar-link block px-3 py-2 text-xs rounded-lg text-slate-400 hover:text-white transition flex items-center gap-2">
+                            <i class="fas fa-folder-open w-4 text-center text-blue-400"></i> Detail L2TP
+                        </a>
+                        <a href="#renew-l2tp" class="sidebar-link block px-3 py-2 text-xs rounded-lg text-slate-400 hover:text-white transition flex items-center gap-2">
+                            <i class="fas fa-calendar-plus w-4 text-center text-yellow-500"></i> Perpanjang L2TP
+                        </a>
+                        <a href="#del-l2tp" class="sidebar-link block px-3 py-2 text-xs rounded-lg text-slate-400 hover:text-white transition flex items-center gap-2">
+                            <i class="fas fa-minus-square w-4 text-center text-red-500"></i> Hapus Akun L2TP
+                        </a>
+                    </div>
+                </div>
+
+                <div>
+                    <h3 class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-3 px-2">System & Monitoring</h3>
+                    <div class="space-y-1">
+                        <a href="#list-accounts" class="sidebar-link block px-3 py-2 text-xs rounded-lg text-slate-400 hover:text-white transition flex items-center gap-2">
+                            <i class="fas fa-users-cog w-4 text-center text-cyan-400"></i> Daftar Akun Server
+                        </a>
+                        <a href="#mon-xray" class="sidebar-link block px-3 py-2 text-xs rounded-lg text-slate-400 hover:text-white transition flex items-center gap-2">
+                            <i class="fas fa-tachometer-alt w-4 text-center text-yellow-400"></i> Monitor Bandwidth & Quota
+                        </a>
+                        <a href="#mon-ssh" class="sidebar-link block px-3 py-2 text-xs rounded-lg text-slate-400 hover:text-white transition flex items-center gap-2">
+                            <i class="fas fa-chalkboard w-4 text-center text-green-400"></i> Monitor Login SSH
+                        </a>
+                        <a href="#sys-resource" class="sidebar-link block px-3 py-2 text-xs rounded-lg text-slate-400 hover:text-white transition flex items-center gap-2">
+                            <i class="fas fa-hdd w-4 text-center text-purple-400"></i> Resource Server
+                        </a>
+                        <a href="#sys-logs" class="sidebar-link block px-3 py-2 text-xs rounded-lg text-slate-400 hover:text-white transition flex items-center gap-2">
+                            <i class="fas fa-clipboard-list w-4 text-center text-slate-400"></i> Live Log Service
+                        </a>
+                        <a href="#sys-backup" class="sidebar-link block px-3 py-2 text-xs rounded-lg text-slate-400 hover:text-white transition flex items-center gap-2">
+                            <i class="fas fa-file-archive w-4 text-center text-blue-500"></i> Backup Konfigurasi
+                        </a>
+                        <a href="#speed-bw" class="sidebar-link block px-3 py-2 text-xs rounded-lg text-slate-400 hover:text-white transition flex items-center gap-2">
+                            <i class="fas fa-signal w-4 text-center text-pink-500"></i> Speedtest & Bandwidth vnStat
+                        </a>
+                    </div>
+                </div>
+
+                <div>
+                    <h3 class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-3 px-2">Integrasi Bot Telegram</h3>
+                    <div class="space-y-1">
+                        <a href="#telegram-bot" class="sidebar-link block px-3 py-2 text-xs rounded-lg text-slate-400 hover:text-white transition flex items-center gap-2">
+                            <i class="fab fa-telegram-plane w-4 text-center text-blue-400"></i> Integrasi Script Bot
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content Area -->
+        <main class="flex-1 min-w-0 space-y-16 pb-24">
+            
+            <!-- Pengenalan API Section -->
+            <section id="quickstart" class="scroll-mt-24 space-y-6">
+                <div class="relative overflow-hidden rounded-3xl glass-panel glow-blue p-8 lg:p-10">
+                    <div class="absolute top-0 right-0 -mt-6 -mr-6 w-32 h-32 bg-blue-500/10 rounded-full blur-3xl"></div>
+                    <div class="flex items-center gap-3 mb-2">
+                        <span class="bg-blue-500/10 text-blue-400 border border-blue-500/30 text-[10px] font-bold tracking-widest uppercase px-2.5 py-1 rounded-full">v5.0 Stable</span>
+                        <span class="text-xs text-slate-550">•</span>
+                        <span class="text-xs text-slate-400">Terakhir Diupdate: Hari Ini</span>
+                    </div>
+                    <h1 class="text-3xl font-extrabold text-white tracking-tight leading-tight">Dokumentasi API Node VPN SRPCOM V5</h1>
+                    <p class="mt-4 text-slate-350 leading-relaxed text-sm md:text-base">
+                        API SRPCOM V5 adalah gerbang remote API berbasis **Flask Python** (`xray-api.py`) yang berjalan di balik reverse proxy **Caddy Web Server**. Layanan ini dirancang khusus untuk mempermudah developer dalam membangun bot manajemen Telegram otomatis atau mengintegrasikan VPS Multiport V5 ke dalam website panel penjualan kustom Anda.
+                    </p>
+                    <div class="mt-6 flex flex-wrap gap-4">
+                        <div class="flex items-center gap-2 text-xs bg-slate-900/80 px-3.5 py-2.5 rounded-xl border border-slate-800">
+                            <span class="text-slate-550">Base URL Server:</span>
+                            <code class="font-mono text-blue-400 font-bold"><span class="host-placeholder">yourvps.com</span></code>
+                        </div>
+                        <div class="flex items-center gap-2 text-xs bg-slate-900/80 px-3.5 py-2.5 rounded-xl border border-slate-800">
+                            <span class="text-slate-550">Protokol Keamanan:</span>
+                            <code class="font-mono text-yellow-400 font-bold">HTTPS (SSL Caddy Otomatis)</code>
+                        </div>
+                    </div>
+                    <div class="mt-6 p-4 rounded-xl bg-blue-500/10 border border-blue-500/20 text-xs md:text-sm text-blue-300 leading-relaxed">
+                        <i class="fas fa-shield-alt mr-2 animate-pulse"></i> **Keamanan Terpusat**: Seluruh endpoint API beroperasi secara non-interaktif dan aman. Pastikan API diaktifkan melalui panel server VPS di Terminal Anda sebelum memanggil request remote.
+                    </div>
+                </div>
+            </section>
+
+            <!-- Autentikasi Section -->
+            <section id="auth" class="scroll-mt-24 space-y-6">
+                <div class="border-b border-slate-800 pb-4">
+                    <h2 class="text-2xl font-bold text-white tracking-tight"><i class="fas fa-lock text-blue-500 mr-2"></i> Autentikasi Keamanan</h2>
+                    <p class="text-sm text-slate-400 mt-1">Mengamankan remote request dari pihak luar menggunakan token header.</p>
+                </div>
+                <div class="space-y-4 text-sm leading-relaxed text-slate-350">
+                    <p>Semua panggilan endpoint API dilindungi menggunakan sistem token rahasia yang dikirimkan melalui header HTTP. API Key ini dapat diatur ulang pada file konfigurasi VPS Anda di `/usr/local/etc/xray/api_key.conf`.</p>
+                    <div class="p-5 rounded-2xl bg-slate-900/40 border border-slate-800 space-y-3 glass-panel">
+                        <h4 class="font-bold text-slate-400 text-xs uppercase tracking-wider">HTTP Header Wajib</h4>
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                            <div class="bg-slate-950 p-3 rounded-lg border border-slate-800">
+                                <span class="block text-[10px] text-slate-550 font-bold uppercase">Nama Header</span>
+                                <code class="font-mono text-xs text-blue-400 font-semibold">x-api-key</code>
+                            </div>
+                            <div class="bg-slate-950 p-3 rounded-lg border border-slate-800 md:col-span-2">
+                                <span class="block text-[10px] text-slate-550 font-bold uppercase">Nilai / Value</span>
+                                <code class="font-mono text-xs text-white"><span class="key-placeholder">SANGATRAHASIA123</span></code> <span class="text-[10px] text-slate-500 ml-2">(Sesuai isi config VPS)</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- HUD CONFIGURATION (PREMIUM ADDITION) -->
+            <section id="hud" class="scroll-mt-24 space-y-6">
+                <div class="relative overflow-hidden rounded-3xl glass-panel glow-green p-8">
+                    <div class="absolute top-0 right-0 -mt-6 -mr-6 w-32 h-32 bg-emerald-500/10 rounded-full blur-3xl"></div>
+                    <div class="flex items-center gap-2 mb-2">
+                        <i class="fas fa-sliders-h text-emerald-400 text-sm"></i>
+                        <span class="text-[10px] font-bold tracking-widest text-emerald-400 uppercase">Configuration Engine</span>
+                    </div>
+                    <h2 class="text-xl font-bold text-white">Dynamic API Sandbox HUD</h2>
+                    <p class="text-xs text-slate-400 mt-1 leading-relaxed">
+                        Masukkan Domain VPS dan API Key Anda di bawah ini. Seluruh request URL, perintah cURL, dan contoh kode integrasi di halaman ini akan terupdate secara otomatis dan siap untuk langsung disalin!
+                    </p>
+                    
+                    <div class="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div class="space-y-2">
+                            <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Domain / IP VPS Anda</label>
+                            <div class="relative">
+                                <i class="fas fa-globe absolute left-3.5 top-3 text-slate-550 text-xs"></i>
+                                <input type="text" id="hud-domain" placeholder="example.myvps.com" value="yourvps.com" class="w-full bg-slate-950/80 border border-slate-800 rounded-xl py-2.5 pl-10 pr-4 text-xs text-white placeholder-slate-600 focus:outline-none focus:border-emerald-500 transition font-mono font-medium">
+                            </div>
+                        </div>
+                        <div class="space-y-2">
+                            <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">API Key VPS Anda</label>
+                            <div class="relative">
+                                <i class="fas fa-key absolute left-3.5 top-3 text-slate-550 text-xs"></i>
+                                <input type="text" id="hud-apikey" placeholder="SANGATRAHASIA123" value="SANGATRAHASIA123" class="w-full bg-slate-950/80 border border-slate-800 rounded-xl py-2.5 pl-10 pr-4 text-xs text-white placeholder-slate-600 focus:outline-none focus:border-emerald-500 transition font-mono font-medium">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mt-4 flex items-center gap-2 bg-emerald-500/10 p-3 rounded-lg border border-emerald-500/20 text-xs text-emerald-300">
+                        <i class="fas fa-magic animate-bounce"></i>
+                        <span>HUD Terkoneksi. Merender <b>cURL</b> & <b>Python</b> snippets secara dinamis!</span>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Xray Core Section -->
+            <section class="space-y-8">
+                <div class="border-b border-slate-800 pb-4">
+                    <h2 class="text-2xl font-bold text-white tracking-tight"><i class="fas fa-bolt text-yellow-500 mr-2"></i> Xray Core API (VMESS, VLESS, TROJAN)</h2>
+                    <p class="text-sm text-slate-400 mt-1">Mengelola akun Xray core berbasis Websocket (Port 80/443).</p>
+                </div>
+
+                <!-- ADD XRAY -->
+                <div id="add-xray" class="scroll-mt-24 space-y-4 bg-slate-900/30 border border-slate-850 rounded-2xl p-6 glow-blue glass-panel">
+                    <div class="flex flex-wrap items-center justify-between gap-4 border-b border-slate-800 pb-4">
+                        <div class="flex items-center gap-3">
+                            <span class="endpoint-badge badge-post">POST</span>
+                            <code class="font-mono text-sm font-bold text-white">/srpcom/add-&lt;protocol&gt;ws</code>
+                        </div>
+                        <span class="text-xs text-slate-450 font-medium">Protocol: <code class="text-blue-400 font-mono">vmess</code>, <code class="text-blue-400 font-mono">vless</code>, <code class="text-blue-400 font-mono">trojan</code></span>
+                    </div>
+                    <p class="text-xs text-slate-400">Membuat akun user baru dengan limitasi IP (Multi-login) dan kuota (GB).</p>
+                    
+                    <!-- TAB CONTAINER -->
+                    <div class="endpoint-tabs" data-endpoint="add-xray">
+                        <div class="flex border-b border-slate-800 gap-1 mb-4">
+                            <button onclick="switchTab('add-xray', 'curl')" class="tab-btn px-4 py-2 text-xs font-semibold text-blue-400 border-b-2 border-blue-500 bg-blue-500/10 rounded-t-lg transition">cURL Command</button>
+                            <button onclick="switchTab('add-xray', 'resp')" class="tab-btn px-4 py-2 text-xs font-semibold text-slate-400 border-b-2 border-transparent hover:text-slate-200 rounded-t-lg transition">Response JSON</button>
+                        </div>
+                        <div id="add-xray-curl" class="tab-content code-container bg-slate-950 rounded-xl border border-slate-900 overflow-hidden">
+                            <button onclick="copyCode(this)" class="copy-btn text-[10px] text-slate-450 px-2 py-1 rounded-md flex items-center gap-1"><i class="far fa-copy"></i> Copy</button>
+                            <pre class="font-mono text-xs text-slate-300 p-4 overflow-x-auto"><code class="language-bash curl-snippet" data-template="curl -X POST https://{DOMAIN}/srpcom/add-vmessws \
+  -H 'Content-Type: application/json' \
+  -H 'x-api-key: {API_KEY}' \
+  -d '{
+    \"user\": \"developer_test\",
+    \"exp\": 30,
+    \"limit_ip\": 2,
+    \"limit_quota\": 50
+  }'">curl -X POST https://yourvps.com/srpcom/add-vmessws \
+  -H 'Content-Type: application/json' \
+  -H 'x-api-key: SANGATRAHASIA123' \
+  -d '{
+    "user": "developer_test",
+    "exp": 30,
+    "limit_ip": 2,
+    "limit_quota": 50
+  }'</code></pre>
+                        </div>
+                        <div id="add-xray-resp" class="tab-content hidden code-container bg-slate-950 rounded-xl border border-slate-900 overflow-hidden">
+                            <button onclick="copyCode(this)" class="copy-btn text-[10px] text-slate-455 px-2 py-1 rounded-md flex items-center gap-1"><i class="far fa-copy"></i> Copy</button>
+                            <pre class="font-mono text-xs text-green-400 p-4 overflow-x-auto"><code>{
+  "stdout": "Pembuatan akun baru berhasil...\nRemarks : developer_test\n...",
+  "stdout_tg": "Pembuatan akun baru berhasil...\nRemarks : `developer_test`\n..."
+}</code></pre>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- TRIAL XRAY -->
+                <div id="trial-xray" class="scroll-mt-24 space-y-4 bg-slate-900/30 border border-slate-850 rounded-2xl p-6 glass-panel">
+                    <div class="flex flex-wrap items-center justify-between gap-4 border-b border-slate-800 pb-4">
+                        <div class="flex items-center gap-3">
+                            <span class="endpoint-badge badge-post">POST</span>
+                            <code class="font-mono text-sm font-bold text-white">/srpcom/trial-&lt;protocol&gt;ws</code>
+                        </div>
+                        <span class="text-xs text-slate-450 font-medium">Protocol: <code class="text-blue-400 font-mono">vmess</code>, <code class="text-blue-400 font-mono">vless</code>, <code class="text-blue-400 font-mono">trojan</code></span>
+                    </div>
+                    <p class="text-xs text-slate-400">Membuat akun uji coba berdurasi 60 menit secara instan dengan limit IP kustom.</p>
+                    
+                    <div class="endpoint-tabs" data-endpoint="trial-xray">
+                        <div class="flex border-b border-slate-800 gap-1 mb-4">
+                            <button onclick="switchTab('trial-xray', 'curl')" class="tab-btn px-4 py-2 text-xs font-semibold text-blue-400 border-b-2 border-blue-500 bg-blue-500/10 rounded-t-lg transition">cURL Command</button>
+                            <button onclick="switchTab('trial-xray', 'resp')" class="tab-btn px-4 py-2 text-xs font-semibold text-slate-400 border-b-2 border-transparent hover:text-slate-200 rounded-t-lg transition">Response JSON</button>
+                        </div>
+                        <div id="trial-xray-curl" class="tab-content code-container bg-slate-950 rounded-xl border border-slate-900 overflow-hidden">
+                            <button onclick="copyCode(this)" class="copy-btn text-[10px] text-slate-455 px-2 py-1 rounded-md flex items-center gap-1"><i class="far fa-copy"></i> Copy</button>
+                            <pre class="font-mono text-xs text-slate-300 p-4 overflow-x-auto"><code class="language-bash curl-snippet" data-template="curl -X POST https://{DOMAIN}/srpcom/trial-vmessws \
+  -H 'Content-Type: application/json' \
+  -H 'x-api-key: {API_KEY}' \
+  -d '{
+    \"limit_ip\": 1
+  }'">curl -X POST https://yourvps.com/srpcom/trial-vmessws \
+  -H 'Content-Type: application/json' \
+  -H 'x-api-key: SANGATRAHASIA123' \
+  -d '{
+    "limit_ip": 1
+  }'</code></pre>
+                        </div>
+                        <div id="trial-xray-resp" class="tab-content hidden code-container bg-slate-950 rounded-xl border border-slate-900 overflow-hidden">
+                            <button onclick="copyCode(this)" class="copy-btn text-[10px] text-slate-455 px-2 py-1 rounded-md flex items-center gap-1"><i class="far fa-copy"></i> Copy</button>
+                            <pre class="font-mono text-xs text-green-400 p-4 overflow-x-auto"><code>{
+  "stdout": "Pembuatan akun trial berhasil...\nRemarks : trialsrp-143005\n...",
+  "stdout_tg": "Pembuatan akun trial berhasil...\nRemarks : `trialsrp-143005`\n..."
+}</code></pre>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- DETAIL XRAY -->
+                <div id="detail-xray" class="scroll-mt-24 space-y-4 bg-slate-900/30 border border-slate-850 rounded-2xl p-6 glass-panel">
+                    <div class="flex flex-wrap items-center justify-between gap-4 border-b border-slate-800 pb-4">
+                        <div class="flex items-center gap-3">
+                            <span class="endpoint-badge badge-post">POST / GET</span>
+                            <code class="font-mono text-sm font-bold text-white">/srpcom/detail-&lt;protocol&gt;ws</code>
+                        </div>
+                        <span class="text-xs text-slate-455 font-medium">Protocol: <code class="text-blue-400 font-mono">vmess</code>, <code class="text-blue-400 font-mono">vless</code>, <code class="text-blue-400 font-mono">trojan</code></span>
+                    </div>
+                    <p class="text-xs text-slate-400">Mendapatkan parameter konfig lengkap akun (UUID, Link TLS/NTLS, Expired, limit).</p>
+                    
+                    <div class="endpoint-tabs" data-endpoint="detail-xray">
+                        <div class="flex border-b border-slate-800 gap-1 mb-4">
+                            <button onclick="switchTab('detail-xray', 'curl')" class="tab-btn px-4 py-2 text-xs font-semibold text-blue-400 border-b-2 border-blue-500 bg-blue-500/10 rounded-t-lg transition">cURL Command</button>
+                            <button onclick="switchTab('detail-xray', 'resp')" class="tab-btn px-4 py-2 text-xs font-semibold text-slate-400 border-b-2 border-transparent hover:text-slate-200 rounded-t-lg transition">Response JSON</button>
+                        </div>
+                        <div id="detail-xray-curl" class="tab-content code-container bg-slate-950 rounded-xl border border-slate-900 overflow-hidden">
+                            <button onclick="copyCode(this)" class="copy-btn text-[10px] text-slate-455 px-2 py-1 rounded-md flex items-center gap-1"><i class="far fa-copy"></i> Copy</button>
+                            <pre class="font-mono text-xs text-slate-300 p-4 overflow-x-auto"><code class="language-bash curl-snippet" data-template="curl -X POST https://{DOMAIN}/srpcom/detail-vmessws \
+  -H 'Content-Type: application/json' \
+  -H 'x-api-key: {API_KEY}' \
+  -d '{
+    \"user\": \"developer_test\"
+  }'">curl -X POST https://yourvps.com/srpcom/detail-vmessws \
+  -H 'Content-Type: application/json' \
+  -H 'x-api-key: SANGATRAHASIA123' \
+  -d '{
+    "user": "developer_test"
+  }'</code></pre>
+                        </div>
+                        <div id="detail-xray-resp" class="tab-content hidden code-container bg-slate-950 rounded-xl border border-slate-900 overflow-hidden">
+                            <button onclick="copyCode(this)" class="copy-btn text-[10px] text-slate-455 px-2 py-1 rounded-md flex items-center gap-1"><i class="far fa-copy"></i> Copy</button>
+                            <pre class="font-mono text-xs text-green-400 p-4 overflow-x-auto"><code>{
+  "stdout": "❖ XRAY/VMESS WS ❖\nRemarks : developer_test\nLink WS TLS : vmess://...",
+  "stdout_tg": "❖ XRAY/VMESS WS ❖\nRemarks : `developer_test`\n..."
+}</code></pre>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- RENEW XRAY -->
+                <div id="renew-xray" class="scroll-mt-24 space-y-4 bg-slate-900/30 border border-slate-850 rounded-2xl p-6 glass-panel">
+                    <div class="flex flex-wrap items-center justify-between gap-4 border-b border-slate-800 pb-4">
+                        <div class="flex items-center gap-3">
+                            <span class="endpoint-badge badge-post">POST</span>
+                            <code class="font-mono text-sm font-bold text-white">/srpcom/renew-&lt;protocol&gt;ws</code>
+                        </div>
+                        <span class="text-xs text-slate-455 font-medium">Protocol: <code class="text-blue-400 font-mono">vmess</code>, <code class="text-blue-400 font-mono">vless</code>, <code class="text-blue-400 font-mono">trojan</code></span>
+                    </div>
+                    <p class="text-xs text-slate-400">Memperpanjang masa aktif akun secara akumulatif (ditambahkan dari tanggal kedaluwarsa saat ini).</p>
+                    
+                    <div class="endpoint-tabs" data-endpoint="renew-xray">
+                        <div class="flex border-b border-slate-800 gap-1 mb-4">
+                            <button onclick="switchTab('renew-xray', 'curl')" class="tab-btn px-4 py-2 text-xs font-semibold text-blue-400 border-b-2 border-blue-500 bg-blue-500/10 rounded-t-lg transition">cURL Command</button>
+                            <button onclick="switchTab('renew-xray', 'resp')" class="tab-btn px-4 py-2 text-xs font-semibold text-slate-400 border-b-2 border-transparent hover:text-slate-200 rounded-t-lg transition">Response JSON</button>
+                        </div>
+                        <div id="renew-xray-curl" class="tab-content code-container bg-slate-950 rounded-xl border border-slate-900 overflow-hidden">
+                            <button onclick="copyCode(this)" class="copy-btn text-[10px] text-slate-455 px-2 py-1 rounded-md flex items-center gap-1"><i class="far fa-copy"></i> Copy</button>
+                            <pre class="font-mono text-xs text-slate-300 p-4 overflow-x-auto"><code class="language-bash curl-snippet" data-template="curl -X POST https://{DOMAIN}/srpcom/renew-vmessws \
+  -H 'Content-Type: application/json' \
+  -H 'x-api-key: {API_KEY}' \
+  -d '{
+    \"user\": \"developer_test\",
+    \"exp\": 30
+  }'">curl -X POST https://yourvps.com/srpcom/renew-vmessws \
+  -H 'Content-Type: application/json' \
+  -H 'x-api-key: SANGATRAHASIA123' \
+  -d '{
+    "user": "developer_test",
+    "exp": 30
+  }'</code></pre>
+                        </div>
+                        <div id="renew-xray-resp" class="tab-content hidden code-container bg-slate-950 rounded-xl border border-slate-900 overflow-hidden">
+                            <button onclick="copyCode(this)" class="copy-btn text-[10px] text-slate-455 px-2 py-1 rounded-md flex items-center gap-1"><i class="far fa-copy"></i> Copy</button>
+                            <pre class="font-mono text-xs text-green-400 p-4 overflow-x-auto"><code>{
+  "stdout": "✅ Akun 'developer_test' berhasil diperpanjang!\nExpired baru: 2026-07-20 14:30:00 WIB",
+  "stdout_tg": "🕑 Akun Diperpanjang\n\n💻 Server: yourvps.com\nType : VMESS WS\n🔑 Akun: `developer_test`\n⏳ Durasi: +30 hari..."
+}</code></pre>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- DEL XRAY -->
+                <div id="del-xray" class="scroll-mt-24 space-y-4 bg-slate-900/30 border border-slate-850 rounded-2xl p-6 glass-panel">
+                    <div class="flex flex-wrap items-center justify-between gap-4 border-b border-slate-800 pb-4">
+                        <div class="flex items-center gap-3">
+                            <span class="endpoint-badge badge-delete">DELETE / POST</span>
+                            <code class="font-mono text-sm font-bold text-white">/srpcom/del-&lt;protocol&gt;ws</code>
+                        </div>
+                        <span class="text-xs text-slate-455 font-medium">Protocol: <code class="text-blue-400 font-mono">vmess</code>, <code class="text-blue-400 font-mono">vless</code>, <code class="text-blue-400 font-mono">trojan</code></span>
+                    </div>
+                    <p class="text-xs text-slate-400">Menghapus akun user Xray core secara permanen dan menyegarkan ulang server config Xray Core.</p>
+                    
+                    <div class="endpoint-tabs" data-endpoint="del-xray">
+                        <div class="flex border-b border-slate-800 gap-1 mb-4">
+                            <button onclick="switchTab('del-xray', 'curl')" class="tab-btn px-4 py-2 text-xs font-semibold text-blue-400 border-b-2 border-blue-500 bg-blue-500/10 rounded-t-lg transition">cURL Command</button>
+                            <button onclick="switchTab('del-xray', 'resp')" class="tab-btn px-4 py-2 text-xs font-semibold text-slate-400 border-b-2 border-transparent hover:text-slate-200 rounded-t-lg transition">Response JSON</button>
+                        </div>
+                        <div id="del-xray-curl" class="tab-content code-container bg-slate-950 rounded-xl border border-slate-900 overflow-hidden">
+                            <button onclick="copyCode(this)" class="copy-btn text-[10px] text-slate-455 px-2 py-1 rounded-md flex items-center gap-1"><i class="far fa-copy"></i> Copy</button>
+                            <pre class="font-mono text-xs text-slate-300 p-4 overflow-x-auto"><code class="language-bash curl-snippet" data-template="curl -X POST https://{DOMAIN}/srpcom/del-vmessws \
+  -H 'Content-Type: application/json' \
+  -H 'x-api-key: {API_KEY}' \
+  -d '{
+    \"user\": \"developer_test\"
+  }'">curl -X POST https://yourvps.com/srpcom/del-vmessws \
+  -H 'Content-Type: application/json' \
+  -H 'x-api-key: SANGATRAHASIA123' \
+  -d '{
+    "user": "developer_test"
+  }'</code></pre>
+                        </div>
+                        <div id="del-xray-resp" class="tab-content hidden code-container bg-slate-950 rounded-xl border border-slate-900 overflow-hidden">
+                            <button onclick="copyCode(this)" class="copy-btn text-[10px] text-slate-455 px-2 py-1 rounded-md flex items-center gap-1"><i class="far fa-copy"></i> Copy</button>
+                            <pre class="font-mono text-xs text-green-400 p-4 overflow-x-auto"><code>{
+  "stdout": "✅ Akun Xray 'developer_test' berhasil dihapus!"
+}</code></pre>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- CHANGE UUID / PASSWORD XRAY (NEW IN DOCS) -->
+                <div id="change-uuid" class="scroll-mt-24 space-y-4 bg-slate-900/30 border border-slate-850 rounded-2xl p-6 glass-panel">
+                    <div class="flex flex-wrap items-center justify-between gap-4 border-b border-slate-800 pb-4">
+                        <div class="flex items-center gap-3">
+                            <span class="endpoint-badge badge-post">POST</span>
+                            <code class="font-mono text-sm font-bold text-white">/srpcom/change-uuid</code>
+                        </div>
+                    </div>
+                    <p class="text-xs text-slate-400">Mengubah UUID (atau Password Trojan) lama pengguna menjadi UUID baru secara instan pada server config.</p>
+                    
+                    <div class="endpoint-tabs" data-endpoint="change-uuid">
+                        <div class="flex border-b border-slate-800 gap-1 mb-4">
+                            <button onclick="switchTab('change-uuid', 'curl')" class="tab-btn px-4 py-2 text-xs font-semibold text-blue-400 border-b-2 border-blue-500 bg-blue-500/10 rounded-t-lg transition">cURL Command</button>
+                            <button onclick="switchTab('change-uuid', 'resp')" class="tab-btn px-4 py-2 text-xs font-semibold text-slate-400 border-b-2 border-transparent hover:text-slate-200 rounded-t-lg transition">Response JSON</button>
+                        </div>
+                        <div id="change-uuid-curl" class="tab-content code-container bg-slate-950 rounded-xl border border-slate-900 overflow-hidden">
+                            <button onclick="copyCode(this)" class="copy-btn text-[10px] text-slate-455 px-2 py-1 rounded-md flex items-center gap-1"><i class="far fa-copy"></i> Copy</button>
+                            <pre class="font-mono text-xs text-slate-300 p-4 overflow-x-auto"><code class="language-bash curl-snippet" data-template="curl -X POST https://{DOMAIN}/srpcom/change-uuid \
+  -H 'Content-Type: application/json' \
+  -H 'x-api-key: {API_KEY}' \
+  -d '{
+    \"uuidold\": \"f7b98d1a-45c1-4b10-9f2d-8889988a8bc8\",
+    \"uuidnew\": \"d01b63da-8e10-4bf0-ba88-825586611ff9\"
+  }'">curl -X POST https://yourvps.com/srpcom/change-uuid \
+  -H 'Content-Type: application/json' \
+  -H 'x-api-key: SANGATRAHASIA123' \
+  -d '{
+    "uuidold": "f7b98d1a-45c1-4b10-9f2d-8889988a8bc8",
+    "uuidnew": "d01b63da-8e10-4bf0-ba88-825586611ff9"
+  }'</code></pre>
+                        </div>
+                        <div id="change-uuid-resp" class="tab-content hidden code-container bg-slate-950 rounded-xl border border-slate-900 overflow-hidden">
+                            <button onclick="copyCode(this)" class="copy-btn text-[10px] text-slate-455 px-2 py-1 rounded-md flex items-center gap-1"><i class="far fa-copy"></i> Copy</button>
+                            <pre class="font-mono text-xs text-green-400 p-4 overflow-x-auto"><code>{
+  "stdout": "✅ UUID untuk akun 'developer_test' berhasil diganti menjadi d01b63da-8e10-4bf0-ba88-825586611ff9.",
+  "stdout_tg": "Update UUID/Password berhasil\n\n❖ XRAY/VMESS WS (UPDATE) ❖\n..."
+}</code></pre>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- LOCK XRAY (NEW IN DOCS) -->
+                <div id="lock-xray" class="scroll-mt-24 space-y-4 bg-slate-900/30 border border-slate-850 rounded-2xl p-6 glass-panel">
+                    <div class="flex flex-wrap items-center justify-between gap-4 border-b border-slate-800 pb-4">
+                        <div class="flex items-center gap-3">
+                            <span class="endpoint-badge badge-post">POST / GET</span>
+                            <code class="font-mono text-sm font-bold text-white">/srpcom/lock-xray</code>
+                        </div>
+                    </div>
+                    <p class="text-xs text-slate-400">Mengunci akun Xray core (dimasukkan ke blacklist locked.json oleh script Autokill) sehingga akses user tersebut dibekukan.</p>
+                    
+                    <div class="endpoint-tabs" data-endpoint="lock-xray">
+                        <div class="flex border-b border-slate-800 gap-1 mb-4">
+                            <button onclick="switchTab('lock-xray', 'curl')" class="tab-btn px-4 py-2 text-xs font-semibold text-blue-400 border-b-2 border-blue-500 bg-blue-500/10 rounded-t-lg transition">cURL Command</button>
+                            <button onclick="switchTab('lock-xray', 'resp')" class="tab-btn px-4 py-2 text-xs font-semibold text-slate-400 border-b-2 border-transparent hover:text-slate-200 rounded-t-lg transition">Response JSON</button>
+                        </div>
+                        <div id="lock-xray-curl" class="tab-content code-container bg-slate-950 rounded-xl border border-slate-900 overflow-hidden">
+                            <button onclick="copyCode(this)" class="copy-btn text-[10px] text-slate-455 px-2 py-1 rounded-md flex items-center gap-1"><i class="far fa-copy"></i> Copy</button>
+                            <pre class="font-mono text-xs text-slate-300 p-4 overflow-x-auto"><code class="language-bash curl-snippet" data-template="curl -X POST https://{DOMAIN}/srpcom/lock-xray \
+  -H 'Content-Type: application/json' \
+  -H 'x-api-key: {API_KEY}' \
+  -d '{
+    \"user\": \"developer_test\"
+  }'">curl -X POST https://yourvps.com/srpcom/lock-xray \
+  -H 'Content-Type: application/json' \
+  -H 'x-api-key: SANGATRAHASIA123' \
+  -d '{
+    "user": "developer_test"
+  }'</code></pre>
+                        </div>
+                        <div id="lock-xray-resp" class="tab-content hidden code-container bg-slate-950 rounded-xl border border-slate-900 overflow-hidden">
+                            <button onclick="copyCode(this)" class="copy-btn text-[10px] text-slate-455 px-2 py-1 rounded-md flex items-center gap-1"><i class="far fa-copy"></i> Copy</button>
+                            <pre class="font-mono text-xs text-green-400 p-4 overflow-x-auto"><code>{
+  "stdout": "Locked"
+}</code></pre>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- CEK STATUS XRAY SERVICE (NEW IN DOCS) -->
+                <div id="cek-xray" class="scroll-mt-24 space-y-4 bg-slate-900/30 border border-slate-850 rounded-2xl p-6 glass-panel">
+                    <div class="flex flex-wrap items-center justify-between gap-4 border-b border-slate-800 pb-4">
+                        <div class="flex items-center gap-3">
+                            <span class="endpoint-badge badge-get">GET</span>
+                            <code class="font-mono text-sm font-bold text-white">/srpcom/cek-xray</code>
+                        </div>
+                    </div>
+                    <p class="text-xs text-slate-400">Memeriksa apakah daemon service `xray` di VPS berjalan secara aktif, lengkap dengan domain VPS.</p>
+                    
+                    <div class="endpoint-tabs" data-endpoint="cek-xray">
+                        <div class="flex border-b border-slate-800 gap-1 mb-4">
+                            <button onclick="switchTab('cek-xray', 'curl')" class="tab-btn px-4 py-2 text-xs font-semibold text-blue-400 border-b-2 border-blue-500 bg-blue-500/10 rounded-t-lg transition">cURL Command</button>
+                            <button onclick="switchTab('cek-xray', 'resp')" class="tab-btn px-4 py-2 text-xs font-semibold text-slate-400 border-b-2 border-transparent hover:text-slate-200 rounded-t-lg transition">Response JSON</button>
+                        </div>
+                        <div id="cek-xray-curl" class="tab-content code-container bg-slate-950 rounded-xl border border-slate-900 overflow-hidden">
+                            <button onclick="copyCode(this)" class="copy-btn text-[10px] text-slate-455 px-2 py-1 rounded-md flex items-center gap-1"><i class="far fa-copy"></i> Copy</button>
+                            <pre class="font-mono text-xs text-slate-300 p-4 overflow-x-auto"><code class="language-bash curl-snippet" data-template="curl -X GET https://{DOMAIN}/srpcom/cek-xray \
+  -H 'x-api-key: {API_KEY}'">curl -X GET https://yourvps.com/srpcom/cek-xray \
+  -H 'x-api-key: SANGATRAHASIA123'</code></pre>
+                        </div>
+                        <div id="cek-xray-resp" class="tab-content hidden code-container bg-slate-950 rounded-xl border border-slate-900 overflow-hidden">
+                            <button onclick="copyCode(this)" class="copy-btn text-[10px] text-slate-455 px-2 py-1 rounded-md flex items-center gap-1"><i class="far fa-copy"></i> Copy</button>
+                            <pre class="font-mono text-xs text-green-400 p-4 overflow-x-auto"><code>{
+  "stdout": "Xray status: active, Domain: yourvps.com"
+}</code></pre>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- SSH & OpenVPN Section -->
+            <section class="space-y-8">
+                <div class="border-b border-slate-800 pb-4">
+                    <h2 class="text-2xl font-bold text-white tracking-tight"><i class="fas fa-shield-alt text-green-500 mr-2"></i> SSH & OpenVPN API</h2>
+                    <p class="text-sm text-slate-400 mt-1">Mengelola akun SSH, Dropbear, OpenVPN, WebSocket SSL/HTTP, dan BadVPN.</p>
+                </div>
+
+                <!-- ADD SSH -->
+                <div id="add-ssh" class="scroll-mt-24 space-y-4 bg-slate-900/30 border border-slate-850 rounded-2xl p-6 glass-panel">
+                    <div class="flex flex-wrap items-center justify-between gap-4 border-b border-slate-800 pb-4">
+                        <div class="flex items-center gap-3">
+                            <span class="endpoint-badge badge-post">POST</span>
+                            <code class="font-mono text-sm font-bold text-white">/srpcom/add-ssh</code>
+                        </div>
+                    </div>
+                    <p class="text-xs text-slate-400">Membuat akun user SSH sistem Linux baru dengan pembatasan login multi-IP.</p>
+                    
+                    <div class="endpoint-tabs" data-endpoint="add-ssh">
+                        <div class="flex border-b border-slate-800 gap-1 mb-4">
+                            <button onclick="switchTab('add-ssh', 'curl')" class="tab-btn px-4 py-2 text-xs font-semibold text-blue-400 border-b-2 border-blue-500 bg-blue-500/10 rounded-t-lg transition">cURL Command</button>
+                            <button onclick="switchTab('add-ssh', 'resp')" class="tab-btn px-4 py-2 text-xs font-semibold text-slate-400 border-b-2 border-transparent hover:text-slate-200 rounded-t-lg transition">Response JSON</button>
+                        </div>
+                        <div id="add-ssh-curl" class="tab-content code-container bg-slate-950 rounded-xl border border-slate-900 overflow-hidden">
+                            <button onclick="copyCode(this)" class="copy-btn text-[10px] text-slate-455 px-2 py-1 rounded-md flex items-center gap-1"><i class="far fa-copy"></i> Copy</button>
+                            <pre class="font-mono text-xs text-slate-300 p-4 overflow-x-auto"><code class="language-bash curl-snippet" data-template="curl -X POST https://{DOMAIN}/srpcom/add-ssh \
+  -H 'Content-Type: application/json' \
+  -H 'x-api-key: {API_KEY}' \
+  -d '{
+    \"user\": \"developer_ssh\",
+    \"password\": \"ssh_password123\",
+    \"exp\": 30,
+    \"limit_ip\": 2
+  }'">curl -X POST https://yourvps.com/srpcom/add-ssh \
+  -H 'Content-Type: application/json' \
+  -H 'x-api-key: SANGATRAHASIA123' \
+  -d '{
+    "user": "developer_ssh",
+    "password": "ssh_password123",
+    "exp": 30,
+    "limit_ip": 2
+  }'</code></pre>
+                        </div>
+                        <div id="add-ssh-resp" class="tab-content hidden code-container bg-slate-950 rounded-xl border border-slate-900 overflow-hidden">
+                            <button onclick="copyCode(this)" class="copy-btn text-[10px] text-slate-455 px-2 py-1 rounded-md flex items-center gap-1"><i class="far fa-copy"></i> Copy</button>
+                            <pre class="font-mono text-xs text-green-400 p-4 overflow-x-auto"><code>{
+  "stdout": "Pembuatan akun baru berhasil\n\n━━━━━━━━━━━━━━━━━━━━\nINFORMASI PREMIUM\nSSH & OVPN ACCOUNT\n...",
+  "stdout_tg": "Pembuatan akun baru berhasil\n\n━━━━━━━━━━━━━━━━━━━━\nINFORMASI PREMIUM\nSSH & OVPN ACCOUNT\n..."
+}</code></pre>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- TRIAL SSH -->
+                <div id="trial-ssh" class="scroll-mt-24 space-y-4 bg-slate-900/30 border border-slate-850 rounded-2xl p-6 glass-panel">
+                    <div class="flex flex-wrap items-center justify-between gap-4 border-b border-slate-800 pb-4">
+                        <div class="flex items-center gap-3">
+                            <span class="endpoint-badge badge-post">POST</span>
+                            <code class="font-mono text-sm font-bold text-white">/srpcom/trial-ssh</code>
+                        </div>
+                    </div>
+                    <p class="text-xs text-slate-400">Membuat akun trial SSH / OVPN / SSH WS berdurasi aktif selama 60 menit secara instan.</p>
+                    
+                    <div class="endpoint-tabs" data-endpoint="trial-ssh">
+                        <div class="flex border-b border-slate-800 gap-1 mb-4">
+                            <button onclick="switchTab('trial-ssh', 'curl')" class="tab-btn px-4 py-2 text-xs font-semibold text-blue-400 border-b-2 border-blue-500 bg-blue-500/10 rounded-t-lg transition">cURL Command</button>
+                            <button onclick="switchTab('trial-ssh', 'resp')" class="tab-btn px-4 py-2 text-xs font-semibold text-slate-400 border-b-2 border-transparent hover:text-slate-200 rounded-t-lg transition">Response JSON</button>
+                        </div>
+                        <div id="trial-ssh-curl" class="tab-content code-container bg-slate-950 rounded-xl border border-slate-900 overflow-hidden">
+                            <button onclick="copyCode(this)" class="copy-btn text-[10px] text-slate-455 px-2 py-1 rounded-md flex items-center gap-1"><i class="far fa-copy"></i> Copy</button>
+                            <pre class="font-mono text-xs text-slate-300 p-4 overflow-x-auto"><code class="language-bash curl-snippet" data-template="curl -X POST https://{DOMAIN}/srpcom/trial-ssh \
+  -H 'Content-Type: application/json' \
+  -H 'x-api-key: {API_KEY}' \
+  -d '{
+    \"limit_ip\": 1
+  }'">curl -X POST https://yourvps.com/srpcom/trial-ssh \
+  -H 'Content-Type: application/json' \
+  -H 'x-api-key: SANGATRAHASIA123' \
+  -d '{
+    "limit_ip": 1
+  }'</code></pre>
+                        </div>
+                        <div id="trial-ssh-resp" class="tab-content hidden code-container bg-slate-950 rounded-xl border border-slate-900 overflow-hidden">
+                            <button onclick="copyCode(this)" class="copy-btn text-[10px] text-slate-455 px-2 py-1 rounded-md flex items-center gap-1"><i class="far fa-copy"></i> Copy</button>
+                            <pre class="font-mono text-xs text-green-400 p-4 overflow-x-auto"><code>{
+  "stdout": "Pembuatan akun trial berhasil\n\n━━━━━━━━━━━━━━━━━━━━\nINFORMASI TRIAL\n...",
+  "stdout_tg": "Pembuatan akun trial berhasil\n\n━━━━━━━━━━━━━━━━━━━━\nINFORMASI TRIAL\n..."
+}</code></pre>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- DETAIL SSH -->
+                <div id="detail-ssh" class="scroll-mt-24 space-y-4 bg-slate-900/30 border border-slate-850 rounded-2xl p-6 glass-panel">
+                    <div class="flex flex-wrap items-center justify-between gap-4 border-b border-slate-800 pb-4">
+                        <div class="flex items-center gap-3">
+                            <span class="endpoint-badge badge-post">POST / GET</span>
+                            <code class="font-mono text-sm font-bold text-white">/srpcom/detail-ssh</code>
+                        </div>
+                    </div>
+                    <p class="text-xs text-slate-400">Mendapatkan detail akun SSH lengkap dengan payload websocket, link file OVPN, port, dan limitasi IP.</p>
+                    
+                    <div class="endpoint-tabs" data-endpoint="detail-ssh">
+                        <div class="flex border-b border-slate-800 gap-1 mb-4">
+                            <button onclick="switchTab('detail-ssh', 'curl')" class="tab-btn px-4 py-2 text-xs font-semibold text-blue-400 border-b-2 border-blue-500 bg-blue-500/10 rounded-t-lg transition">cURL Command</button>
+                            <button onclick="switchTab('detail-ssh', 'resp')" class="tab-btn px-4 py-2 text-xs font-semibold text-slate-400 border-b-2 border-transparent hover:text-slate-200 rounded-t-lg transition">Response JSON</button>
+                        </div>
+                        <div id="detail-ssh-curl" class="tab-content code-container bg-slate-950 rounded-xl border border-slate-900 overflow-hidden">
+                            <button onclick="copyCode(this)" class="copy-btn text-[10px] text-slate-455 px-2 py-1 rounded-md flex items-center gap-1"><i class="far fa-copy"></i> Copy</button>
+                            <pre class="font-mono text-xs text-slate-300 p-4 overflow-x-auto"><code class="language-bash curl-snippet" data-template="curl -X POST https://{DOMAIN}/srpcom/detail-ssh \
+  -H 'Content-Type: application/json' \
+  -H 'x-api-key: {API_KEY}' \
+  -d '{
+    \"user\": \"developer_ssh\"
+  }'">curl -X POST https://yourvps.com/srpcom/detail-ssh \
+  -H 'Content-Type: application/json' \
+  -H 'x-api-key: SANGATRAHASIA123' \
+  -d '{
+    "user": "developer_ssh"
+  }'</code></pre>
+                        </div>
+                        <div id="detail-ssh-resp" class="tab-content hidden code-container bg-slate-950 rounded-xl border border-slate-900 overflow-hidden">
+                            <button onclick="copyCode(this)" class="copy-btn text-[10px] text-slate-455 px-2 py-1 rounded-md flex items-center gap-1"><i class="far fa-copy"></i> Copy</button>
+                            <pre class="font-mono text-xs text-green-400 p-4 overflow-x-auto"><code>{
+  "stdout": "━━━━━━━━━━━━━━━━━━━━\nINFORMASI PREMIUM\nSSH & OVPN ACCOUNT\n...",
+  "stdout_tg": "━━━━━━━━━━━━━━━━━━━━\nINFORMASI PREMIUM\nSSH & OVPN ACCOUNT\n..."
+}</code></pre>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- RENEW SSH -->
+                <div id="renew-ssh" class="scroll-mt-24 space-y-4 bg-slate-900/30 border border-slate-850 rounded-2xl p-6 glass-panel">
+                    <div class="flex flex-wrap items-center justify-between gap-4 border-b border-slate-800 pb-4">
+                        <div class="flex items-center gap-3">
+                            <span class="endpoint-badge badge-post">POST</span>
+                            <code class="font-mono text-sm font-bold text-white">/srpcom/renew-ssh</code>
+                        </div>
+                    </div>
+                    <p class="text-xs text-slate-400">Memperpanjang masa aktif akun SSH/OVPN dengan mengubah parameter *expiry* sistem Linux.</p>
+                    
+                    <div class="endpoint-tabs" data-endpoint="renew-ssh">
+                        <div class="flex border-b border-slate-800 gap-1 mb-4">
+                            <button onclick="switchTab('renew-ssh', 'curl')" class="tab-btn px-4 py-2 text-xs font-semibold text-blue-400 border-b-2 border-blue-500 bg-blue-500/10 rounded-t-lg transition">cURL Command</button>
+                            <button onclick="switchTab('renew-ssh', 'resp')" class="tab-btn px-4 py-2 text-xs font-semibold text-slate-400 border-b-2 border-transparent hover:text-slate-200 rounded-t-lg transition">Response JSON</button>
+                        </div>
+                        <div id="renew-ssh-curl" class="tab-content code-container bg-slate-950 rounded-xl border border-slate-900 overflow-hidden">
+                            <button onclick="copyCode(this)" class="copy-btn text-[10px] text-slate-455 px-2 py-1 rounded-md flex items-center gap-1"><i class="far fa-copy"></i> Copy</button>
+                            <pre class="font-mono text-xs text-slate-300 p-4 overflow-x-auto"><code class="language-bash curl-snippet" data-template="curl -X POST https://{DOMAIN}/srpcom/renew-ssh \
+  -H 'Content-Type: application/json' \
+  -H 'x-api-key: {API_KEY}' \
+  -d '{
+    \"user\": \"developer_ssh\",
+    \"exp\": 30
+  }'">curl -X POST https://yourvps.com/srpcom/renew-ssh \
+  -H 'Content-Type: application/json' \
+  -H 'x-api-key: SANGATRAHASIA123' \
+  -d '{
+    "user": "developer_ssh",
+    "exp": 30
+  }'</code></pre>
+                        </div>
+                        <div id="renew-ssh-resp" class="tab-content hidden code-container bg-slate-950 rounded-xl border border-slate-900 overflow-hidden">
+                            <button onclick="copyCode(this)" class="copy-btn text-[10px] text-slate-455 px-2 py-1 rounded-md flex items-center gap-1"><i class="far fa-copy"></i> Copy</button>
+                            <pre class="font-mono text-xs text-green-400 p-4 overflow-x-auto"><code>{
+  "stdout": "✅ Akun SSH 'developer_ssh' diperpanjang!\nExpired baru: 2026-07-20 14:30:00 WIB",
+  "stdout_tg": "🕑 Akun Diperpanjang\n\n💻 Server: yourvps.com\nType : SSH & OVPN\n🔑 Akun: `developer_ssh`..."
+}</code></pre>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- DEL SSH -->
+                <div id="del-ssh" class="scroll-mt-24 space-y-4 bg-slate-900/30 border border-slate-850 rounded-2xl p-6 glass-panel">
+                    <div class="flex flex-wrap items-center justify-between gap-4 border-b border-slate-800 pb-4">
+                        <div class="flex items-center gap-3">
+                            <span class="endpoint-badge badge-delete">DELETE / POST</span>
+                            <code class="font-mono text-sm font-bold text-white">/srpcom/del-ssh</code>
+                        </div>
+                    </div>
+                    <p class="text-xs text-slate-400">Menghapus user SSH secara paksa dari sistem operasi Linux VPS dan mematikan session active.</p>
+                    
+                    <div class="endpoint-tabs" data-endpoint="del-ssh">
+                        <div class="flex border-b border-slate-800 gap-1 mb-4">
+                            <button onclick="switchTab('del-ssh', 'curl')" class="tab-btn px-4 py-2 text-xs font-semibold text-blue-400 border-b-2 border-blue-500 bg-blue-500/10 rounded-t-lg transition">cURL Command</button>
+                            <button onclick="switchTab('del-ssh', 'resp')" class="tab-btn px-4 py-2 text-xs font-semibold text-slate-400 border-b-2 border-transparent hover:text-slate-200 rounded-t-lg transition">Response JSON</button>
+                        </div>
+                        <div id="del-ssh-curl" class="tab-content code-container bg-slate-950 rounded-xl border border-slate-900 overflow-hidden">
+                            <button onclick="copyCode(this)" class="copy-btn text-[10px] text-slate-455 px-2 py-1 rounded-md flex items-center gap-1"><i class="far fa-copy"></i> Copy</button>
+                            <pre class="font-mono text-xs text-slate-300 p-4 overflow-x-auto"><code class="language-bash curl-snippet" data-template="curl -X POST https://{DOMAIN}/srpcom/del-ssh \
+  -H 'Content-Type: application/json' \
+  -H 'x-api-key: {API_KEY}' \
+  -d '{
+    \"user\": \"developer_ssh\"
+  }'">curl -X POST https://yourvps.com/srpcom/del-ssh \
+  -H 'Content-Type: application/json' \
+  -H 'x-api-key: SANGATRAHASIA123' \
+  -d '{
+    "user": "developer_ssh"
+  }'</code></pre>
+                        </div>
+                        <div id="del-ssh-resp" class="tab-content hidden code-container bg-slate-950 rounded-xl border border-slate-900 overflow-hidden">
+                            <button onclick="copyCode(this)" class="copy-btn text-[10px] text-slate-455 px-2 py-1 rounded-md flex items-center gap-1"><i class="far fa-copy"></i> Copy</button>
+                            <pre class="font-mono text-xs text-green-400 p-4 overflow-x-auto"><code>{
+  "stdout": "✅ Akun SSH 'developer_ssh' berhasil dihapus!"
+}</code></pre>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- LOCK SSH (NEW IN DOCS) -->
+                <div id="lock-ssh" class="scroll-mt-24 space-y-4 bg-slate-900/30 border border-slate-850 rounded-2xl p-6 glass-panel">
+                    <div class="flex flex-wrap items-center justify-between gap-4 border-b border-slate-800 pb-4">
+                        <div class="flex items-center gap-3">
+                            <span class="endpoint-badge badge-post">POST</span>
+                            <code class="font-mono text-sm font-bold text-white">/srpcom/lock-ssh</code>
+                        </div>
+                    </div>
+                    <p class="text-xs text-slate-400">Mengunci kata sandi pengguna SSH (`usermod -L`) di sistem Linux VPS, menolak seluruh koneksi masuk.</p>
+                    
+                    <div class="endpoint-tabs" data-endpoint="lock-ssh">
+                        <div class="flex border-b border-slate-800 gap-1 mb-4">
+                            <button onclick="switchTab('lock-ssh', 'curl')" class="tab-btn px-4 py-2 text-xs font-semibold text-blue-400 border-b-2 border-blue-500 bg-blue-500/10 rounded-t-lg transition">cURL Command</button>
+                            <button onclick="switchTab('lock-ssh', 'resp')" class="tab-btn px-4 py-2 text-xs font-semibold text-slate-400 border-b-2 border-transparent hover:text-slate-200 rounded-t-lg transition">Response JSON</button>
+                        </div>
+                        <div id="lock-ssh-curl" class="tab-content code-container bg-slate-950 rounded-xl border border-slate-900 overflow-hidden">
+                            <button onclick="copyCode(this)" class="copy-btn text-[10px] text-slate-455 px-2 py-1 rounded-md flex items-center gap-1"><i class="far fa-copy"></i> Copy</button>
+                            <pre class="font-mono text-xs text-slate-300 p-4 overflow-x-auto"><code class="language-bash curl-snippet" data-template="curl -X POST https://{DOMAIN}/srpcom/lock-ssh \
+  -H 'Content-Type: application/json' \
+  -H 'x-api-key: {API_KEY}' \
+  -d '{
+    \"user\": \"developer_ssh\"
+  }'">curl -X POST https://yourvps.com/srpcom/lock-ssh \
+  -H 'Content-Type: application/json' \
+  -H 'x-api-key: SANGATRAHASIA123' \
+  -d '{
+    "user": "developer_ssh"
+  }'</code></pre>
+                        </div>
+                        <div id="lock-ssh-resp" class="tab-content hidden code-container bg-slate-950 rounded-xl border border-slate-900 overflow-hidden">
+                            <button onclick="copyCode(this)" class="copy-btn text-[10px] text-slate-455 px-2 py-1 rounded-md flex items-center gap-1"><i class="far fa-copy"></i> Copy</button>
+                            <pre class="font-mono text-xs text-green-400 p-4 overflow-x-auto"><code>{
+  "stdout": "Locked"
+}</code></pre>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- L2TP IPsec VPN Section -->
+            <section class="space-y-8">
+                <div class="border-b border-slate-800 pb-4">
+                    <h2 class="text-2xl font-bold text-white tracking-tight"><i class="fas fa-network-wired text-purple-500 mr-2"></i> L2TP IPsec VPN API</h2>
+                    <p class="text-sm text-slate-400 mt-1">Mengelola akun VPN L2TP / IPsec IPSec PSK.</p>
+                </div>
+
+                <!-- ADD L2TP -->
+                <div id="add-l2tp" class="scroll-mt-24 space-y-4 bg-slate-900/30 border border-slate-855 rounded-2xl p-6 glass-panel">
+                    <div class="flex flex-wrap items-center justify-between gap-4 border-b border-slate-800 pb-4">
+                        <div class="flex items-center gap-3">
+                            <span class="endpoint-badge badge-post">POST</span>
+                            <code class="font-mono text-sm font-bold text-white">/srpcom/add-l2tp</code>
+                        </div>
+                    </div>
+                    <p class="text-xs text-slate-400">Mendaftarkan user L2TP baru ke dalam file `/etc/ppp/chap-secrets`.</p>
+                    
+                    <div class="endpoint-tabs" data-endpoint="add-l2tp">
+                        <div class="flex border-b border-slate-800 gap-1 mb-4">
+                            <button onclick="switchTab('add-l2tp', 'curl')" class="tab-btn px-4 py-2 text-xs font-semibold text-blue-400 border-b-2 border-blue-500 bg-blue-500/10 rounded-t-lg transition">cURL Command</button>
+                            <button onclick="switchTab('add-l2tp', 'resp')" class="tab-btn px-4 py-2 text-xs font-semibold text-slate-400 border-b-2 border-transparent hover:text-slate-200 rounded-t-lg transition">Response JSON</button>
+                        </div>
+                        <div id="add-l2tp-curl" class="tab-content code-container bg-slate-950 rounded-xl border border-slate-900 overflow-hidden">
+                            <button onclick="copyCode(this)" class="copy-btn text-[10px] text-slate-455 px-2 py-1 rounded-md flex items-center gap-1"><i class="far fa-copy"></i> Copy</button>
+                            <pre class="font-mono text-xs text-slate-300 p-4 overflow-x-auto"><code class="language-bash curl-snippet" data-template="curl -X POST https://{DOMAIN}/srpcom/add-l2tp \
+  -H 'Content-Type: application/json' \
+  -H 'x-api-key: {API_KEY}' \
+  -d '{
+    \"user\": \"developer_l2tp\",
+    \"password\": \"l2tp_password123\",
+    \"exp\": 30
+  }'">curl -X POST https://yourvps.com/srpcom/add-l2tp \
+  -H 'Content-Type: application/json' \
+  -H 'x-api-key: SANGATRAHASIA123' \
+  -d '{
+    "user": "developer_l2tp",
+    "password": "l2tp_password123",
+    "exp": 30
+  }'</code></pre>
+                        </div>
+                        <div id="add-l2tp-resp" class="tab-content hidden code-container bg-slate-950 rounded-xl border border-slate-900 overflow-hidden">
+                            <button onclick="copyCode(this)" class="copy-btn text-[10px] text-slate-455 px-2 py-1 rounded-md flex items-center gap-1"><i class="far fa-copy"></i> Copy</button>
+                            <pre class="font-mono text-xs text-green-400 p-4 overflow-x-auto"><code>{
+  "stdout": "Pembuatan akun baru berhasil\n\n━━━━━━━━━━━━━━━━━━━━\n❖ L2TP / IPsec VPN ❖\n...",
+  "stdout_tg": "Pembuatan akun baru berhasil\n\n━━━━━━━━━━━━━━━━━━━━\n❖ L2TP / IPsec VPN ❖\n..."
+}</code></pre>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- TRIAL L2TP (NEW IN DOCS) -->
+                <div id="trial-l2tp" class="scroll-mt-24 space-y-4 bg-slate-900/30 border border-slate-855 rounded-2xl p-6 glass-panel">
+                    <div class="flex flex-wrap items-center justify-between gap-4 border-b border-slate-800 pb-4">
+                        <div class="flex items-center gap-3">
+                            <span class="endpoint-badge badge-post">POST</span>
+                            <code class="font-mono text-sm font-bold text-white">/srpcom/trial-l2tp</code>
+                        </div>
+                    </div>
+                    <p class="text-xs text-slate-400">Membuat akun L2TP Trial secara instan untuk kebutuhan demonstrasi API.</p>
+                    
+                    <div class="endpoint-tabs" data-endpoint="trial-l2tp">
+                        <div class="flex border-b border-slate-800 gap-1 mb-4">
+                            <button onclick="switchTab('trial-l2tp', 'curl')" class="tab-btn px-4 py-2 text-xs font-semibold text-blue-400 border-b-2 border-blue-500 bg-blue-500/10 rounded-t-lg transition">cURL Command</button>
+                            <button onclick="switchTab('trial-l2tp', 'resp')" class="tab-btn px-4 py-2 text-xs font-semibold text-slate-400 border-b-2 border-transparent hover:text-slate-200 rounded-t-lg transition">Response JSON</button>
+                        </div>
+                        <div id="trial-l2tp-curl" class="tab-content code-container bg-slate-950 rounded-xl border border-slate-900 overflow-hidden">
+                            <button onclick="copyCode(this)" class="copy-btn text-[10px] text-slate-455 px-2 py-1 rounded-md flex items-center gap-1"><i class="far fa-copy"></i> Copy</button>
+                            <pre class="font-mono text-xs text-slate-300 p-4 overflow-x-auto"><code class="language-bash curl-snippet" data-template="curl -X POST https://{DOMAIN}/srpcom/trial-l2tp \
+  -H 'x-api-key: {API_KEY}'">curl -X POST https://yourvps.com/srpcom/trial-l2tp \
+  -H 'x-api-key: SANGATRAHASIA123'</code></pre>
+                        </div>
+                        <div id="trial-l2tp-resp" class="tab-content hidden code-container bg-slate-950 rounded-xl border border-slate-900 overflow-hidden">
+                            <button onclick="copyCode(this)" class="copy-btn text-[10px] text-slate-455 px-2 py-1 rounded-md flex items-center gap-1"><i class="far fa-copy"></i> Copy</button>
+                            <pre class="font-mono text-xs text-green-400 p-4 overflow-x-auto"><code>{
+  "stdout": "L2TP Trial created (Demo via API)"
+}</code></pre>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- DETAIL L2TP -->
+                <div id="detail-l2tp" class="scroll-mt-24 space-y-4 bg-slate-900/30 border border-slate-850 rounded-2xl p-6 glass-panel">
+                    <div class="flex flex-wrap items-center justify-between gap-4 border-b border-slate-800 pb-4">
+                        <div class="flex items-center gap-3">
+                            <span class="endpoint-badge badge-post">POST / GET</span>
+                            <code class="font-mono text-sm font-bold text-white">/srpcom/detail-l2tp</code>
+                        </div>
+                    </div>
+                    <p class="text-xs text-slate-400">Mendapatkan parameter konfig L2TP (IPsec PSK key, username, password, expiry).</p>
+                    
+                    <div class="endpoint-tabs" data-endpoint="detail-l2tp">
+                        <div class="flex border-b border-slate-800 gap-1 mb-4">
+                            <button onclick="switchTab('detail-l2tp', 'curl')" class="tab-btn px-4 py-2 text-xs font-semibold text-blue-400 border-b-2 border-blue-500 bg-blue-500/10 rounded-t-lg transition">cURL Command</button>
+                            <button onclick="switchTab('detail-l2tp', 'resp')" class="tab-btn px-4 py-2 text-xs font-semibold text-slate-400 border-b-2 border-transparent hover:text-slate-200 rounded-t-lg transition">Response JSON</button>
+                        </div>
+                        <div id="detail-l2tp-curl" class="tab-content code-container bg-slate-950 rounded-xl border border-slate-900 overflow-hidden">
+                            <button onclick="copyCode(this)" class="copy-btn text-[10px] text-slate-455 px-2 py-1 rounded-md flex items-center gap-1"><i class="far fa-copy"></i> Copy</button>
+                            <pre class="font-mono text-xs text-slate-300 p-4 overflow-x-auto"><code class="language-bash curl-snippet" data-template="curl -X POST https://{DOMAIN}/srpcom/detail-l2tp \
+  -H 'Content-Type: application/json' \
+  -H 'x-api-key: {API_KEY}' \
+  -d '{
+    \"user\": \"developer_l2tp\"
+  }'">curl -X POST https://yourvps.com/srpcom/detail-l2tp \
+  -H 'Content-Type: application/json' \
+  -H 'x-api-key: SANGATRAHASIA123' \
+  -d '{
+    "user": "developer_l2tp"
+  }'</code></pre>
+                        </div>
+                        <div id="detail-l2tp-resp" class="tab-content hidden code-container bg-slate-950 rounded-xl border border-slate-900 overflow-hidden">
+                            <button onclick="copyCode(this)" class="copy-btn text-[10px] text-slate-455 px-2 py-1 rounded-md flex items-center gap-1"><i class="far fa-copy"></i> Copy</button>
+                            <pre class="font-mono text-xs text-green-400 p-4 overflow-x-auto"><code>{
+  "stdout": "❖ L2TP / IPsec VPN ❖\nUsername : developer_l2tp\nPassword : l2tp_password123\nIPsec PSK : srpcom_vpn\n...",
+  "stdout_tg": "❖ L2TP / IPsec VPN ❖\nUsername : `developer_l2tp`\n..."
+}</code></pre>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- RENEW L2TP -->
+                <div id="renew-l2tp" class="scroll-mt-24 space-y-4 bg-slate-900/30 border border-slate-850 rounded-2xl p-6 glass-panel">
+                    <div class="flex flex-wrap items-center justify-between gap-4 border-b border-slate-800 pb-4">
+                        <div class="flex items-center gap-3">
+                            <span class="endpoint-badge badge-post">POST</span>
+                            <code class="font-mono text-sm font-bold text-white">/srpcom/renew-l2tp</code>
+                        </div>
+                    </div>
+                    <p class="text-xs text-slate-400">Memperpanjang masa aktif akun VPN L2TP secara akumulatif.</p>
+                    
+                    <div class="endpoint-tabs" data-endpoint="renew-l2tp">
+                        <div class="flex border-b border-slate-800 gap-1 mb-4">
+                            <button onclick="switchTab('renew-l2tp', 'curl')" class="tab-btn px-4 py-2 text-xs font-semibold text-blue-400 border-b-2 border-blue-500 bg-blue-500/10 rounded-t-lg transition">cURL Command</button>
+                            <button onclick="switchTab('renew-l2tp', 'resp')" class="tab-btn px-4 py-2 text-xs font-semibold text-slate-400 border-b-2 border-transparent hover:text-slate-200 rounded-t-lg transition">Response JSON</button>
+                        </div>
+                        <div id="renew-l2tp-curl" class="tab-content code-container bg-slate-950 rounded-xl border border-slate-900 overflow-hidden">
+                            <button onclick="copyCode(this)" class="copy-btn text-[10px] text-slate-455 px-2 py-1 rounded-md flex items-center gap-1"><i class="far fa-copy"></i> Copy</button>
+                            <pre class="font-mono text-xs text-slate-300 p-4 overflow-x-auto"><code class="language-bash curl-snippet" data-template="curl -X POST https://{DOMAIN}/srpcom/renew-l2tp \
+  -H 'Content-Type: application/json' \
+  -H 'x-api-key: {API_KEY}' \
+  -d '{
+    \"user\": \"developer_l2tp\",
+    \"exp\": 30
+  }'">curl -X POST https://yourvps.com/srpcom/renew-l2tp \
+  -H 'Content-Type: application/json' \
+  -H 'x-api-key: SANGATRAHASIA123' \
+  -d '{
+    "user": "developer_l2tp",
+    "exp": 30
+  }'</code></pre>
+                        </div>
+                        <div id="renew-l2tp-resp" class="tab-content hidden code-container bg-slate-950 rounded-xl border border-slate-900 overflow-hidden">
+                            <button onclick="copyCode(this)" class="copy-btn text-[10px] text-slate-455 px-2 py-1 rounded-md flex items-center gap-1"><i class="far fa-copy"></i> Copy</button>
+                            <pre class="font-mono text-xs text-green-400 p-4 overflow-x-auto"><code>{
+  "stdout": "✅ Akun L2TP 'developer_l2tp' diperpanjang!\nExpired baru: 2026-07-20 14:30:00 WIB",
+  "stdout_tg": "🕑 Akun Diperpanjang\n\n💻 Server: yourvps.com\nType : L2TP IPsec\n🔑 Akun: `developer_l2tp`..."
+}</code></pre>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- DEL L2TP -->
+                <div id="del-l2tp" class="scroll-mt-24 space-y-4 bg-slate-900/30 border border-slate-850 rounded-2xl p-6 glass-panel">
+                    <div class="flex flex-wrap items-center justify-between gap-4 border-b border-slate-800 pb-4">
+                        <div class="flex items-center gap-3">
+                            <span class="endpoint-badge badge-delete">DELETE / POST</span>
+                            <code class="font-mono text-sm font-bold text-white">/srpcom/del-l2tp</code>
+                        </div>
+                    </div>
+                    <p class="text-xs text-slate-400">Menghapus data user L2TP dari file chap-secrets secara permanen.</p>
+                    
+                    <div class="endpoint-tabs" data-endpoint="del-l2tp">
+                        <div class="flex border-b border-slate-800 gap-1 mb-4">
+                            <button onclick="switchTab('del-l2tp', 'curl')" class="tab-btn px-4 py-2 text-xs font-semibold text-blue-400 border-b-2 border-blue-500 bg-blue-500/10 rounded-t-lg transition">cURL Command</button>
+                            <button onclick="switchTab('del-l2tp', 'resp')" class="tab-btn px-4 py-2 text-xs font-semibold text-slate-400 border-b-2 border-transparent hover:text-slate-200 rounded-t-lg transition">Response JSON</button>
+                        </div>
+                        <div id="del-l2tp-curl" class="tab-content code-container bg-slate-950 rounded-xl border border-slate-900 overflow-hidden">
+                            <button onclick="copyCode(this)" class="copy-btn text-[10px] text-slate-455 px-2 py-1 rounded-md flex items-center gap-1"><i class="far fa-copy"></i> Copy</button>
+                            <pre class="font-mono text-xs text-slate-300 p-4 overflow-x-auto"><code class="language-bash curl-snippet" data-template="curl -X POST https://{DOMAIN}/srpcom/del-l2tp \
+  -H 'Content-Type: application/json' \
+  -H 'x-api-key: {API_KEY}' \
+  -d '{
+    \"user\": \"developer_l2tp\"
+  }'">curl -X POST https://yourvps.com/srpcom/del-l2tp \
+  -H 'Content-Type: application/json' \
+  -H 'x-api-key: SANGATRAHASIA123' \
+  -d '{
+    "user": "developer_l2tp"
+  }'</code></pre>
+                        </div>
+                        <div id="del-l2tp-resp" class="tab-content hidden code-container bg-slate-950 rounded-xl border border-slate-900 overflow-hidden">
+                            <button onclick="copyCode(this)" class="copy-btn text-[10px] text-slate-455 px-2 py-1 rounded-md flex items-center gap-1"><i class="far fa-copy"></i> Copy</button>
+                            <pre class="font-mono text-xs text-green-400 p-4 overflow-x-auto"><code>{
+  "stdout": "✅ Akun L2TP 'developer_l2tp' berhasil dihapus!"
+}</code></pre>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- System & Monitoring Section -->
+            <section class="space-y-8">
+                <div class="border-b border-slate-800 pb-4">
+                    <h2 class="text-2xl font-bold text-white tracking-tight"><i class="fas fa-desktop text-cyan-400 mr-2"></i> System & Monitoring API</h2>
+                    <p class="text-sm text-slate-400 mt-1">Mengambil rincian performa, live metrics, bandwidth, backup, dan log sistem secara non-interaktif.</p>
+                </div>
+
+                <!-- LIST ACTIVE ACCOUNTS -->
+                <div id="list-accounts" class="scroll-mt-24 space-y-4 bg-slate-900/30 border border-slate-850 rounded-2xl p-6 glass-panel">
+                    <div class="flex flex-wrap items-center justify-between gap-4 border-b border-slate-800 pb-4">
+                        <div class="flex items-center gap-3">
+                            <span class="endpoint-badge badge-get">GET</span>
+                            <code class="font-mono text-sm font-bold text-white">/srpcom/list-accounts/&lt;protocol&gt;</code>
+                        </div>
+                        <span class="text-xs text-slate-455 font-medium">Protocol: <code class="text-blue-400 font-mono">vmess</code>, <code class="text-blue-400 font-mono">vless</code>, <code class="text-blue-400 font-mono">trojan</code>, <code class="text-blue-400 font-mono">ssh</code>, <code class="text-blue-400 font-mono">l2tp</code></span>
+                    </div>
+                    <p class="text-xs text-slate-400">Mengambil daftar lengkap akun yang aktif beserta rincian sisa hari aktif.</p>
+                    
+                    <div class="endpoint-tabs" data-endpoint="list-accounts">
+                        <div class="flex border-b border-slate-800 gap-1 mb-4">
+                            <button onclick="switchTab('list-accounts', 'curl')" class="tab-btn px-4 py-2 text-xs font-semibold text-blue-400 border-b-2 border-blue-500 bg-blue-500/10 rounded-t-lg transition">cURL Command</button>
+                            <button onclick="switchTab('list-accounts', 'resp')" class="tab-btn px-4 py-2 text-xs font-semibold text-slate-400 border-b-2 border-transparent hover:text-slate-200 rounded-t-lg transition">Response JSON</button>
+                        </div>
+                        <div id="list-accounts-curl" class="tab-content code-container bg-slate-950 rounded-xl border border-slate-900 overflow-hidden">
+                            <button onclick="copyCode(this)" class="copy-btn text-[10px] text-slate-455 px-2 py-1 rounded-md flex items-center gap-1"><i class="far fa-copy"></i> Copy</button>
+                            <pre class="font-mono text-xs text-slate-300 p-4 overflow-x-auto"><code class="language-bash curl-snippet" data-template="curl -X GET https://{DOMAIN}/srpcom/list-accounts/vmess \
+  -H 'x-api-key: {API_KEY}'">curl -X GET https://yourvps.com/srpcom/list-accounts/vmess \
+  -H 'x-api-key: SANGATRAHASIA123'</code></pre>
+                        </div>
+                        <div id="list-accounts-resp" class="tab-content hidden code-container bg-slate-950 rounded-xl border border-slate-900 overflow-hidden">
+                            <button onclick="copyCode(this)" class="copy-btn text-[10px] text-slate-455 px-2 py-1 rounded-md flex items-center gap-1"><i class="far fa-copy"></i> Copy</button>
+                            <pre class="font-mono text-xs text-green-400 p-4 overflow-x-auto"><code>{
+  "stdout": "<div class=\"flex flex-col gap-2.5\"><div class=\"flex justify-between p-3.5 bg-slate-800/40 rounded-xl border border-slate-700/50\">...</div></div>",
+  "stdout_tg": "📋 *LIST ACCOUNT VMESS*\n━━━━━━━━━━━━━━━━━━━━\n• `vmess_user` (Exp: 2026-06-20 (29 Hari))"
+}</code></pre>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- MONITOR XRAY -->
+                <div id="mon-xray" class="scroll-mt-24 space-y-4 bg-slate-900/30 border border-slate-850 rounded-2xl p-6 glass-panel">
+                    <div class="flex flex-wrap items-center justify-between gap-4 border-b border-slate-800 pb-4">
+                        <div class="flex items-center gap-3">
+                            <span class="endpoint-badge badge-get">GET</span>
+                            <code class="font-mono text-sm font-bold text-white">/srpcom/monitor-xray</code>
+                        </div>
+                    </div>
+                    <p class="text-xs text-slate-400">Mengambil real-time IP login aktif & total kuota data terpakai (Uplink + Downlink) seluruh user Xray core.</p>
+                    
+                    <div class="endpoint-tabs" data-endpoint="mon-xray">
+                        <div class="flex border-b border-slate-800 gap-1 mb-4">
+                            <button onclick="switchTab('mon-xray', 'curl')" class="tab-btn px-4 py-2 text-xs font-semibold text-blue-400 border-b-2 border-blue-500 bg-blue-500/10 rounded-t-lg transition">cURL Command</button>
+                            <button onclick="switchTab('mon-xray', 'resp')" class="tab-btn px-4 py-2 text-xs font-semibold text-slate-400 border-b-2 border-transparent hover:text-slate-200 rounded-t-lg transition">Response JSON</button>
+                        </div>
+                        <div id="mon-xray-curl" class="tab-content code-container bg-slate-950 rounded-xl border border-slate-900 overflow-hidden">
+                            <button onclick="copyCode(this)" class="copy-btn text-[10px] text-slate-455 px-2 py-1 rounded-md flex items-center gap-1"><i class="far fa-copy"></i> Copy</button>
+                            <pre class="font-mono text-xs text-slate-300 p-4 overflow-x-auto"><code class="language-bash curl-snippet" data-template="curl -X GET https://{DOMAIN}/srpcom/monitor-xray \
+  -H 'x-api-key: {API_KEY}'">curl -X GET https://yourvps.com/srpcom/monitor-xray \
+  -H 'x-api-key: SANGATRAHASIA123'</code></pre>
+                        </div>
+                        <div id="mon-xray-resp" class="tab-content hidden code-container bg-slate-950 rounded-xl border border-slate-900 overflow-hidden">
+                            <button onclick="copyCode(this)" class="copy-btn text-[10px] text-slate-455 px-2 py-1 rounded-md flex items-center gap-1"><i class="far fa-copy"></i> Copy</button>
+                            <pre class="font-mono text-xs text-green-400 p-4 overflow-x-auto"><code>{
+  "stdout": "📈 *XRAY MONITORING*\n━━━━━━━━━━━━━━━━━━━━\n👤 *user_test*\n├ IP Aktif : 2 / 2\n└ Kuota : 12.35 GB / 50 GB\n\n"
+}</code></pre>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- MONITOR SSH -->
+                <div id="mon-ssh" class="scroll-mt-24 space-y-4 bg-slate-900/30 border border-slate-850 rounded-2xl p-6 glass-panel">
+                    <div class="flex flex-wrap items-center justify-between gap-4 border-b border-slate-800 pb-4">
+                        <div class="flex items-center gap-3">
+                            <span class="endpoint-badge badge-get">GET</span>
+                            <code class="font-mono text-sm font-bold text-white">/srpcom/monitor-ssh</code>
+                        </div>
+                    </div>
+                    <p class="text-xs text-slate-400">Melacak status live login session koneksi SSH Dropbear & OpenSSH aktif saat ini.</p>
+                    
+                    <div class="endpoint-tabs" data-endpoint="mon-ssh">
+                        <div class="flex border-b border-slate-800 gap-1 mb-4">
+                            <button onclick="switchTab('mon-ssh', 'curl')" class="tab-btn px-4 py-2 text-xs font-semibold text-blue-400 border-b-2 border-blue-500 bg-blue-500/10 rounded-t-lg transition">cURL Command</button>
+                            <button onclick="switchTab('mon-ssh', 'resp')" class="tab-btn px-4 py-2 text-xs font-semibold text-slate-400 border-b-2 border-transparent hover:text-slate-200 rounded-t-lg transition">Response JSON</button>
+                        </div>
+                        <div id="mon-ssh-curl" class="tab-content code-container bg-slate-950 rounded-xl border border-slate-900 overflow-hidden">
+                            <button onclick="copyCode(this)" class="copy-btn text-[10px] text-slate-455 px-2 py-1 rounded-md flex items-center gap-1"><i class="far fa-copy"></i> Copy</button>
+                            <pre class="font-mono text-xs text-slate-300 p-4 overflow-x-auto"><code class="language-bash curl-snippet" data-template="curl -X GET https://{DOMAIN}/srpcom/monitor-ssh \
+  -H 'x-api-key: {API_KEY}'">curl -X GET https://yourvps.com/srpcom/monitor-ssh \
+  -H 'x-api-key: SANGATRAHASIA123'</code></pre>
+                        </div>
+                        <div id="mon-ssh-resp" class="tab-content hidden code-container bg-slate-950 rounded-xl border border-slate-900 overflow-hidden">
+                            <button onclick="copyCode(this)" class="copy-btn text-[10px] text-slate-455 px-2 py-1 rounded-md flex items-center gap-1"><i class="far fa-copy"></i> Copy</button>
+                            <pre class="font-mono text-xs text-green-400 p-4 overflow-x-auto"><code>{
+  "stdout": "💻 *SSH MONITORING*\n━━━━━━━━━━━━━━━━━━━━\n👤 `ssh_user` | 🌐 114.79.12.34"
+}</code></pre>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- SYSTEM RESOURCES -->
+                <div id="sys-resource" class="scroll-mt-24 space-y-4 bg-slate-900/30 border border-slate-850 rounded-2xl p-6 glass-panel">
+                    <div class="flex flex-wrap items-center justify-between gap-4 border-b border-slate-800 pb-4">
+                        <div class="flex items-center gap-3">
+                            <span class="endpoint-badge badge-get">GET</span>
+                            <code class="font-mono text-sm font-bold text-white">/srpcom/sys-resource</code>
+                        </div>
+                    </div>
+                    <p class="text-xs text-slate-400">Mendapatkan detail persentase performa CPU, RAM, & DISK VPS untuk visual charts panel.</p>
+                    
+                    <div class="endpoint-tabs" data-endpoint="sys-resource">
+                        <div class="flex border-b border-slate-800 gap-1 mb-4">
+                            <button onclick="switchTab('sys-resource', 'curl')" class="tab-btn px-4 py-2 text-xs font-semibold text-blue-400 border-b-2 border-blue-500 bg-blue-500/10 rounded-t-lg transition">cURL Command</button>
+                            <button onclick="switchTab('sys-resource', 'resp')" class="tab-btn px-4 py-2 text-xs font-semibold text-slate-400 border-b-2 border-transparent hover:text-slate-200 rounded-t-lg transition">Response JSON</button>
+                        </div>
+                        <div id="sys-resource-curl" class="tab-content code-container bg-slate-950 rounded-xl border border-slate-900 overflow-hidden">
+                            <button onclick="copyCode(this)" class="copy-btn text-[10px] text-slate-455 px-2 py-1 rounded-md flex items-center gap-1"><i class="far fa-copy"></i> Copy</button>
+                            <pre class="font-mono text-xs text-slate-300 p-4 overflow-x-auto"><code class="language-bash curl-snippet" data-template="curl -X GET https://{DOMAIN}/srpcom/sys-resource \
+  -H 'x-api-key: {API_KEY}'">curl -X GET https://yourvps.com/srpcom/sys-resource \
+  -H 'x-api-key: SANGATRAHASIA123'</code></pre>
+                        </div>
+                        <div id="sys-resource-resp" class="tab-content hidden code-container bg-slate-950 rounded-xl border border-slate-900 overflow-hidden">
+                            <button onclick="copyCode(this)" class="copy-btn text-[10px] text-slate-455 px-2 py-1 rounded-md flex items-center gap-1"><i class="far fa-copy"></i> Copy</button>
+                            <pre class="font-mono text-xs text-green-400 p-4 overflow-x-auto"><code>{
+  "stdout": "💻 SYSTEM RESOURCES (CPU, RAM, DISK)...",
+  "metrics": {
+    "cpu": 8.4,
+    "ram": 33.2,
+    "disk": 22.8
+  }
+}</code></pre>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- SYSTEM LOGS -->
+                <div id="sys-logs" class="scroll-mt-24 space-y-4 bg-slate-900/30 border border-slate-850 rounded-2xl p-6 glass-panel">
+                    <div class="flex flex-wrap items-center justify-between gap-4 border-b border-slate-800 pb-4">
+                        <div class="flex items-center gap-3">
+                            <span class="endpoint-badge badge-get">GET</span>
+                            <code class="font-mono text-sm font-bold text-white">/srpcom/log-&lt;logtype&gt;</code>
+                        </div>
+                        <span class="text-xs text-slate-455 font-medium">Logtype: <code class="text-blue-400 font-mono">xray-access</code>, <code class="text-blue-400 font-mono">xray-error</code>, <code class="text-blue-400 font-mono">l2tp</code>, <code class="text-blue-400 font-mono">openvpn</code>, <code class="text-blue-400 font-mono">caddy</code></span>
+                    </div>
+                    <p class="text-xs text-slate-400">Mengambil 50 baris terakhir (*live tail*) berkas log service untuk keperluan troubleshooting jaringan.</p>
+                    
+                    <div class="endpoint-tabs" data-endpoint="sys-logs">
+                        <div class="flex border-b border-slate-800 gap-1 mb-4">
+                            <button onclick="switchTab('sys-logs', 'curl')" class="tab-btn px-4 py-2 text-xs font-semibold text-blue-400 border-b-2 border-blue-500 bg-blue-500/10 rounded-t-lg transition">cURL Command</button>
+                            <button onclick="switchTab('sys-logs', 'resp')" class="tab-btn px-4 py-2 text-xs font-semibold text-slate-400 border-b-2 border-transparent hover:text-slate-200 rounded-t-lg transition">Response JSON</button>
+                        </div>
+                        <div id="sys-logs-curl" class="tab-content code-container bg-slate-950 rounded-xl border border-slate-900 overflow-hidden">
+                            <button onclick="copyCode(this)" class="copy-btn text-[10px] text-slate-455 px-2 py-1 rounded-md flex items-center gap-1"><i class="far fa-copy"></i> Copy</button>
+                            <pre class="font-mono text-xs text-slate-300 p-4 overflow-x-auto"><code class="language-bash curl-snippet" data-template="curl -X GET https://{DOMAIN}/srpcom/log-xray-access \
+  -H 'x-api-key: {API_KEY}'">curl -X GET https://yourvps.com/srpcom/log-xray-access \
+  -H 'x-api-key: SANGATRAHASIA123'</code></pre>
+                        </div>
+                        <div id="sys-logs-resp" class="tab-content hidden code-container bg-slate-950 rounded-xl border border-slate-900 overflow-hidden">
+                            <button onclick="copyCode(this)" class="copy-btn text-[10px] text-slate-455 px-2 py-1 rounded-md flex items-center gap-1"><i class="far fa-copy"></i> Copy</button>
+                            <pre class="font-mono text-xs text-green-400 p-4 overflow-x-auto"><code>{
+  "stdout": "📄 LIVE LOG: XRAY-ACCESS\n━━━━━━━━━━━━━━━━━━━━\n2026/05/21 14:30:12 127.0.0.1:51240 accepted tcp:114.23.45.12:9443..."
+}</code></pre>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- REQUEST BACKUP -->
+                <div id="sys-backup" class="scroll-mt-24 space-y-4 bg-slate-900/30 border border-slate-850 rounded-2xl p-6 glass-panel">
+                    <div class="flex flex-wrap items-center justify-between gap-4 border-b border-slate-800 pb-4">
+                        <div class="flex items-center gap-3">
+                            <span class="endpoint-badge badge-get">GET</span>
+                            <code class="font-mono text-sm font-bold text-white">/srpcom/sys-backup</code>
+                        </div>
+                    </div>
+                    <p class="text-xs text-slate-400">Mencadangkan data config, limit, exp, & chap-secrets VPS ke tarball terkompresi berformat **Base64**.</p>
+                    
+                    <div class="endpoint-tabs" data-endpoint="sys-backup">
+                        <div class="flex border-b border-slate-800 gap-1 mb-4">
+                            <button onclick="switchTab('sys-backup', 'curl')" class="tab-btn px-4 py-2 text-xs font-semibold text-blue-400 border-b-2 border-blue-500 bg-blue-500/10 rounded-t-lg transition">cURL Command</button>
+                            <button onclick="switchTab('sys-backup', 'resp')" class="tab-btn px-4 py-2 text-xs font-semibold text-slate-400 border-b-2 border-transparent hover:text-slate-200 rounded-t-lg transition">Response JSON</button>
+                        </div>
+                        <div id="sys-backup-curl" class="tab-content code-container bg-slate-950 rounded-xl border border-slate-900 overflow-hidden">
+                            <button onclick="copyCode(this)" class="copy-btn text-[10px] text-slate-455 px-2 py-1 rounded-md flex items-center gap-1"><i class="far fa-copy"></i> Copy</button>
+                            <pre class="font-mono text-xs text-slate-300 p-4 overflow-x-auto"><code class="language-bash curl-snippet" data-template="curl -X GET https://{DOMAIN}/srpcom/sys-backup \
+  -H 'x-api-key: {API_KEY}'">curl -X GET https://yourvps.com/srpcom/sys-backup \
+  -H 'x-api-key: SANGATRAHASIA123'</code></pre>
+                        </div>
+                        <div id="sys-backup-resp" class="tab-content hidden code-container bg-slate-950 rounded-xl border border-slate-900 overflow-hidden">
+                            <button onclick="copyCode(this)" class="copy-btn text-[10px] text-slate-455 px-2 py-1 rounded-md flex items-center gap-1"><i class="far fa-copy"></i> Copy</button>
+                            <pre class="font-mono text-xs text-green-400 p-4 overflow-x-auto"><code>{
+  "filename": "srpcom-backup-20260521_143000.tar.gz",
+  "data": "H4sICGZvZ2AAA2JhY2t1cC50YXIA..." // String Base64 terkompresi
+}</code></pre>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- SPEEDTEST & vnStat BANDWIDTH -->
+                <div id="speed-bw" class="scroll-mt-24 space-y-4 bg-slate-900/30 border border-slate-850 rounded-2xl p-6 glass-panel">
+                    <div class="flex flex-wrap items-center justify-between gap-4 border-b border-slate-800 pb-4">
+                        <div class="flex items-center gap-3">
+                            <span class="endpoint-badge badge-get">GET</span>
+                            <code class="font-mono text-sm font-bold text-white">/srpcom/speedtest</code>
+                            <span class="text-slate-700">|</span>
+                            <code class="font-mono text-sm font-bold text-white">/srpcom/bandwidth</code>
+                        </div>
+                    </div>
+                    <p class="text-xs text-slate-400">Menguji kecepatan internet VPS via Ookla CLI resmi atau memantau rincian log vnStat harian/bulanan VPS.</p>
+                    
+                    <div class="endpoint-tabs" data-endpoint="speed-bw">
+                        <div class="flex border-b border-slate-800 gap-1 mb-4">
+                            <button onclick="switchTab('speed-bw', 'curl')" class="tab-btn px-4 py-2 text-xs font-semibold text-blue-400 border-b-2 border-blue-500 bg-blue-500/10 rounded-t-lg transition">cURL Command</button>
+                            <button onclick="switchTab('speed-bw', 'resp')" class="tab-btn px-4 py-2 text-xs font-semibold text-slate-400 border-b-2 border-transparent hover:text-slate-200 rounded-t-lg transition">Response JSON</button>
+                        </div>
+                        <div id="speed-bw-curl" class="tab-content code-container bg-slate-950 rounded-xl border border-slate-900 overflow-hidden">
+                            <button onclick="copyCode(this)" class="copy-btn text-[10px] text-slate-455 px-2 py-1 rounded-md flex items-center gap-1"><i class="far fa-copy"></i> Copy</button>
+                            <pre class="font-mono text-xs text-slate-300 p-4 overflow-x-auto"><code class="language-bash curl-snippet" data-template="curl -X GET https://{DOMAIN}/srpcom/speedtest \
+  -H 'x-api-key: {API_KEY}'">curl -X GET https://yourvps.com/srpcom/speedtest \
+  -H 'x-api-key: SANGATRAHASIA123'</code></pre>
+                        </div>
+                        <div id="speed-bw-resp" class="tab-content hidden code-container bg-slate-950 rounded-xl border border-slate-900 overflow-hidden">
+                            <button onclick="copyCode(this)" class="copy-btn text-[10px] text-slate-455 px-2 py-1 rounded-md flex items-center gap-1"><i class="far fa-copy"></i> Copy</button>
+                            <pre class="font-mono text-xs text-green-400 p-4 overflow-x-auto"><code>{
+  "stdout": "🚀 SPEEDTEST SERVER\n━━━━━━━━━━━━━━━\nSpeedtest by Ookla\n..."
+}</code></pre>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Telegram Bot Code Example Section -->
+            <section id="telegram-bot" class="scroll-mt-24 space-y-6">
+                <div class="border-b border-slate-800 pb-4">
+                    <h2 class="text-2xl font-bold text-white tracking-tight"><i class="fab fa-telegram text-blue-400 mr-2"></i> Integrasi Bot Telegram Kustom Anda</h2>
+                    <p class="text-sm text-slate-400 mt-1">Panduan praktis membangun bot Telegram kustom menggunakan library Python Telebot (`pyTelegramBotAPI`).</p>
+                </div>
+                
+                <div class="space-y-4">
+                    <p class="text-sm text-slate-350 leading-relaxed">
+                        Anda dapat memanfaatkan library Python untuk membuat bot Telegram interaktif agar reseller atau pembeli Anda dapat melakukan transaksi mandiri (transaksional bot) secara otomatis. Di bawah ini adalah contoh kode bot Python siap pakai:
+                    </p>
+                    <div class="code-container bg-slate-950 rounded-xl border border-slate-900 overflow-hidden shadow-2xl">
+                        <button onclick="copyCode(this)" class="copy-btn text-xs text-slate-400 px-3 py-1.5 rounded-lg flex items-center gap-1.5"><i class="far fa-copy"></i> Copy</button>
+                        <pre class="font-mono text-xs text-slate-300 p-5 overflow-x-auto"><code class="language-python" id="python-bot-code">import telebot
+import requests
+
+# Masukkan Token Bot Telegram Anda dari @BotFather
+BOT_TOKEN = "YOUR_TELEGRAM_BOT_TOKEN"
+bot = telebot.TeleBot(BOT_TOKEN)
+
+# Parameter Konfigurasi API VPS SRPCOM V5 (Ter-sync dinamis dari HUD)
+API_URL = "https://yourvps.com"
+API_KEY = "SANGATRAHASIA123"
+
+HEADERS = {
+    "Content-Type": "application/json",
+    "x-api-key": API_KEY
+}
+
+@bot.message_handler(commands=['start', 'help'])
+def send_welcome(message):
+    welcome_text = (
+        "🤖 *Selamat Datang di Bot VPS Manager!*\n\n"
+        "Gunakan perintah di bawah ini:\n"
+        "• `/addvmess <username>` - Buat akun VMess\n"
+        "• `/addssh <username> <pass>` - Buat akun SSH & OVPN\n"
+        "• `/detailvmess <username>` - Cek konfigurasi VMess\n"
+        "• `/listvmess` - Daftar seluruh akun VMess aktif\n"
+        "• `/vpsstatus` - Pantau performa Server (CPU/RAM)"
+    )
+    bot.reply_to(message, welcome_text, parse_mode="Markdown")
+
+@bot.message_handler(commands=['addvmess'])
+def handle_add_vmess(message):
+    args = message.text.split()
+    if len(args) < 2:
+        bot.reply_to(message, "❌ *Gagal*: Gunakan format `/addvmess [username]`")
+        return
+        
+    username = args[1]
+    bot.reply_to(message, f"⌛ Sedang memproses pembuatan akun VMess: `{username}`...")
+    
+    # Panggil Endpoint API SRPCOM
+    response = requests.post(
+        f"{API_URL}/srpcom/add-vmessws",
+        json={"user": username, "exp": 30, "limit_ip": 2, "limit_quota": 50},
+        headers=HEADERS
+    )
+    
+    if response.status_code == 200:
+        bot.reply_to(message, response.json().get("stdout_tg"), parse_mode="Markdown")
+    else:
+        bot.reply_to(message, f"❌ *Error*: Gagal menghubungi API VPS (Status: {response.status_code})")
+
+@bot.message_handler(commands=['listvmess'])
+def handle_list_vmess(message):
+    bot.reply_to(message, "⌛ Mengambil data akun dari VPS...")
+    response = requests.get(f"{API_URL}/srpcom/list-accounts/vmess", headers=HEADERS)
+    
+    if response.status_code == 200:
+        bot.reply_to(message, response.json().get("stdout_tg"), parse_mode="Markdown")
+    else:
+        bot.reply_to(message, "❌ *Gagal*: Tidak dapat mengambil daftar akun aktif.")
+
+@bot.message_handler(commands=['vpsstatus'])
+def handle_status(message):
+    response = requests.get(f"{API_URL}/srpcom/sys-resource", headers=HEADERS)
+    if response.status_code == 200:
+        bot.reply_to(message, response.json().get("stdout"), parse_mode="Markdown")
+    else:
+        bot.reply_to(message, "❌ *Gagal* mengambil status server.")
+
+print("🤖 Bot Telegram Kustom sedang berjalan...")
+bot.infinity_polling()</code></pre>
+                    </div>
+                </div>
+            </section>
+
+        </main>
+    </div>
+
+    <!-- Script Copy Code, Switch Tabs, Navigation & Dynamic HUD Sync -->
+    <script>
+        // Global variables for sandbox HUD config
+        const config = {
+            domain: "yourvps.com",
+            apiKey: "SANGATRAHASIA123"
+        };
+
+        // DOM elements
+        const hudDomainInput = document.getElementById('hud-domain');
+        const hudApiKeyInput = document.getElementById('hud-apikey');
+
+        // Update all snippets dynamically
+        function updateSnippets() {
+            // Update simple placeholders
+            document.querySelectorAll('.host-placeholder').forEach(el => {
+                el.innerText = config.domain;
+            });
+            document.querySelectorAll('.key-placeholder').forEach(el => {
+                el.innerText = config.apiKey;
+            });
+
+            // Update complex cURL code snippets
+            document.querySelectorAll('.curl-snippet').forEach(codeEl => {
+                const template = codeEl.getAttribute('data-template');
+                if (template) {
+                    let replaced = template
+                        .replace(/{DOMAIN}/g, config.domain)
+                        .replace(/{API_KEY}/g, config.apiKey);
+                    codeEl.innerText = replaced;
+                }
+            });
+
+            // Update Python bot code snippet dynamically
+            const pyCodeEl = document.getElementById('python-bot-code');
+            if (pyCodeEl) {
+                let pyTemplate = `import telebot
+import requests
+
+# Masukkan Token Bot Telegram Anda dari @BotFather
+BOT_TOKEN = "YOUR_TELEGRAM_BOT_TOKEN"
+bot = telebot.TeleBot(BOT_TOKEN)
+
+# Parameter Konfigurasi API VPS SRPCOM V5 (Ter-sync dinamis dari HUD)
+API_URL = "https://${config.domain}"
+API_KEY = "${config.apiKey}"
+
+HEADERS = {
+    "Content-Type": "application/json",
+    "x-api-key": API_KEY
+}
+
+@bot.message_handler(commands=['start', 'help'])
+def send_welcome(message):
+    welcome_text = (
+        "🤖 *Selamat Datang di Bot VPS Manager!*\\n\\n"
+        "Gunakan perintah di bawah ini:\\n"
+        "• \`/addvmess <username>\` - Buat akun VMess\\n"
+        "• \`/addssh <username> <pass>\` - Buat akun SSH & OVPN\\n"
+        "• \`/detailvmess <username>\` - Cek konfigurasi VMess\\n"
+        "• \`/listvmess\` - Daftar seluruh akun VMess aktif\\n"
+        "• \`/vpsstatus\` - Pantau performa Server (CPU/RAM)"
+    )
+    bot.reply_to(message, welcome_text, parse_mode="Markdown")
+
+@bot.message_handler(commands=['addvmess'])
+def handle_add_vmess(message):
+    args = message.text.split()
+    if len(args) < 2:
+        bot.reply_to(message, "❌ *Gagal*: Gunakan format \`/addvmess [username]\`")
+        return
+        
+    username = args[1]
+    bot.reply_to(message, f"⌛ Sedang memproses pembuatan akun VMess: \`{username}\`...")
+    
+    # Panggil Endpoint API SRPCOM
+    response = requests.post(
+        f"{API_URL}/srpcom/add-vmessws",
+        json={"user": username, "exp": 30, "limit_ip": 2, "limit_quota": 50},
+        headers=HEADERS
+    )
+    
+    if response.status_code == 200:
+        bot.reply_to(message, response.json().get("stdout_tg"), parse_mode="Markdown")
+    else:
+        bot.reply_to(message, f"❌ *Error*: Gagal menghubungi API VPS (Status: {response.status_code})")
+
+@bot.message_handler(commands=['listvmess'])
+def handle_list_vmess(message):
+    bot.reply_to(message, "⌛ Mengambil data akun dari VPS...")
+    response = requests.get(f"{API_URL}/srpcom/list-accounts/vmess", headers=HEADERS)
+    
+    if response.status_code == 200:
+        bot.reply_to(message, response.json().get("stdout_tg"), parse_mode="Markdown")
+    else:
+        bot.reply_to(message, "❌ *Gagal*: Tidak dapat mengambil daftar akun aktif.")
+
+@bot.message_handler(commands=['vpsstatus'])
+def handle_status(message):
+    response = requests.get(f"{API_URL}/srpcom/sys-resource", headers=HEADERS)
+    if response.status_code == 200:
+        bot.reply_to(message, response.json().get("stdout"), parse_mode="Markdown")
+    else:
+        bot.reply_to(message, "❌ *Gagal* mengambil status server.")
+
+print("🤖 Bot Telegram Kustom sedang berjalan...")
+bot.infinity_polling()`;
+                pyCodeEl.innerText = pyTemplate;
+            }
+        }
+
+        // HUD Listeners
+        if (hudDomainInput) {
+            hudDomainInput.addEventListener('input', (e) => {
+                config.domain = e.target.value.trim() || "yourvps.com";
+                updateSnippets();
+            });
+        }
+        if (hudApiKeyInput) {
+            hudApiKeyInput.addEventListener('input', (e) => {
+                config.apiKey = e.target.value.trim() || "SANGATRAHASIA123";
+                updateSnippets();
+            });
+        }
+
+        // Copy Code to Clipboard
+        function copyCode(btn) {
+            const container = btn.closest('.code-container');
+            const code = container.querySelector('code').innerText;
+            
+            navigator.clipboard.writeText(code).then(() => {
+                const originalText = btn.innerHTML;
+                btn.innerHTML = '<i class="fas fa-check text-green-400"></i> Copied!';
+                btn.classList.add('bg-green-500/10', 'border-green-500/30');
+                
+                setTimeout(() => {
+                    btn.innerHTML = originalText;
+                    btn.classList.remove('bg-green-500/10', 'border-green-500/30');
+                }, 2000);
+            });
+        }
+
+        // Toggle code tabs (cURL Command vs Response JSON)
+        function switchTab(endpointId, type) {
+            const parent = document.getElementById(endpointId);
+            if (!parent) return;
+
+            // Hide all tab contents under this parent
+            parent.querySelectorAll('.tab-content').forEach(content => {
+                content.classList.add('hidden');
+            });
+
+            // Deactivate all tab buttons under this parent
+            parent.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.classList.remove('text-blue-400', 'border-blue-500', 'bg-blue-500/10');
+                btn.classList.add('text-slate-400', 'border-transparent');
+            });
+
+            // Show selected content
+            const targetContent = document.getElementById(`${endpointId}-${type}`);
+            if (targetContent) {
+                targetContent.classList.remove('hidden');
+            }
+
+            // Activate clicked button
+            const clickedBtn = event.currentTarget;
+            clickedBtn.classList.add('text-blue-400', 'border-blue-500', 'bg-blue-500/10');
+            clickedBtn.classList.remove('text-slate-400', 'border-transparent');
+        }
+
+        // Toggle Mobile Sidebar Drawer
+        function toggleMobileSidebar() {
+            const sidebar = document.getElementById('sidebar-container');
+            const menuIcon = document.getElementById('mobile-menu-icon');
+            if (sidebar.classList.contains('hidden')) {
+                sidebar.classList.remove('hidden');
+                sidebar.classList.add('block');
+                menuIcon.classList.remove('fa-bars');
+                menuIcon.classList.add('fa-times');
+            } else {
+                sidebar.classList.add('hidden');
+                sidebar.classList.remove('block');
+                menuIcon.classList.remove('fa-times');
+                menuIcon.classList.add('fa-bars');
+            }
+        }
+
+        // Interactive Sidebar Search Engine
+        const searchInput = document.getElementById('sidebar-search');
+        if (searchInput) {
+            searchInput.addEventListener('input', (e) => {
+                const query = e.target.value.toLowerCase().trim();
+                
+                // 1. Filter sidebar links
+                document.querySelectorAll('.sidebar-link').forEach(link => {
+                    const text = link.textContent.toLowerCase();
+                    if (text.includes(query)) {
+                        link.style.display = 'flex';
+                    } else {
+                        link.style.display = 'none';
+                    }
+                });
+
+                // 2. Filter main content blocks
+                document.querySelectorAll('main > section, main div[id]').forEach(block => {
+                    const text = block.textContent.toLowerCase();
+                    const id = block.getAttribute('id');
+                    
+                    // Don't hide parent sections completely unless all children are hidden
+                    if (block.tagName === 'SECTION') {
+                        let hasVisibleChild = false;
+                        block.querySelectorAll('div[id]').forEach(child => {
+                            const childText = child.textContent.toLowerCase();
+                            if (childText.includes(query)) {
+                                child.style.display = 'block';
+                                hasVisibleChild = true;
+                            } else {
+                                child.style.display = 'none';
+                            }
+                        });
+                        
+                        if (hasVisibleChild || text.includes(query) || query === '') {
+                            block.style.display = 'block';
+                        } else {
+                            block.style.display = 'none';
+                        }
+                    } else {
+                        // It's a div[id] inside a section
+                        if (text.includes(query)) {
+                            block.style.display = 'block';
+                        } else {
+                            block.style.display = 'none';
+                        }
+                    }
+                });
+            });
+        }
+
+        // Smooth Scrolling & Accurate Scrollspy Highlight
+        let isManualScrolling = false;
+
+        document.querySelectorAll('.sidebar-link').forEach(link => {
+            link.addEventListener('click', (e) => {
+                e.preventDefault();
+                const targetId = link.getAttribute('href').substring(1);
+                const targetEl = document.getElementById(targetId);
+                
+                if (targetEl) {
+                    isManualScrolling = true;
+                    
+                    // On mobile, automatically close the menu when clicked
+                    if (window.innerWidth < 1024) {
+                        toggleMobileSidebar();
+                    }
+
+                    // Perform smooth scroll with header offset
+                    const headerOffset = 80;
+                    const elementPosition = targetEl.getBoundingClientRect().top;
+                    const offsetPosition = elementPosition + window.pageYOffset - headerOffset;
+
+                    window.scrollTo({
+                        top: offsetPosition,
+                        behavior: 'smooth'
+                    });
+
+                    // Set active style immediately
+                    document.querySelectorAll('.sidebar-link').forEach(l => {
+                        l.classList.remove('text-blue-400', 'bg-blue-500/5', 'border-l-4', 'border-blue-500', 'font-medium');
+                        l.classList.add('text-slate-400');
+                    });
+                    link.classList.add('text-blue-400', 'bg-blue-500/5', 'border-l-4', 'border-blue-500', 'font-medium');
+                    link.classList.remove('text-slate-400');
+
+                    // Release scrollspy block after animation finishes
+                    setTimeout(() => {
+                        isManualScrolling = false;
+                    }, 800);
+                }
+            });
+        });
+
+        // Robust custom Scrollspy logic
+        window.addEventListener('scroll', () => {
+            if (isManualScrolling) return;
+
+            const scrollPosition = window.scrollY + 120;
+            let activeId = null;
+
+            // Find which section is currently on screen
+            const targets = document.querySelectorAll('section, div[id]');
+            for (let i = 0; i < targets.length; i++) {
+                const target = targets[i];
+                if (target.style.display === 'none') continue; // Skip hidden elements in search
+
+                const top = target.offsetTop;
+                const height = target.offsetHeight;
+
+                if (scrollPosition >= top && scrollPosition < top + height) {
+                    activeId = target.getAttribute('id');
+                }
+            }
+
+            if (activeId) {
+                const activeLink = document.querySelector(`.sidebar-link[href="#${activeId}"]`);
+                if (activeLink) {
+                    document.querySelectorAll('.sidebar-link').forEach(l => {
+                        l.classList.remove('text-blue-400', 'bg-blue-500/5', 'border-l-4', 'border-blue-500', 'font-medium');
+                        l.classList.add('text-slate-400');
+                    });
+                    activeLink.classList.add('text-blue-400', 'bg-blue-500/5', 'border-l-4', 'border-blue-500', 'font-medium');
+                    activeLink.classList.remove('text-slate-400');
+
+                    // Auto-scroll the sidebar viewport to keep active item visible
+                    const sidebar = document.getElementById('sidebar-container');
+                    const linkTop = activeLink.offsetTop;
+                    const linkHeight = activeLink.offsetHeight;
+                    const sidebarHeight = sidebar.clientHeight;
+                    const sidebarScroll = sidebar.scrollTop;
+
+                    if (linkTop < sidebarScroll) {
+                        sidebar.scrollTop = linkTop - 20;
+                    } else if (linkTop + linkHeight > sidebarScroll + sidebarHeight) {
+                        sidebar.scrollTop = linkTop + linkHeight - sidebarHeight + 20;
+                    }
+                }
+            }
+        });
+
+        // Initialize dynamic templates on page load
+        window.addEventListener('DOMContentLoaded', () => {
+            updateSnippets();
+        });
+    </script>
+</body>
+</html>
