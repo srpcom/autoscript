@@ -34,7 +34,13 @@ if [[ -z "$STY" ]]; then
     
     # Pengecekan apakah script dijalankan dari file lokal (bukan via pipe curl)
     if [[ -f "$0" ]]; then
-        exec screen -S srpcom_install bash "$0" "$@"
+        # Jika berupa shell script biasa (*.sh), jalankan dengan bash.
+        # Jika berupa file binary hasil kompilasi shc (seperti installx), jalankan langsung.
+        if [[ "$0" == *.sh ]]; then
+            exec screen -S srpcom_install bash "$0" "$@"
+        else
+            exec screen -S srpcom_install "$0" "$@"
+        fi
     else
         echo -e "\e[31m[WARNING]\e[0m Script dijalankan via pipe. Fitur Anti-Diskonek tidak maksimal."
         echo -e "Melanjutkan instalasi normal..."
