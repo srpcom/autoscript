@@ -218,9 +218,6 @@ def list_accounts(protocol):
             f'  </div>'
             f'  <div class="flex items-center justify-between sm:justify-end gap-3 w-full sm:w-auto">'
             f'    <span class="text-[11px] px-2.5 py-1 rounded-full {badge_class} font-mono">{exp_text}</span>'
-            f'    <button onclick="checkAccountDetail(\'{u}\', \'{prot}\')" class="px-3 py-1.5 text-[11px] bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 text-white rounded-lg transition-all duration-150 flex items-center gap-1.5 font-sans font-semibold shadow-md shadow-blue-900/20">'
-            f'      <i class="fas fa-search text-[9px]"></i> Detail'
-            f'    </button>'
             f'  </div>'
             f'</div>'
         )
@@ -252,7 +249,7 @@ def list_accounts(protocol):
         f'  </div>'
         f'  <div class="mt-5 flex items-center gap-2 bg-blue-500/10 p-3 rounded-lg border border-blue-500/20 text-xs text-blue-300">'
         f'    <i class="fas fa-info-circle"></i>'
-        f'    <span>Klik pada nama akun atau tombol <b>Detail</b> untuk menampilkan konfigurasi lengkap secara instan.</span>'
+        f'    <span>Klik pada nama akun untuk menampilkan konfigurasi lengkap secara instan.</span>'
         f'  </div>'
         f'</div>'
     )
