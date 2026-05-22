@@ -108,29 +108,81 @@ fi
 
 # Mengambil tanggal expired dari JSON (Grep manual karena jq belum terinstall)
 EXP_DATE_INIT=$(echo "$JSON_BODY" | grep -o '"expires_at":"[^"]*' | cut -d'"' -f4)
+SUBDOMAIN_CF=$(echo "$JSON_BODY" | grep -o '"subdomain":"[^"]*' | cut -d'"' -f4)
 echo -e "\e[32m[SUCCESS]\e[0m Lisensi Valid (Exp: $EXP_DATE_INIT)! Melanjutkan instalasi...\n"
 # ==========================================
 
 
+echo -e "Pilih Opsi Domain untuk Server VPN Anda:"
+echo -e " 1) Gunakan Domain Sendiri (Pribadi)"
+if [ -n "$SUBDOMAIN_CF" ] && [ "$SUBDOMAIN_CF" != "null" ]; then
+    echo -e " 2) Gunakan Domain Bawaan Script (Pre-allocated: $SUBDOMAIN_CF)"
+else
+    echo -e " 2) Gunakan Domain Bawaan Script (Tidak tersedia/belum dikonfigurasi)"
+fi
+
 while true; do
-    read -p "Masukkan Domain VPS Anda (contoh: aw.srpcom.cloud): " DOMAIN
-    if [ -z "$DOMAIN" ]; then echo -e "\e[31m[ERROR]\e[0m Domain tidak boleh kosong!\n"; continue; fi
-    
-    # FITUR BYPASS: Mencegah user terjebak looping jika DNS sedang masa propagasi lambat
-    if [[ "$DOMAIN" == "skip" || "$DOMAIN" == "SKIP" ]]; then
-        read -p "Masukkan Domain secara manual (tanpa validasi DNS): " DOMAIN
-        echo -e "\e[33m[WARNING]\e[0m Validasi DNS dilewati secara paksa untuk domain: $DOMAIN"
+    read -p "Pilihan Anda (1 atau 2): " DOMAIN_OPTION
+    if [[ "$DOMAIN_OPTION" == "1" ]]; then
+        while true; do
+            read -p "Masukkan Domain VPS Anda (contoh: aw.srpcom.cloud): " DOMAIN
+            if [ -z "$DOMAIN" ]; then echo -e "\e[31m[ERROR]\e[0m Domain tidak boleh kosong!\n"; continue; fi
+            
+            # FITUR BYPASS: Mencegah user terjebak looping jika DNS sedang masa propagasi lambat
+            if [[ "$DOMAIN" == "skip" || "$DOMAIN" == "SKIP" ]]; then
+                read -p "Masukkan Domain secara manual (tanpa validasi DNS): " DOMAIN
+                echo -e "\e[33m[WARNING]\e[0m Validasi DNS dilewati secara paksa untuk domain: $DOMAIN"
+                break
+            fi
+            
+            DOMAIN_IP=$(getent ahostsv4 "$DOMAIN" | awk '{ print $1 }' | head -n 1)
+            if [ "$DOMAIN_IP" == "$VPS_IP" ]; then
+                echo -e "\e[32m[SUCCESS]\e[0m Domain valid! ($DOMAIN -> $VPS_IP)"
+                break
+            else
+                echo -e "\e[31m[ERROR] VERIFIKASI DOMAIN GAGAL!\e[0m"
+                echo -e "\e[33m[Solusi]\e[0m Pastikan A Record di DNS mengarah ke IP $VPS_IP (DNS Only)."
+                echo -e "Ketik \e[32mskip\e[0m jika Anda YAKIN DNS sudah disetting dan sedang menunggu propagasi (Propagasi bisa memakan waktu 5-30 menit).\n"
+            fi
+        done
         break
-    fi
-    
-    DOMAIN_IP=$(getent ahostsv4 "$DOMAIN" | awk '{ print $1 }' | head -n 1)
-    if [ "$DOMAIN_IP" == "$VPS_IP" ]; then
-        echo -e "\e[32m[SUCCESS]\e[0m Domain valid! ($DOMAIN -> $VPS_IP)"
+    elif [[ "$DOMAIN_OPTION" == "2" ]]; then
+        if [ -z "$SUBDOMAIN_CF" ] || [ "$SUBDOMAIN_CF" == "null" ]; then
+            echo -e "\e[31m[ERROR]\e[0m Domain bawaan tidak tersedia. Silakan gunakan opsi 1 (Domain Sendiri).\n"
+            continue
+        fi
+        
+        DOMAIN="$SUBDOMAIN_CF"
+        echo -e "\nMemverifikasi resolusi DNS untuk Domain Bawaan ($DOMAIN -> $VPS_IP)..."
+        
+        # Validasi resolusi DNS
+        DOMAIN_IP=$(getent ahostsv4 "$DOMAIN" | awk '{ print $1 }' | head -n 1)
+        if [ "$DOMAIN_IP" == "$VPS_IP" ]; then
+            echo -e "\e[32m[SUCCESS]\e[0m Domain bawaan valid! ($DOMAIN -> $VPS_IP)"
+            break
+        else
+            echo -e "\e[33m[WARNING]\e[0m DNS record baru dibuat dan mungkin sedang dalam masa propagasi (biasanya 1-5 menit)."
+            echo -e "Silakan tunggu sebentar atau ketik \e[32mskip\e[0m untuk melewati validasi DNS jika Anda yakin IP $VPS_IP sudah benar."
+            
+            while true; do
+                read -p "Ketik 'skip' atau tekan [ENTER] untuk coba verifikasi lagi: " DNS_CONFIRM
+                if [[ "$DNS_CONFIRM" == "skip" || "$DNS_CONFIRM" == "SKIP" ]]; then
+                    echo -e "\e[33m[WARNING]\e[0m Validasi DNS dilewati secara paksa untuk domain bawaan: $DOMAIN"
+                    break 2
+                fi
+                
+                DOMAIN_IP=$(getent ahostsv4 "$DOMAIN" | awk '{ print $1 }' | head -n 1)
+                if [ "$DOMAIN_IP" == "$VPS_IP" ]; then
+                    echo -e "\e[32m[SUCCESS]\e[0m Domain bawaan valid! ($DOMAIN -> $VPS_IP)"
+                    break 2
+                else
+                    echo -e "\e[31m[ERROR]\e[0m DNS belum terarah ke $VPS_IP (Resolusi saat ini: $DOMAIN_IP)."
+                fi
+            done
+        fi
         break
     else
-        echo -e "\e[31m[ERROR] VERIFIKASI DOMAIN GAGAL!\e[0m"
-        echo -e "\e[33m[Solusi]\e[0m Pastikan A Record di DNS mengarah ke IP $VPS_IP (DNS Only)."
-        echo -e "Ketik \e[32mskip\e[0m jika Anda YAKIN DNS sudah disetting dan sedang menunggu propagasi (Propagasi bisa memakan waktu 5-30 menit).\n"
+        echo -e "\e[31m[ERROR]\e[0m Pilihan tidak valid! Masukkan 1 atau 2.\n"
     fi
 done
 
