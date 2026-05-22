@@ -629,6 +629,59 @@ def detail_user(protocol):
         return jsonify({"stdout": msg_cli, "stdout_tg": msg_tg})
     return jsonify({"stdout": f"Error: User {user} tidak ditemukan!"})
 
+@app.route('/srpcom/detail-by-uuid', methods=['GET', 'POST'])
+def detail_by_uuid():
+    data = request.json or {}
+    target_uuid = data.get('uuid') or request.args.get('uuid')
+    if not target_uuid:
+        return jsonify({"stdout": "Error: uuid required"}), 400
+    
+    cfg = load_json(XRAY_CONF)
+    found_user = None
+    found_protocol = None
+    
+    for ib in cfg.get('inbounds', []):
+        proto = ib.get('protocol')
+        if proto in ['vmess', 'vless']:
+            for c in ib.get('settings', {}).get('clients', []):
+                if c.get('id') == target_uuid:
+                    found_user = c.get('email')
+                    found_protocol = proto
+                    break
+        elif proto == 'trojan':
+            for c in ib.get('settings', {}).get('clients', []):
+                if c.get('password') == target_uuid:
+                    found_user = c.get('email')
+                    found_protocol = proto
+                    break
+        if found_user:
+            break
+            
+    if found_user:
+        exp_date_str, limit_ip, limit_q = "Lifetime", 0, 0
+        if os.path.exists(EXP_FILE):
+            with open(EXP_FILE, 'r') as f:
+                for line in f:
+                    if line.startswith(found_user + ' '):
+                        exp_date_str = line.strip().split(' ', 1)[1]
+                        break
+        if os.path.exists(LIMIT_FILE):
+            with open(LIMIT_FILE, 'r') as f:
+                for line in f:
+                    if line.startswith(found_user + ' '):
+                        p = line.strip().split()
+                        if len(p) >= 3:
+                            limit_ip, limit_q = int(p[1]), int(p[2])
+                        break
+                        
+        msg_cli, msg_tg = generate_account_detail(found_protocol, found_user, target_uuid, exp_date_str, False, limit_ip, limit_q)
+        msg_cli = msg_cli.replace("Pembuatan akun baru berhasil\n\n", "")
+        msg_tg = msg_tg.replace("Pembuatan akun baru berhasil\n\n", "")
+        return jsonify({"success": True, "user": found_user, "protocol": found_protocol, "stdout": msg_cli, "stdout_tg": msg_tg})
+        
+    return jsonify({"success": False, "stdout": "Error: UUID/Password tidak terdaftar!"})
+
+
 @app.route('/srpcom/del-<protocol>ws', methods=['DELETE', 'POST'])
 def del_user(protocol):
     user = (request.json or {}).get('user')
