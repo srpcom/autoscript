@@ -36,3 +36,4 @@ vplay.iflix.com
 audisi.ruangguru.com
 ovo.id
 media-sin6-3.cdn.whatsapp.net
+s3.amazonaws.com
