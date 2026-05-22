@@ -6,7 +6,7 @@
 # Versi : 1.5 (Fitur: Dual Bot Architecture + Bug Murni)
 # ==========================================
 
-SCRIPT_VERSION="1.5 (Dual Bot Arch)"
+SCRIPT_VERSION="1.6 (stabil)"
 
 source /usr/local/etc/srpcom/env.conf 2>/dev/null
 source /usr/local/bin/srpcom/utils.sh 2>/dev/null
@@ -861,21 +861,12 @@ menu_extra_domain() {
 }
 
 change_banner() {
-    while true; do
-        clear
-        echo "======================================"
-        echo "       UBAH BANNER LOGIN SSH/VPN      "
-        echo "======================================"
-        echo " 1. Gunakan Template TUBAN.STORE (HTML)"
-        echo " 2. Edit Manual (Editor Nano)"
-        echo " 0. Kembali"
-        echo "======================================"
-        read -p " Pilih opsi [0-2]: " opt
-        
-        case $opt in
-            1)
-                echo -e "\n=> Menerapkan Template TUBAN.STORE..."
-                cat > /etc/issue.net << EOF
+    clear
+    echo "======================================"
+    echo "       UBAH BANNER LOGIN SSH/VPN      "
+    echo "======================================"
+    echo -e "\n=> Menerapkan Template TUBAN.STORE..."
+    cat > /etc/issue.net << EOF
 <font color="#00FF00">======================================</font><br>
 <font color="#00FFFF"><b>WELCOME TO SRPCOM SCRIPT</b></font><br>
 <font color="#00FFFF"><b>dev : t.me/srpcomadmin</b></font><br>
@@ -889,18 +880,6 @@ change_banner() {
 <font color="#FF9900"><b>Jika melanggar, akun akan di-BANNED permanen!</b></font><br>
 <font color="#00FF00">======================================</font><br>
 EOF
-                break
-                ;;
-            2)
-                echo -e "\n=> Membuka editor nano..."
-                sleep 1
-                nano /etc/issue.net
-                break
-                ;;
-            0) return ;;
-            *) echo -e "\n=> Pilihan tidak valid!"; sleep 1 ;;
-        esac
-    done
 
     echo -e "\n=> Mengonfigurasi Dropbear & OpenSSH..."
     
