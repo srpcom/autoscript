@@ -808,11 +808,57 @@ echo "0 * * * * root /usr/local/bin/srpcom/auto_expired.sh >/dev/null 2>&1" > /e
 
 
 # ==========================================
-# REBUILD SHORTCUTS (WRAPPER)
+# AUTO IMPORT EXTRA DOMAIN & BUG MURNI FROM GITHUB
+# ==========================================
+echo -e "\n=> Melakukan Import Bug/SNI & Subdomain dari GitHub..."
+TEMP_DOMAINS="/tmp/extra_domains_raw.txt"
+TARGET_DOMAINS="/usr/local/etc/srpcom/extra_domains.txt"
+touch "$TARGET_DOMAINS"
+
+wget -q -O "$TEMP_DOMAINS" "$GITHUB_RAW/core/extra_domains.txt"
+if [ -s "$TEMP_DOMAINS" ]; then
+    # 1. Jalankan Import Wildcard (WC) dengan Validasi IP
+    while read -r raw_domain; do
+        raw_domain=$(echo "$raw_domain" | tr -d '\r' | xargs)
+        if [[ -z "$raw_domain" || "$raw_domain" == \#* ]]; then continue; fi
+        
+        domain_ip=$(getent ahostsv4 "$raw_domain" | awk '{ print $1 }' | head -n 1)
+        if [[ "$domain_ip" == "$VPS_IP" ]]; then
+            echo "$raw_domain" >> "$TARGET_DOMAINS"
+        else
+            clean_input=${raw_domain%.$DOMAIN}
+            full_domain="${clean_input}.${DOMAIN}"
+            domain_ip=$(getent ahostsv4 "$full_domain" | awk '{ print $1 }' | head -n 1)
+            if [[ "$domain_ip" == "$VPS_IP" ]]; then
+                echo "$full_domain" >> "$TARGET_DOMAINS"
+            fi
+        fi
+    done < "$TEMP_DOMAINS"
+
+    # 2. Jalankan Import Bug Murni (Tanpa Validasi IP)
+    while read -r raw_domain; do
+        raw_domain=$(echo "$raw_domain" | tr -d '\r' | xargs)
+        if [[ -z "$raw_domain" || "$raw_domain" == \#* ]]; then continue; fi
+        echo "$raw_domain" >> "$TARGET_DOMAINS"
+    done < "$TEMP_DOMAINS"
+
+    # Hapus duplikat secara aman
+    if [ -f "$TARGET_DOMAINS" ]; then
+        sort -u "$TARGET_DOMAINS" -o "$TARGET_DOMAINS"
+    fi
+    rm -f "$TEMP_DOMAINS"
+    echo -e "=> Import selesai: $(wc -l < "$TARGET_DOMAINS" 2>/dev/null || echo 0) domain/bug berhasil dimuat."
+else
+    echo -e "\e[33m[WARNING]\e[0m Gagal mengunduh daftar bug dari GitHub."
+fi
+
+# ==========================================
+# REBUILD SHORTCUTS & CADDYFILE
 # ==========================================
 chmod +x /usr/local/bin/srpcom/menu.sh
 source /usr/local/bin/srpcom/menu.sh
 rebuild_shortcuts
+rebuild_caddyfile
 # ==========================================
 
 
