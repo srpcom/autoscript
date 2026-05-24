@@ -219,6 +219,16 @@ pip3 install pyTelegramBotAPI requests --break-system-packages 2>/dev/null || pi
 echo -e "\n=> Menginstal Speedtest CLI Resmi Ookla..."
 curl -s https://packagecloud.io/install/repositories/ookla/speedtest-cli/script.deb.sh | bash
 apt install speedtest -y
+if [ $? -ne 0 ] || ! command -v speedtest &> /dev/null; then
+    echo -e "\e[33m[WARNING]\e[0m Gagal menginstal speedtest via repository. Menggunakan unduhan binary langsung..."
+    rm -f /etc/apt/sources.list.d/ookla_speedtest-cli.list
+    apt update
+    wget -qO /tmp/speedtest.tgz https://install.speedtest.net/app/cli/ookla-speedtest-1.2.0-linux-x86_64.tgz
+    if [ -f /tmp/speedtest.tgz ]; then
+        tar -xzf /tmp/speedtest.tgz -C /usr/local/bin/ speedtest
+        rm -f /tmp/speedtest.tgz
+    fi
+fi
 
 
 mkdir -p /usr/local/etc/srpcom
@@ -449,11 +459,16 @@ touch /usr/local/etc/srpcom/ssh_limit.txt
 
 
 echo -e "Membuat layanan BadVPN (UDP Custom)..."
+systemctl stop badvpn-7100 badvpn-7200 badvpn-7300 >/dev/null 2>&1
+rm -f /usr/local/bin/badvpn-udpgw
 git clone https://github.com/ambrop72/badvpn.git /tmp/badvpn >/dev/null 2>&1
-mkdir -p /tmp/badvpn/build && cd /tmp/badvpn/build
-cmake .. -DBUILD_NOTHING_BY_DEFAULT=1 -DBUILD_UDPGW=1 >/dev/null 2>&1
-make >/dev/null 2>&1
-cp udpgw/badvpn-udpgw /usr/local/bin/
+mkdir -p /tmp/badvpn/build
+(
+    cd /tmp/badvpn/build
+    cmake .. -DBUILD_NOTHING_BY_DEFAULT=1 -DBUILD_UDPGW=1 >/dev/null 2>&1
+    make >/dev/null 2>&1
+    cp udpgw/badvpn-udpgw /usr/local/bin/
+)
 
 
 for port in 7100 7200 7300; do
