@@ -6,7 +6,7 @@
 # Versi : 1.5 (Fitur: Dual Bot Architecture + Bug Murni)
 # ==========================================
 
-SCRIPT_VERSION="1.6 (stabil)"
+SCRIPT_VERSION="1.5 (Dual Bot Arch)"
 
 source /usr/local/etc/srpcom/env.conf 2>/dev/null
 source /usr/local/bin/srpcom/utils.sh 2>/dev/null
