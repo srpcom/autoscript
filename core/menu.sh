@@ -860,27 +860,7 @@ menu_extra_domain() {
     done
 }
 
-change_banner() {
-    clear
-    echo "======================================"
-    echo "       UBAH BANNER LOGIN SSH/VPN      "
-    echo "======================================"
-    echo -e "\n=> Menerapkan Template TUBAN.STORE..."
-    cat > /etc/issue.net << EOF
-<font color="#00FF00">======================================</font><br>
-<font color="#00FFFF"><b>WELCOME TO SRPCOM SCRIPT</b></font><br>
-<font color="#00FFFF"><b>dev : t.me/srpcomadmin</b></font><br>
-<font color="#00FF00">======================================</font><br>
-<font color="#00FFFF"><b>Server : $DOMAIN</b></font><br>
-<font color="#FFFF00"><b>PERINGATAN PENGGUNAAN SERVER:</b></font><br>
-<font color="#FFFFFF">Dilarang keras menggunakan layanan ini untuk:</font><br>
-<font color="#FF0000">✖ Carding & Fraud</font><br>
-<font color="#FF0000">✖ Hacking & DDOS</font><br>
-<font color="#FF0000">✖ Spamming & Torrent</font><br>
-<font color="#FF9900"><b>Jika melanggar, akun akan di-BANNED permanen!</b></font><br>
-<font color="#00FF00">======================================</font><br>
-EOF
-
+apply_banner_config() {
     echo -e "\n=> Mengonfigurasi Dropbear & OpenSSH..."
     
     if grep -q "^DROPBEAR_BANNER=" /etc/default/dropbear 2>/dev/null; then
@@ -899,9 +879,62 @@ EOF
     
     echo "=> Merestart layanan SSH & Dropbear..."
     systemctl restart ssh sshd dropbear 2>/dev/null
-    
-    echo -e "\n\e[32m[SUCCESS]\e[0m Banner Login berhasil diperbarui dan diterapkan!"
-    sleep 2
+}
+
+change_banner() {
+    while true; do
+        clear
+        echo "======================================"
+        echo "       UBAH BANNER LOGIN SSH/VPN      "
+        echo "======================================"
+        echo " 1. Gunakan banner srpcom"
+        echo " 2. Edit banner"
+        echo " 0. Kembali"
+        echo "======================================"
+        read -p " Pilih opsi [0-2]: " opt_banner
+        case $opt_banner in
+            1)
+                clear
+                echo "======================================"
+                echo "      GUNAKAN BANNER DEFAULT SRPCOM   "
+                echo "======================================"
+                echo -e "\n=> Menerapkan Template Default SRPCOM..."
+                cat > /etc/issue.net << EOF
+<font color="#00FF00">======================================</font><br>
+<font color="#00FFFF"><b>WELCOME TO SRPCOM SCRIPT</b></font><br>
+<font color="#00FFFF"><b>dev : t.me/srpcomadmin</b></font><br>
+<font color="#00FF00">======================================</font><br>
+<font color="#00FFFF"><b>Server : $DOMAIN</b></font><br>
+<font color="#FFFF00"><b>PERINGATAN PENGGUNAAN SERVER:</b></font><br>
+<font color="#FFFFFF">Dilarang keras menggunakan layanan ini untuk:</font><br>
+<font color="#FF0000">✖ Carding & Fraud</font><br>
+<font color="#FF0000">✖ Hacking & DDOS</font><br>
+<font color="#FF0000">✖ Spamming & Torrent</font><br>
+<font color="#FF9900"><b>Jika melanggar, akun akan di-BANNED permanen!</b></font><br>
+<font color="#00FF00">======================================</font><br>
+EOF
+                apply_banner_config
+                echo -e "\n\e[32m[SUCCESS]\e[0m Banner default berhasil diterapkan!"
+                sleep 2
+                ;;
+            2)
+                clear
+                echo "======================================"
+                echo "          EDIT BANNER LOGIN           "
+                echo "======================================"
+                echo "Ketik/edit banner Anda menggunakan editor nano."
+                echo "Setelah selesai, simpan dengan menekan Ctrl+O, Enter, lalu Ctrl+X."
+                echo "Tekan [ENTER] untuk mulai mengedit..."
+                read -p ""
+                nano /etc/issue.net
+                apply_banner_config
+                echo -e "\n\e[32m[SUCCESS]\e[0m Banner kustom berhasil disimpan dan diterapkan!"
+                sleep 2
+                ;;
+            0|x|X) break ;;
+            *) echo -e "\n=> Pilihan tidak valid!"; sleep 1 ;;
+        esac
+    done
 }
 
 restore_data() {
