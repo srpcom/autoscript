@@ -14,6 +14,17 @@ if [ "${EUID}" -ne 0 ]; then
     exit 1
 fi
 
+# ==========================================
+# SETUP LOGGING (LOG INSTALASI)
+# ==========================================
+LOG_FILE="/root/srpcom_install.log"
+if [[ -f "$LOG_FILE" && -z "$STY" ]]; then
+    rm -f "$LOG_FILE"
+fi
+exec > >(tee -a "$LOG_FILE") 2>&1
+echo "=== LOG INSTALASI SRPCOM AUTOSCRIPT: $(date) ==="
+
+
 
 # ==========================================
 # FITUR ANTI-DISKONEK (AUTO SCREEN)
@@ -705,7 +716,9 @@ echo -e "\n[11/12] Menginstal & Mengonfigurasi Caddy..."
 apt install -y apt-transport-https curl gnupg
 mkdir -p /etc/apt/keyrings
 curl -fsSL 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | gpg --dearmor --yes -o /etc/apt/keyrings/caddy-stable-archive-keyring.gpg
+chmod 644 /etc/apt/keyrings/caddy-stable-archive-keyring.gpg
 curl -fsSL 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | sed 's|/usr/share/keyrings/caddy-stable-archive-keyring.gpg|/etc/apt/keyrings/caddy-stable-archive-keyring.gpg|g' | tee /etc/apt/sources.list.d/caddy-stable.list
+chmod 644 /etc/apt/sources.list.d/caddy-stable.list
 apt update && apt install caddy -y
 
 
