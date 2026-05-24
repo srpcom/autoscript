@@ -395,11 +395,36 @@ systemctl enable ipsec xl2tpd
 
 
 echo -e "\n[6/12] Mengonfigurasi SSH, Dropbear, SSH-WS, BadVPN & OpenVPN..."
+# Setup Default Banner srpcom
+cat > /etc/issue.net << EOF
+<font color="#00FF00">======================================</font><br>
+<font color="#00FFFF"><b>WELCOME TO SRPCOM SCRIPT</b></font><br>
+<font color="#00FFFF"><b>dev : t.me/srpcomadmin</b></font><br>
+<font color="#00FF00">======================================</font><br>
+<font color="#00FFFF"><b>Server : $DOMAIN</b></font><br>
+<font color="#FFFF00"><b>PERINGATAN PENGGUNAAN SERVER:</b></font><br>
+<font color="#FFFFFF">Dilarang keras menggunakan layanan ini untuk:</font><br>
+<font color="#FF0000">✖ Carding & Fraud</font><br>
+<font color="#FF0000">✖ Hacking & DDOS</font><br>
+<font color="#FF0000">✖ Spamming & Torrent</font><br>
+<font color="#FF9900"><b>Jika melanggar, akun akan di-BANNED permanen!</b></font><br>
+<font color="#00FF00">======================================</font><br>
+EOF
+
+if grep -q "^Banner" /etc/ssh/sshd_config 2>/dev/null; then
+    sed -i 's|^Banner.*|Banner /etc/issue.net|g' /etc/ssh/sshd_config
+elif grep -q "^#Banner" /etc/ssh/sshd_config 2>/dev/null; then
+    sed -i 's|^#Banner.*|Banner /etc/issue.net|g' /etc/ssh/sshd_config
+else
+    echo "Banner /etc/issue.net" >> /etc/ssh/sshd_config
+fi
+systemctl restart sshd 2>/dev/null || systemctl restart ssh 2>/dev/null
+
 cat > /etc/default/dropbear << 'EOF'
 NO_START=0
 DROPBEAR_PORT=109
 DROPBEAR_EXTRA_ARGS="-p 143"
-DROPBEAR_BANNER=""
+DROPBEAR_BANNER="/etc/issue.net"
 DROPBEAR_RECEIVE_WINDOW=65536
 EOF
 systemctl restart dropbear
