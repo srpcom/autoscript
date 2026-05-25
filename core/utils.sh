@@ -56,7 +56,7 @@ print_header() {
     dom_str=" DOMAIN        : ${DOMAIN}"
     ip_str=" IP ADDRESS    : ${IP_ADD}"
     isp_str=" ISP           : ${ISP_NAME}"
-    vps_str=" VPS name : ${VPS_NAME:-Unknown}"
+    vps_str=" VPS Name      : ${VPS_NAME:-Unknown}"
 
     echo "${os_str:0:40}"
     echo "${krnl_str:0:40}"
