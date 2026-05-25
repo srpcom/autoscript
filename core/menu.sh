@@ -74,7 +74,7 @@ validate_license_cli() {
         echo -e "\e[31m║         AKSES MENU DITOLAK         ║\e[0m"
         echo -e "\e[31m╚════════════════════════════════════╝\e[0m"
         echo -e "\e[33m Lisensi VPS ini telah HABIS.\e[0m"
-        echo -e " Nama: $VPS_NAME"
+        echo -e " VPS name : $VPS_NAME"
         echo -e " IP  : $IP_ADD"
         echo -e ""
         echo -e " Perpanjang lisensi Anda di:"

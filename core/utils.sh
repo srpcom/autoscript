@@ -56,6 +56,7 @@ print_header() {
     dom_str=" DOMAIN        : ${DOMAIN}"
     ip_str=" IP ADDRESS    : ${IP_ADD}"
     isp_str=" ISP           : ${ISP_NAME}"
+    vps_str=" VPS name : ${VPS_NAME:-Unknown}"
 
     echo "${os_str:0:40}"
     echo "${krnl_str:0:40}"
@@ -64,6 +65,7 @@ print_header() {
     echo "${dom_str:0:40}"
     echo "${ip_str:0:40}"
     echo "${isp_str:0:40}"
+    echo "${vps_str:0:40}"
     
     echo -e "${CYAN}╔══════════════════════════════════════╗${NC}"
     printf "${CYAN}║ XRAY: %-5s| SSH: %-5s| L2TP: %-6s║\n${NC}" "${XRAY_C:-0}" "${SSH_C:-0}" "${L2TP_C:-0}"
