@@ -10,6 +10,7 @@ source /usr/local/etc/srpcom/env.conf
 GREEN='\e[32m'
 RED='\e[31m'
 YELLOW='\e[33m'
+BYELLOW='\e[93m'
 CYAN='\e[36m'
 NC='\e[0m' # No Color
 
@@ -67,7 +68,7 @@ print_header() {
     echo "${isp_str:0:40}"
     echo "${vps_str:0:40}"
     
-    echo -e "${CYAN}╔══════════════════════════════════════╗${NC}"
-    printf "${CYAN}║ XRAY: %-5s| SSH: %-5s| L2TP: %-6s║\n${NC}" "${XRAY_C:-0}" "${SSH_C:-0}" "${L2TP_C:-0}"
-    echo -e "${CYAN}╚══════════════════════════════════════╝${NC}"
+    echo -e "${BYELLOW}╔══════════════════════════════════════╗${NC}"
+    printf "${BYELLOW}║ XRAY: %-5s| SSH: %-5s| L2TP: %-6s║\n${NC}" "${XRAY_C:-0}" "${SSH_C:-0}" "${L2TP_C:-0}"
+    echo -e "${BYELLOW}╚══════════════════════════════════════╝${NC}"
 }
