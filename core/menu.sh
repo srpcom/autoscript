@@ -196,7 +196,20 @@ EOFSC
     chmod +x /usr/bin/srpcom
 }
 
+fix_xray_proxy_protocol() {
+    if [ -f "/usr/local/etc/xray/config.json" ]; then
+        if ! grep -q "acceptProxyProtocol" /usr/local/etc/xray/config.json 2>/dev/null; then
+            jq '(.inbounds[] | select(.port == 10001 or .port == 10002 or .port == 10003) | .streamSettings.sockopt) |= {"acceptProxyProtocol": true}' /usr/local/etc/xray/config.json > /tmp/config_fix.json 2>/dev/null
+            if [ -s /tmp/config_fix.json ]; then
+                mv /tmp/config_fix.json /usr/local/etc/xray/config.json
+                systemctl restart xray >/dev/null 2>&1
+            fi
+        fi
+    fi
+}
+
 rebuild_caddyfile() {
+    fix_xray_proxy_protocol
     local main_domain="$DOMAIN"
     local main_str="http://$main_domain, https://$main_domain"
     
@@ -369,6 +382,9 @@ menu_update() {
                 chmod +x /usr/local/bin/srpcom/menu.sh
                 source /usr/local/bin/srpcom/menu.sh
                 rebuild_shortcuts
+                fix_xray_proxy_protocol
+                rebuild_caddyfile
+                systemctl restart caddy xray >/dev/null 2>&1
                 echo -e "\e[32m[SUCCESS]\e[0m Seluruh sistem berhasil diperbarui!"
                 sleep 2; exec menu ;;
             11)
