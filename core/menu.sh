@@ -219,13 +219,19 @@ rebuild_caddyfile() {
         respond "Server is running normally." 200
     }
     handle /vmessws* {
-        reverse_proxy localhost:10001
+        reverse_proxy localhost:10001 {
+            proxy_protocol v2
+        }
     }
     handle /vlessws* {
-        reverse_proxy localhost:10002
+        reverse_proxy localhost:10002 {
+            proxy_protocol v2
+        }
     }
     handle /trojanws* {
-        reverse_proxy localhost:10003
+        reverse_proxy localhost:10003 {
+            proxy_protocol v2
+        }
     }
     handle /sshws* {
         reverse_proxy localhost:10004

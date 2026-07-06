@@ -304,9 +304,9 @@ cat > /usr/local/etc/xray/config.json << EOF
   "stats": {},
   "policy": {"levels": {"0": {"statsUserUplink": true, "statsUserDownlink": true}}, "system": {"statsInboundUplink": true, "statsInboundDownlink": true}},
   "inbounds": [
-    {"port": 10001, "listen": "127.0.0.1", "protocol": "vmess", "settings": {"clients": []}, "streamSettings": {"network": "ws", "wsSettings": {"path": "/vmessws"}}},
-    {"port": 10002, "listen": "127.0.0.1", "protocol": "vless", "settings": {"clients": [], "decryption": "none"}, "streamSettings": {"network": "ws", "wsSettings": {"path": "/vlessws"}}},
-    {"port": 10003, "listen": "127.0.0.1", "protocol": "trojan", "settings": {"clients": []}, "streamSettings": {"network": "ws", "wsSettings": {"path": "/trojanws"}}},
+    {"port": 10001, "listen": "127.0.0.1", "protocol": "vmess", "settings": {"clients": []}, "streamSettings": {"network": "ws", "sockopt": {"acceptProxyProtocol": true}, "wsSettings": {"path": "/vmessws"}}},
+    {"port": 10002, "listen": "127.0.0.1", "protocol": "vless", "settings": {"clients": [], "decryption": "none"}, "streamSettings": {"network": "ws", "sockopt": {"acceptProxyProtocol": true}, "wsSettings": {"path": "/vlessws"}}},
+    {"port": 10003, "listen": "127.0.0.1", "protocol": "trojan", "settings": {"clients": []}, "streamSettings": {"network": "ws", "sockopt": {"acceptProxyProtocol": true}, "wsSettings": {"path": "/trojanws"}}},
     {"port": 10085, "listen": "127.0.0.1", "protocol": "dokodemo-door", "settings": {"address": "127.0.0.1"}, "tag": "api"}
   ],
   "outbounds": [{"protocol": "freedom"}],
@@ -790,13 +790,19 @@ $DOMAINS_STR {
         respond "Server is running normally." 200
     }
     handle /vmessws* {
-        reverse_proxy localhost:10001
+        reverse_proxy localhost:10001 {
+            proxy_protocol v2
+        }
     }
     handle /vlessws* {
-        reverse_proxy localhost:10002
+        reverse_proxy localhost:10002 {
+            proxy_protocol v2
+        }
     }
     handle /trojanws* {
-        reverse_proxy localhost:10003
+        reverse_proxy localhost:10003 {
+            proxy_protocol v2
+        }
     }
     handle /sshws* {
         reverse_proxy localhost:10004
