@@ -276,8 +276,11 @@ def monitor_xray():
                             elif token == 'email:' and idx + 1 < len(parts):
                                 user = parts[idx + 1]
                         if user and ip and ip != '127.0.0.1':
-                            if user not in ip_data: ip_data[user] = set()
-                            ip_data[user].add(ip)
+                            ip_parts = ip.split('.')
+                            if len(ip_parts) == 4:
+                                subnet = f"{ip_parts[0]}.{ip_parts[1]}.{ip_parts[2]}"
+                                if user not in ip_data: ip_data[user] = set()
+                                ip_data[user].add(subnet)
             except: pass
 
         stats = {}

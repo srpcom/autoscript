@@ -48,14 +48,14 @@ run_autokill() {
             
             # --- A. CEK LIMIT IP (MULTI LOGIN) ---
             if [[ "$limit_ip" -gt 0 ]]; then
-                # Ekstrak IP unik dari log yang mengandung email/user tersebut
-                ip_count=$(grep -w "$user" /tmp/xray_access.log 2>/dev/null | grep "accepted" | awk '{for(i=1;i<NF;i++){if($i=="from"){ip=$(i+1);sub(/^tcp:/,"",ip);sub(/^udp:/,"",ip);split(ip,a,":");if(a[1]!=""&&a[1]!="127.0.0.1")print a[1]}}}' | sort -u | wc -l)
+                # Ekstrak Subnet /24 unik dari log untuk mencegah false-positive akibat rotasi IP seluler 1 HP
+                ip_count=$(grep -w "$user" /tmp/xray_access.log 2>/dev/null | grep "accepted" | awk '{for(i=1;i<NF;i++){if($i=="from"){ip=$(i+1);sub(/^tcp:/,"",ip);sub(/^udp:/,"",ip);split(ip,a,":");if(a[1]!=""&&a[1]!="127.0.0.1"){split(a[1],b,".");if(b[1]!=""&&b[2]!=""&&b[3]!="")print b[1]"."b[2]"."b[3]}}}}' | sort -u | wc -l)
                 
                 if [[ "$ip_count" -gt "$limit_ip" ]]; then
-                    msg="🚫 *AUTO LOCK XRAY (MULTI LOGIN)* 🚫\n━━━━━━━━━━━━━━━━━━━━\nUser : \`$user\`\nLimit IP : $limit_ip IP\nTerdeteksi : $ip_count IP\nStatus : *LOCKED*\n━━━━━━━━━━━━━━━━━━━━\n_Gunakan fitur Unlock di Menu / Bot untuk membuka kunci._"
+                    msg="🚫 *AUTO LOCK XRAY (MULTI LOGIN)* 🚫\n━━━━━━━━━━━━━━━━━━━━\nUser : \`$user\`\nLimit IP : $limit_ip IP\nTerdeteksi : $ip_count Subnet/IP\nStatus : *LOCKED*\n━━━━━━━━━━━━━━━━━━━━\n_Gunakan fitur Unlock di Menu / Bot untuk membuka kunci._"
                     send_telegram "$msg"
                     is_killed=true
-                    lock_reason="Multi Login ($ip_count IP / Max $limit_ip IP)"
+                    lock_reason="Multi Login ($ip_count Subnet/IP / Max $limit_ip IP)"
                 fi
             fi
             
