@@ -507,6 +507,89 @@ EOF
     done
 }
 
+set_limit_xray_cli() {
+    clear
+    echo "======================================"
+    echo "    SET LIMIT IP & KUOTA AKUN XRAY    "
+    echo "======================================"
+    if [ ! -f "/usr/local/etc/xray/expiry.txt" ] || [ ! -s "/usr/local/etc/xray/expiry.txt" ]; then
+        echo -e "\e[31m[ERROR]\e[0m Belum ada akun Xray yang dibuat."
+        sleep 2; return
+    fi
+    
+    mapfile -t users < <(awk '{print $1}' /usr/local/etc/xray/expiry.txt | sort -u)
+    echo "Pilih Akun Xray yang ingin diatur limitnya:"
+    no=1
+    for u in "${users[@]}"; do
+        curr_lim=$(grep "^$u " /usr/local/etc/xray/limit.txt 2>/dev/null | awk '{print "IP:"$2" | Quota:"$3"GB"}')
+        if [ -z "$curr_lim" ]; then curr_lim="Belum diset (Unli)"; fi
+        echo " $no) $u ($curr_lim)"
+        ((no++))
+    done
+    echo " 0) Batal"
+    echo "--------------------------------------"
+    read -p " Pilih opsi [1-${#users[@]} or 0]: " sel
+    if [[ "$sel" == "0" || -z "$sel" ]]; then return; fi
+    
+    idx=$((sel - 1))
+    if [ $idx -ge 0 ] && [ $idx -lt ${#users[@]} ]; then
+        target_user="${users[$idx]}"
+        echo -e "\nMengatur limit untuk user: \e[33m$target_user\e[0m"
+        read -p "Masukkan Batas Maksimal IP (0 = Unlimited): " lim_ip
+        read -p "Masukkan Batas Maksimal Kuota (GB, 0 = Unlimited): " lim_q
+        
+        lim_ip=${lim_ip:-0}
+        lim_q=${lim_q:-0}
+        
+        sed -i "/^$target_user /d" /usr/local/etc/xray/limit.txt 2>/dev/null
+        echo "$target_user $lim_ip $lim_q" >> /usr/local/etc/xray/limit.txt
+        echo -e "\n\e[32m[SUCCESS]\e[0m Limit user \e[33m$target_user\e[0m berhasil diset: \e[36m$lim_ip IP\e[0m | \e[36m$lim_q GB Kuota\e[0m"
+    else
+        echo -e "\n=> Pilihan tidak valid!"; sleep 1
+    fi
+    sleep 2
+}
+
+set_limit_ssh_cli() {
+    clear
+    echo "======================================"
+    echo "       SET LIMIT IP AKUN SSH          "
+    echo "======================================"
+    if [ ! -f "/usr/local/etc/srpcom/ssh_expiry.txt" ] || [ ! -s "/usr/local/etc/srpcom/ssh_expiry.txt" ]; then
+        echo -e "\e[31m[ERROR]\e[0m Belum ada akun SSH yang dibuat."
+        sleep 2; return
+    fi
+    
+    mapfile -t users < <(awk '{print $1}' /usr/local/etc/srpcom/ssh_expiry.txt | sort -u)
+    echo "Pilih Akun SSH yang ingin diatur limitnya:"
+    no=1
+    for u in "${users[@]}"; do
+        curr_lim=$(grep "^$u " /usr/local/etc/srpcom/ssh_limit.txt 2>/dev/null | awk '{print $2}')
+        if [ -z "$curr_lim" ] || [ "$curr_lim" -eq 0 ]; then curr_lim="Unli"; else curr_lim="${curr_lim} IP"; fi
+        echo " $no) $u (Limit saat ini: $curr_lim)"
+        ((no++))
+    done
+    echo " 0) Batal"
+    echo "--------------------------------------"
+    read -p " Pilih opsi [1-${#users[@]} or 0]: " sel
+    if [[ "$sel" == "0" || -z "$sel" ]]; then return; fi
+    
+    idx=$((sel - 1))
+    if [ $idx -ge 0 ] && [ $idx -lt ${#users[@]} ]; then
+        target_user="${users[$idx]}"
+        echo -e "\nMengatur limit untuk user SSH: \e[33m$target_user\e[0m"
+        read -p "Masukkan Batas Maksimal IP (0 = Unlimited): " lim_ip
+        lim_ip=${lim_ip:-0}
+        
+        sed -i "/^$target_user /d" /usr/local/etc/srpcom/ssh_limit.txt 2>/dev/null
+        echo "$target_user $lim_ip" >> /usr/local/etc/srpcom/ssh_limit.txt
+        echo -e "\n\e[32m[SUCCESS]\e[0m Limit SSH \e[33m$target_user\e[0m berhasil diset ke \e[36m$lim_ip IP\e[0m"
+    else
+        echo -e "\n=> Pilihan tidak valid!"; sleep 1
+    fi
+    sleep 2
+}
+
 menu_autokill() {
     while true; do
         clear
@@ -514,24 +597,28 @@ menu_autokill() {
         if [ -n "$status_cron" ]; then st="\e[32m[ ON ]\e[0m"; else st="\e[31m[ OFF ]\e[0m"; fi
         
         echo "======================================"
-        echo "      AUTO KILL & LIMIT SETTINGS      "
+        echo "      AUTO LOCK & LIMIT SETTINGS      "
         echo "======================================"
         echo -e "Status Daemon (3 Menit) : $st"
         echo "======================================"
-        echo " 1. Turn ON Auto Kill Daemon"
-        echo " 2. Turn OFF Auto Kill Daemon"
+        echo " 1. Turn ON Auto Lock Daemon"
+        echo " 2. Turn OFF Auto Lock Daemon"
+        echo " 3. Set Limit IP & Kuota Akun Xray"
+        echo " 4. Set Limit IP Akun SSH"
         echo " 0. Kembali"
         echo "======================================"
-        read -p " Pilih opsi [0-2]: " opt
+        read -p " Pilih opsi [0-4]: " opt
         case $opt in
             1) 
                 echo "*/3 * * * * root /usr/local/bin/srpcom/autokill.sh run_kill >/dev/null 2>&1" > /etc/cron.d/srpcom_autokill
                 systemctl restart cron
-                echo -e "\n=> Auto Kill DIAKTIFKAN!"; sleep 2 ;;
+                echo -e "\n=> Auto Lock DIAKTIFKAN!"; sleep 2 ;;
             2) 
                 rm -f /etc/cron.d/srpcom_autokill
                 systemctl restart cron
-                echo -e "\n=> Auto Kill DIMATIKAN!"; sleep 2 ;;
+                echo -e "\n=> Auto Lock DIMATIKAN!"; sleep 2 ;;
+            3) set_limit_xray_cli ;;
+            4) set_limit_ssh_cli ;;
             0|x|X) break ;;
             *) echo -e "\n=> Pilihan tidak valid!"; sleep 1 ;;
         esac
