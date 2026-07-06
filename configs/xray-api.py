@@ -269,14 +269,15 @@ def monitor_xray():
                         parts = line.split()
                         if len(parts) >= 5:
                             ip = parts[2].replace('tcp:', '').replace('udp:', '').split(':')[0]
-                            user = ""
-                            for idx, token in enumerate(parts):
-                                if token == 'email:' and idx + 1 < len(parts):
-                                    user = parts[idx + 1]
-                                    break
-                            if user and ip:
-                                if user not in ip_data: ip_data[user] = set()
-                                ip_data[user].add(ip)
+                            if ip != '127.0.0.1':
+                                user = ""
+                                for idx, token in enumerate(parts):
+                                    if token == 'email:' and idx + 1 < len(parts):
+                                        user = parts[idx + 1]
+                                        break
+                                if user and ip:
+                                    if user not in ip_data: ip_data[user] = set()
+                                    ip_data[user].add(ip)
             except: pass
 
         stats = {}

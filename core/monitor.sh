@@ -27,7 +27,7 @@ monitor_xray() {
             prot=$(echo "$item" | cut -d':' -f1)
             user=$(echo "$item" | cut -d':' -f2)
             
-            ip_count=$(grep -E "email: +$user\b" /var/log/xray/access.log 2>/dev/null | awk '{print $3}' | cut -d: -f1 | sort -u | wc -l)
+            ip_count=$(grep -w "$user" /var/log/xray/access.log 2>/dev/null | grep "accepted" | awk '{print $3}' | cut -d: -f1 | grep -v "^127\.0\.0\.1$" | sort -u | wc -l)
             
             dl=$(echo "$stats_json" | jq -r '.stat[] | select(.name == "user>>>'${user}'>>>traffic>>>downlink") | .value' 2>/dev/null)
             ul=$(echo "$stats_json" | jq -r '.stat[] | select(.name == "user>>>'${user}'>>>traffic>>>uplink") | .value' 2>/dev/null)
