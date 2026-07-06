@@ -191,6 +191,8 @@ def monitor_menu_keyboard():
     markup.add(
         InlineKeyboardButton("📈 MONITOR XRAY (IP & KUOTA)", callback_data="mon_xray"),
         InlineKeyboardButton("💻 MONITOR SSH (USER AKTIF)", callback_data="mon_ssh"),
+        InlineKeyboardButton("🔒 DAFTAR AKUN TERKUNCI (LOCKED)", callback_data="mon_locked"),
+        InlineKeyboardButton("🔓 UNLOCK AKUN USER", callback_data="act_unlock_user"),
         InlineKeyboardButton("📊 BANDWIDTH USAGE (VNSTAT)", callback_data="mon_bandwidth"),
         InlineKeyboardButton("🔙 KEMBALI", callback_data="menu_main")
     )
@@ -210,7 +212,6 @@ def handle_detail_command(message):
         bot.reply_to(message, "⛔ Akses Ditolak!")
         return
     try:
-        # Command format: /det_{protocol}_{username} (special chars replaced by underscores)
         parts = message.text.split('_', 2)
         if len(parts) < 3:
             bot.reply_to(message, "❌ Format command tidak valid! Gunakan `/det_{protocol}_{username}`", parse_mode="Markdown")
@@ -218,45 +219,43 @@ def handle_detail_command(message):
             
         api_ep = parts[1]
         user = parts[2]
-        
-        bot.send_message(message.chat.id, "⏳ Sedang mengambil detail akun...", parse_mode="Markdown")
-        response = api_req(f"detail-{api_ep}", "POST", {"user": user}, chat_id=message.chat.id)
-        send_safe_message(message.chat.id, response, parse_mode="Markdown")
+        bot.send_message(message.chat.id, "⏳ Mengambil detail akun dari Node...")
+        send_safe_message(message.chat.id, api_req(f"detail-{api_ep}/{user}", "GET", chat_id=message.chat.id), parse_mode="Markdown")
     except Exception as e:
-        bot.send_message(message.chat.id, f"❌ Gagal mengambil detail: {e}")
+        bot.reply_to(message, f"❌ Error: {e}")
 
 @bot.callback_query_handler(func=lambda call: True)
-def handle_query(call):
+def callback_inline(call):
     if not is_admin(call.message):
-        bot.answer_callback_query(call.id, "Akses Ditolak!")
+        bot.answer_callback_query(call.id, "⛔ Akses Ditolak!")
         return
-    
-    data = call.data
+
     chat_id = call.message.chat.id
     msg_id = call.message.message_id
-    
+    data = call.data
+
     try:
-        if data == "menu_server_selection":
+        if data == "menu_main":
+            bot.edit_message_text("👋 *PILIH SUBLAYANAN MANAGEMENT*", chat_id, msg_id, reply_markup=main_menu_keyboard(), parse_mode="Markdown")
+            
+        elif data == "menu_server_selection":
             bot.edit_message_text("👋 *PILIH NODE SERVER UNTUK DIKELOLA*", chat_id, msg_id, reply_markup=server_selection_keyboard(), parse_mode="Markdown")
             
         elif data.startswith("sel_srv_"):
-            srv_id = data.split("sel_srv_")[1]
-            srv_info = get_default_server()
-            if srv_id != "local":
+            val = data.replace("sel_srv_", "")
+            if val == "local":
+                active_server[str(chat_id)] = get_default_server()
+            else:
                 try:
+                    idx = int(val)
                     with open(SERVERS_FILE, 'r') as f:
                         nodes = json.load(f).get("nodes", [])
-                        idx = int(srv_id)
-                        if idx < len(nodes):
-                            srv_info = {"name": nodes[idx]["name"], "domain": nodes[idx]["domain"], "api_key": nodes[idx]["api_key"]}
-                except: pass
+                        active_server[str(chat_id)] = nodes[idx]
+                except:
+                    active_server[str(chat_id)] = get_default_server()
             
-            active_server[str(chat_id)] = srv_info
-            bot.edit_message_text(f"👋 *PANEL ADMIN VPS*\nConnected Node: 🟢 *{srv_info['name']}*", chat_id, msg_id, reply_markup=main_menu_keyboard(), parse_mode="Markdown")
-            
-        elif data == "menu_main":
-            srv = active_server.get(str(chat_id), get_default_server())
-            bot.edit_message_text(f"👋 *PANEL ADMIN VPS*\nConnected Node: 🟢 *{srv['name']}*", chat_id, msg_id, reply_markup=main_menu_keyboard(), parse_mode="Markdown")
+            srv_name = active_server[str(chat_id)]['name']
+            bot.edit_message_text(f"✅ Node aktif diubah ke: *{srv_name}*\n\n👋 *PILIH SUBLAYANAN MANAGEMENT*", chat_id, msg_id, reply_markup=main_menu_keyboard(), parse_mode="Markdown")
         
         elif data == "menu_status":
             bot.edit_message_text("⚙️ *MENU STATUS & BACKUP*", chat_id, msg_id, reply_markup=status_menu_keyboard(), parse_mode="Markdown")
@@ -271,6 +270,14 @@ def handle_query(call):
         elif data == "mon_ssh":
             bot.answer_callback_query(call.id, "Mengambil data SSH...")
             send_safe_message(chat_id, api_req("monitor-ssh", "GET", chat_id=chat_id), parse_mode="Markdown")
+
+        elif data == "mon_locked":
+            bot.answer_callback_query(call.id, "Mengambil daftar akun ter-lock...")
+            send_safe_message(chat_id, api_req("locked-users", "GET", chat_id=chat_id), parse_mode="Markdown")
+
+        elif data == "act_unlock_user":
+            msg = bot.send_message(chat_id, "🔓 Masukkan *Username* yang ingin di-unlock:\n_(Ketik 'x' untuk batal)_", parse_mode="Markdown", reply_markup=ForceReply())
+            bot.register_next_step_handler(msg, step_unlock_user)
 
         elif data == "mon_bandwidth":
             bot.answer_callback_query(call.id, "Mengambil data Bandwidth...")
@@ -395,15 +402,20 @@ def step_limit_quota(message, act, prot, api_ep, data):
         
     execute_api(message, act, api_ep, data)
 
-# --- EXECUTE API AFTER ALL STEPS GATHERED ---
 def execute_api(message, act, api_ep, data):
     bot.send_message(message.chat.id, "⏳ Sedang memproses ke Node Server...", parse_mode="Markdown")
     endpoint = f"{act}-{api_ep}"
-    
-    # Detail and Del can use POST via JSON body
     method = "POST" 
-    
     response = api_req(endpoint, method, data, chat_id=message.chat.id)
+    send_safe_message(message.chat.id, response, parse_mode="Markdown")
+
+def step_unlock_user(message):
+    text = message.text.strip()
+    if text.lower() == 'x':
+        bot.send_message(message.chat.id, "🚫 Operasi dibatalkan.")
+        return
+    bot.send_message(message.chat.id, "⏳ Memproses unlock ke Node Server...", parse_mode="Markdown")
+    response = api_req("unlock-user", "POST", {"username": text}, chat_id=message.chat.id)
     send_safe_message(message.chat.id, response, parse_mode="Markdown")
 
 if __name__ == '__main__':

@@ -269,6 +269,88 @@ detail_ssh() {
     fi
 }
 
+list_locked_ssh() {
+    clear
+    echo "╔════════════════════════════════════╗"
+    echo "║       DAFTAR AKUN SSH TERKUNCI     ║"
+    echo "╚════════════════════════════════════╝"
+    tmp_file="/tmp/locked_ssh_list.txt"
+    > "$tmp_file"
+    
+    if [ -f "/usr/local/etc/srpcom/ssh_expiry.txt" ]; then
+        awk '{print $1}' /usr/local/etc/srpcom/ssh_expiry.txt | while read -r user; do
+            if [ -n "$user" ]; then
+                passwd_status=$(passwd -S "$user" 2>/dev/null | awk '{print $2}')
+                if [[ "$passwd_status" == "L" || "$passwd_status" == "LK" ]]; then
+                    echo "$user" >> "$tmp_file"
+                fi
+            fi
+        done
+    fi
+    
+    if [ ! -s "$tmp_file" ]; then
+        echo -e " \e[32mTidak ada akun SSH yang sedang ter-lock.\e[0m"
+    else
+        echo " USERNAME    | STATUS "
+        echo "----------------------"
+        while read -r u; do
+            printf " %-11s | \e[31mLOCKED\e[0m\n" "$u"
+        done < "$tmp_file"
+    fi
+    rm -f "$tmp_file"
+    echo "======================================"
+    pause
+}
+
+unlock_ssh_user() {
+    clear
+    echo "╔════════════════════════════════════╗"
+    echo "║         UNLOCK AKUN SSH (OPEN)     ║"
+    echo "╚════════════════════════════════════╝"
+    tmp_file="/tmp/locked_ssh_list.txt"
+    > "$tmp_file"
+    
+    if [ -f "/usr/local/etc/srpcom/ssh_expiry.txt" ]; then
+        awk '{print $1}' /usr/local/etc/srpcom/ssh_expiry.txt | while read -r user; do
+            if [ -n "$user" ]; then
+                passwd_status=$(passwd -S "$user" 2>/dev/null | awk '{print $2}')
+                if [[ "$passwd_status" == "L" || "$passwd_status" == "LK" ]]; then
+                    echo "$user" >> "$tmp_file"
+                fi
+            fi
+        done
+    fi
+    
+    if [ ! -s "$tmp_file" ]; then
+        echo -e " \e[32mTidak ada akun SSH yang sedang ter-lock.\e[0m"
+        rm -f "$tmp_file"; sleep 2; return
+    fi
+    
+    mapfile -t locked_ssh_users < "$tmp_file"
+    rm -f "$tmp_file"
+    
+    echo "Pilih Akun SSH yang ingin di-unlock:"
+    no=1
+    for u in "${locked_ssh_users[@]}"; do
+        echo " $no) $u"
+        ((no++))
+    done
+    echo " 0) Batal"
+    echo "--------------------------------------"
+    read -p " Pilih Opsi [1-${#locked_ssh_users[@]} or 0]: " sel
+    if [[ "$sel" == "0" || -z "$sel" ]]; then return; fi
+    
+    idx=$((sel - 1))
+    if [ $idx -ge 0 ] && [ $idx -lt ${#locked_ssh_users[@]} ]; then
+        target_user="${locked_ssh_users[$idx]}"
+        usermod -U "$target_user" 2>/dev/null
+        echo -e "\n\e[32m[SUCCESS]\e[0m Akun SSH \e[33m$target_user\e[0m berhasil di-unlock dan dapat login kembali!"
+    else
+        echo -e "\n=> Pilihan tidak valid!"; sleep 1
+    fi
+    sleep 2
+}
+
 menu_ssh() {
     while true; do
         clear
@@ -281,9 +363,11 @@ menu_ssh() {
         echo "4. Renew SSH Account"
         echo "5. List SSH Account"
         echo "6. Detail SSH Account"
+        echo "7. List Locked SSH Accounts"
+        echo "8. Unlock SSH Account"
         echo "0/x. Back to Main Menu"
         echo "======================================"
-        read -p "Please select an option [0-6 or x]: " opt
+        read -p "Please select an option [0-8 or x]: " opt
         case $opt in
             1) add_ssh ;; 
             2) add_trial_ssh ;; 
@@ -291,6 +375,8 @@ menu_ssh() {
             4) renew_ssh ;;
             5) list_ssh ;;
             6) detail_ssh ;;
+            7) list_locked_ssh ;;
+            8) unlock_ssh_user ;;
             0|x|X) break ;;
             *) echo -e "\n=> Pilihan tidak valid!"; sleep 1 ;;
         esac

@@ -359,6 +359,100 @@ def read_logs(logtype):
     except Exception as e:
         return jsonify({"stdout": f"Error: {e}"})
 
+@app.route('/srpcom/locked-users', methods=['GET'])
+def get_locked_users():
+    try:
+        locked_data = {}
+        if os.path.exists(LOCKED_FILE):
+            try:
+                with open(LOCKED_FILE, 'r') as f:
+                    locked_data = json.load(f)
+            except: pass
+
+        ssh_locked = []
+        if os.path.exists(SSH_EXP):
+            try:
+                with open(SSH_EXP, 'r') as f:
+                    for line in f:
+                        parts = line.strip().split()
+                        if parts:
+                            user = parts[0]
+                            st = subprocess.run(f"passwd -S {user} 2>/dev/null", shell=True, capture_output=True, text=True).stdout
+                            if ' L ' in st or ' LK ' in st:
+                                ssh_locked.append(user)
+            except: pass
+
+        res = "🔒 *DAFTAR AKUN TERKUNCI (LOCKED)*\n━━━━━━━━━━━━━━━━━━━━\n"
+        res += "*[ XRAY LOCKED ]*\n"
+        if not locked_data:
+            res += "Tidak ada akun Xray ter-lock.\n"
+        else:
+            for u, d in locked_data.items():
+                res += f"👤 `{u}`\n├ Alasan: {d.get('reason', '-')}\n└ Waktu: {d.get('locked_at', '-')}\n"
+        
+        res += "\n*[ SSH LOCKED ]*\n"
+        if not ssh_locked:
+            res += "Tidak ada akun SSH ter-lock.\n"
+        else:
+            for u in ssh_locked:
+                res += f"👤 `{u}` (Status: LOCKED)\n"
+
+        return jsonify({"status": "success", "locked_xray": locked_data, "locked_ssh": ssh_locked, "stdout": res})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e), "stdout": f"Error: {e}"})
+
+@app.route('/srpcom/unlock-user', methods=['POST'])
+def unlock_user_api():
+    try:
+        data = request.json or {}
+        user = data.get('username') or data.get('user')
+
+        if not user:
+            return jsonify({"status": "error", "message": "Username required"})
+
+        unlocked = False
+        msg = ""
+
+        if os.path.exists(LOCKED_FILE):
+            try:
+                with open(LOCKED_FILE, 'r') as f:
+                    locked_data = json.load(f)
+                if user in locked_data:
+                    client_data = locked_data[user].get('client_data')
+                    if client_data:
+                        with open(XRAY_CONF, 'r') as f:
+                            config = json.load(f)
+                        for inb in config.get('inbounds', []):
+                            if inb.get('protocol') in ['vmess', 'vless', 'trojan']:
+                                inb['settings']['clients'].append(client_data)
+                        with open(XRAY_CONF, 'w') as f:
+                            json.dump(config, f, indent=2)
+                        del locked_data[user]
+                        with open(LOCKED_FILE, 'w') as f:
+                            json.dump(locked_data, f, indent=2)
+                        subprocess.run(['systemctl', 'restart', 'xray'])
+                        unlocked = True
+                        msg = f"Akun Xray {user} berhasil di-unlock!"
+            except Exception as ex:
+                msg = f"Gagal unlock Xray: {ex}"
+
+        if not unlocked:
+            try:
+                st = subprocess.run(f"passwd -S {user} 2>/dev/null", shell=True, capture_output=True, text=True).stdout
+                if ' L ' in st or ' LK ' in st:
+                    subprocess.run(['usermod', '-U', user])
+                    unlocked = True
+                    msg = f"Akun SSH {user} berhasil di-unlock!"
+            except Exception as ex:
+                msg = f"Gagal unlock SSH: {ex}"
+
+        if unlocked:
+            return jsonify({"status": "success", "message": msg, "stdout": f"✅ {msg}"})
+        else:
+            return jsonify({"status": "error", "message": msg or f"User {user} tidak ditemukan dalam daftar lock."})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)})
+
 @app.route('/srpcom/sys-resource', methods=['GET'])
 def sys_resource():
     try:

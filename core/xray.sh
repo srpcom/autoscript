@@ -609,6 +609,75 @@ menu_change_uuid() {
     esac
 }
 
+list_locked_xray() {
+    clear
+    echo "╔════════════════════════════════════╗"
+    echo "║       DAFTAR AKUN XRAY TERKUNCI    ║"
+    echo "╚════════════════════════════════════╝"
+    LOCKED_FILE="/usr/local/etc/xray/locked.json"
+    if [ ! -f "$LOCKED_FILE" ] || [ "$(jq 'length' "$LOCKED_FILE" 2>/dev/null)" -eq 0 ]; then
+        echo -e " \e[32mTidak ada akun Xray yang sedang ter-lock.\e[0m"
+    else
+        printf " %-3s | %-12s | %-20s | %-16s\n" "No" "User" "Alasan" "Waktu Lock"
+        echo "--------------------------------------------------------"
+        no=1
+        jq -r 'to_entries[] | "\(.value.user)|\(.value.reason)|\(.value.locked_at)"' "$LOCKED_FILE" 2>/dev/null | while IFS='|' read -r u r t; do
+            printf " %-3s | %-12s | %-20s | %-16s\n" "$no." "$u" "${r:0:20}" "$t"
+            ((no++))
+        done
+    fi
+    echo "======================================"
+    pause
+}
+
+unlock_xray_user() {
+    clear
+    echo "╔════════════════════════════════════╗"
+    echo "║        UNLOCK AKUN XRAY (OPEN)     ║"
+    echo "╚════════════════════════════════════╝"
+    LOCKED_FILE="/usr/local/etc/xray/locked.json"
+    if [ ! -f "$LOCKED_FILE" ] || [ "$(jq 'length' "$LOCKED_FILE" 2>/dev/null)" -eq 0 ]; then
+        echo -e " \e[32mTidak ada akun Xray yang sedang ter-lock.\e[0m"
+        sleep 2; return
+    fi
+    
+    mapfile -t locked_users < <(jq -r 'keys[]' "$LOCKED_FILE" 2>/dev/null)
+    echo "Pilih Akun Xray yang ingin di-unlock:"
+    no=1
+    for u in "${locked_users[@]}"; do
+        r=$(jq -r --arg u "$u" '.[$u].reason' "$LOCKED_FILE" 2>/dev/null)
+        echo " $no) $u (Alasan: $r)"
+        ((no++))
+    done
+    echo " 0) Batal"
+    echo "--------------------------------------"
+    read -p " Pilih Opsi [1-${#locked_users[@]} or 0]: " sel
+    if [[ "$sel" == "0" || -z "$sel" ]]; then return; fi
+    
+    idx=$((sel - 1))
+    if [ $idx -ge 0 ] && [ $idx -lt ${#locked_users[@]} ]; then
+        target_user="${locked_users[$idx]}"
+        client_data=$(jq -c --arg u "$target_user" '.[$u].client_data' "$LOCKED_FILE" 2>/dev/null)
+        
+        if [ -n "$client_data" ] && [ "$client_data" != "null" ]; then
+            jq --argjson c "$client_data" '(.inbounds[] | select(.protocol == "vmess" or .protocol == "vless" or .protocol == "trojan") | .settings.clients) += [$c]' /usr/local/etc/xray/config.json > /tmp/config.json
+            if [ -s /tmp/config.json ]; then
+                mv /tmp/config.json /usr/local/etc/xray/config.json
+                jq --arg u "$target_user" 'del(.[$u])' "$LOCKED_FILE" > /tmp/locked.json && mv /tmp/locked.json "$LOCKED_FILE"
+                systemctl restart xray
+                echo -e "\n\e[32m[SUCCESS]\e[0m Akun \e[33m$target_user\e[0m berhasil di-unlock dan aktif kembali!"
+            else
+                echo -e "\n\e[31m[ERROR]\e[0m Gagal memperbarui config.json Xray."
+            fi
+        else
+            echo -e "\n\e[31m[ERROR]\e[0m Data client untuk $target_user tidak ditemukan."
+        fi
+    else
+        echo -e "\n=> Pilihan tidak valid!"; sleep 1
+    fi
+    sleep 2
+}
+
 menu_xray() {
     XRAY_VER=$(/usr/local/bin/xray version 2>/dev/null | head -n 1 | awk '{print $1" "$2}')
     if [[ -z "$XRAY_VER" ]]; then XRAY_VER="Xray 24.11.11"; fi
@@ -625,10 +694,12 @@ menu_xray() {
         echo " 4. List XRAY Account"
         echo " 5. Detail XRAY Account"
         echo " 6. Change UUID / Password"
+        echo " 7. List Locked Accounts"
+        echo " 8. Unlock XRAY Account"
         echo "--------------------------------------"
         echo " 0. Kembali ke Menu Utama"
         echo "======================================"
-        read -p " Pilih opsi [0-6]: " opt
+        read -p " Pilih opsi [0-8]: " opt
         case $opt in
             1) create_xray ;; 
             2) delete_xray ;; 
@@ -636,6 +707,8 @@ menu_xray() {
             4) list_xray ;;
             5) detail_xray ;;
             6) menu_change_uuid ;;
+            7) list_locked_xray ;;
+            8) unlock_xray_user ;;
             0) break ;;
             *) echo -e "\n=> Pilihan tidak valid!"; sleep 1 ;;
         esac

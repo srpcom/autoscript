@@ -52,9 +52,10 @@ run_autokill() {
                 ip_count=$(grep -w "$user" /tmp/xray_access.log 2>/dev/null | grep "accepted" | awk '{for(i=1;i<NF;i++){if($i=="from"){ip=$(i+1);sub(/^tcp:/,"",ip);sub(/^udp:/,"",ip);split(ip,a,":");if(a[1]!=""&&a[1]!="127.0.0.1")print a[1]}}}' | sort -u | wc -l)
                 
                 if [[ "$ip_count" -gt "$limit_ip" ]]; then
-                    msg="🚫 *AUTO KILL XRAY (MULTI LOGIN)* 🚫\n━━━━━━━━━━━━━━━━━━━━\nUser : \`$user\`\nLimit IP : $limit_ip IP\nTerdeteksi : $ip_count IP\nStatus : *DELETED*\n━━━━━━━━━━━━━━━━━━━━"
+                    msg="🚫 *AUTO LOCK XRAY (MULTI LOGIN)* 🚫\n━━━━━━━━━━━━━━━━━━━━\nUser : \`$user\`\nLimit IP : $limit_ip IP\nTerdeteksi : $ip_count IP\nStatus : *LOCKED*\n━━━━━━━━━━━━━━━━━━━━\n_Gunakan fitur Unlock di Menu / Bot untuk membuka kunci._"
                     send_telegram "$msg"
                     is_killed=true
+                    lock_reason="Multi Login ($ip_count IP / Max $limit_ip IP)"
                 fi
             fi
             
@@ -74,24 +75,34 @@ run_autokill() {
                 
                 if [[ "$total_mb" -ge "$limit_mb" ]]; then
                     total_gb=$(($total_mb / 1024))
-                    msg="🚫 *AUTO KILL XRAY (LIMIT KUOTA)* 🚫\n━━━━━━━━━━━━━━━━━━━━\nUser : \`$user\`\nLimit : $limit_quota GB\nTerpakai : $total_gb GB\nStatus : *DELETED*\n━━━━━━━━━━━━━━━━━━━━"
+                    msg="🚫 *AUTO LOCK XRAY (LIMIT KUOTA)* 🚫\n━━━━━━━━━━━━━━━━━━━━\nUser : \`$user\`\nLimit : $limit_quota GB\nTerpakai : $total_gb GB\nStatus : *LOCKED*\n━━━━━━━━━━━━━━━━━━━━\n_Gunakan fitur Unlock di Menu / Bot untuk membuka kunci._"
                     send_telegram "$msg"
                     is_killed=true
+                    lock_reason="Limit Kuota ($total_gb GB / Max $limit_quota GB)"
                 fi
             fi
             
-            # --- C. EKSEKUSI PENGHAPUSAN XRAY JIKA MELANGGAR ---
+            # --- C. EKSEKUSI PENGUNCIAN (AUTO LOCK) XRAY JIKA MELANGGAR ---
             if [[ "$is_killed" == true ]]; then
-                # Hapus dari konfigurasi secara aman (Mencegah Xray config 0 bytes)
+                # Simpan data client dan status locked ke /usr/local/etc/xray/locked.json
+                LOCKED_FILE="/usr/local/etc/xray/locked.json"
+                if [ ! -f "$LOCKED_FILE" ] || [ ! -s "$LOCKED_FILE" ]; then echo "{}" > "$LOCKED_FILE"; fi
+                
+                client_obj=$(jq -c '(.inbounds[] | select(.protocol == "vmess" or .protocol == "vless" or .protocol == "trojan") | .settings.clients[]) | select(.email == "'$user'")' /usr/local/etc/xray/config.json 2>/dev/null | head -n 1)
+                
+                if [ -n "$client_obj" ]; then
+                    now_date=$(date "+%Y-%m-%d %H:%M:%S")
+                    jq --arg u "$user" --arg r "$lock_reason" --arg t "$now_date" --argjson c "$client_obj" \
+                       '.[$u] = {"user": $u, "reason": $r, "locked_at": $t, "client_data": $c}' \
+                       "$LOCKED_FILE" > /tmp/locked.json && mv /tmp/locked.json "$LOCKED_FILE"
+                fi
+
+                # Lepas dari inbounds config.json secara aman
                 jq '(.inbounds[] | select(.protocol == "vmess" or .protocol == "vless" or .protocol == "trojan") | .settings.clients) |= map(select(.email != "'$user'"))' /usr/local/etc/xray/config.json > /tmp/config.json
                 
                 if [ -s /tmp/config.json ]; then 
                     mv /tmp/config.json /usr/local/etc/xray/config.json
                 fi
-                
-                # Hapus dari database txt
-                sed -i "/^$user /d" /usr/local/etc/xray/expiry.txt
-                sed -i "/^$user /d" /usr/local/etc/xray/limit.txt
                 
                 touch /tmp/xray_restart.flag
             fi
