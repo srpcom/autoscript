@@ -49,7 +49,7 @@ run_autokill() {
             # --- A. CEK LIMIT IP (MULTI LOGIN) ---
             if [[ "$limit_ip" -gt 0 ]]; then
                 # Ekstrak IP unik dari log yang mengandung email/user tersebut
-                ip_count=$(grep -w "$user" /tmp/xray_access.log 2>/dev/null | grep "accepted" | awk '{print $3}' | cut -d: -f1 | grep -v "^127\.0\.0\.1$" | sort -u | wc -l)
+                ip_count=$(grep -w "$user" /tmp/xray_access.log 2>/dev/null | grep "accepted" | awk '{for(i=1;i<NF;i++){if($i=="from"){ip=$(i+1);sub(/^tcp:/,"",ip);sub(/^udp:/,"",ip);split(ip,a,":");if(a[1]!=""&&a[1]!="127.0.0.1")print a[1]}}}' | sort -u | wc -l)
                 
                 if [[ "$ip_count" -gt "$limit_ip" ]]; then
                     msg="🚫 *AUTO KILL XRAY (MULTI LOGIN)* 🚫\n━━━━━━━━━━━━━━━━━━━━\nUser : \`$user\`\nLimit IP : $limit_ip IP\nTerdeteksi : $ip_count IP\nStatus : *DELETED*\n━━━━━━━━━━━━━━━━━━━━"
