@@ -201,7 +201,7 @@ apt update && apt upgrade -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Optio
 
 
 # PERUBAHAN: Menambahkan 'vnstat' ke daftar instalasi dependensi
-apt install curl wget unzip uuid-runtime jq tzdata ufw cron gnupg2 gnupg python3 python3-flask python3-pip strongswan xl2tpd iptables dropbear openvpn cmake make gcc git net-tools vnstat -y
+apt install curl wget unzip uuid-runtime jq tzdata ufw cron gnupg2 gnupg python3 python3-flask python3-pip strongswan xl2tpd iptables dropbear openvpn cmake make gcc git net-tools vnstat sqlite3 -y
 timedatectl set-timezone Asia/Jakarta
 
 
@@ -659,6 +659,7 @@ wget -q -O /usr/local/bin/srpcom/monitor.sh "$GITHUB_RAW/core/monitor.sh"
 wget -q -O /usr/local/bin/srpcom/autokill.sh "$GITHUB_RAW/core/autokill.sh"
 wget -q -O /usr/local/bin/srpcom/menu.sh "$GITHUB_RAW/core/menu.sh"
 wget -q -O /usr/local/bin/srpcom/auto_expired.sh "$GITHUB_RAW/core/auto_expired.sh"
+wget -q -O /usr/local/bin/srpcom/db_helper.sh "$GITHUB_RAW/core/db_helper.sh"
 wget -q -O /usr/local/bin/xray-api.py "$GITHUB_RAW/configs/xray-api.py"
 wget -q -O /usr/local/bin/bot-admin.py "$GITHUB_RAW/configs/bot-admin.py"
 
@@ -879,6 +880,8 @@ fi
 # REBUILD SHORTCUTS & CADDYFILE
 # ==========================================
 chmod +x /usr/local/bin/srpcom/menu.sh
+chmod +x /usr/local/bin/srpcom/db_helper.sh
+/usr/local/bin/srpcom/db_helper.sh db_import_from_txt 2>/dev/null
 source /usr/local/bin/srpcom/menu.sh
 rebuild_shortcuts
 rebuild_caddyfile

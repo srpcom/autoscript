@@ -90,6 +90,15 @@ def save_json(p, d):
 
 def restart_xray(): subprocess.run(['systemctl', 'restart', 'xray'])
 def restart_l2tp(): subprocess.run(['systemctl', 'restart', 'ipsec', 'xl2tpd'])
+def sync_to_db():
+    try: subprocess.run(['/usr/local/bin/srpcom/db_helper.sh', 'db_import_from_txt'], capture_output=True)
+    except: pass
+
+@app.after_request
+def after_request_callback(response):
+    if request.path.startswith('/srpcom/') and request.method == 'POST':
+        sync_to_db()
+    return response
 
 def send_telegram(text):
     try:
@@ -372,42 +381,39 @@ def read_logs(logtype):
 @app.route('/srpcom/locked-users', methods=['GET'])
 def get_locked_users():
     try:
-        locked_data = {}
-        if os.path.exists(LOCKED_FILE):
-            try:
-                with open(LOCKED_FILE, 'r') as f:
-                    locked_data = json.load(f)
-            except: pass
-
-        ssh_locked = []
-        if os.path.exists(SSH_EXP):
-            try:
-                with open(SSH_EXP, 'r') as f:
-                    for line in f:
-                        parts = line.strip().split()
-                        if parts:
-                            user = parts[0]
-                            st = subprocess.run(f"passwd -S {user} 2>/dev/null", shell=True, capture_output=True, text=True).stdout
-                            if ' L ' in st or ' LK ' in st:
-                                ssh_locked.append(user)
-            except: pass
+        import sqlite3
+        conn = sqlite3.connect('/var/lib/srpcom/srpcom.db')
+        conn.row_factory = sqlite3.Row
+        cur = conn.cursor()
+        
+        # Xray Locked
+        cur.execute("SELECT username, reason, locked_at FROM lock_history WHERE username IN (SELECT username FROM accounts WHERE status='LOCKED' AND protocol != 'ssh')")
+        xray_rows = cur.fetchall()
+        locked_xray = {r['username']: {'user': r['username'], 'reason': r['reason'], 'locked_at': r['locked_at']} for r in xray_rows}
+        
+        # SSH Locked
+        cur.execute("SELECT username FROM accounts WHERE status='LOCKED' AND protocol = 'ssh'")
+        ssh_rows = cur.fetchall()
+        locked_ssh = [r['username'] for r in ssh_rows]
+        
+        conn.close()
 
         res = "🔒 *DAFTAR AKUN TERKUNCI (LOCKED)*\n━━━━━━━━━━━━━━━━━━━━\n"
         res += "*[ XRAY LOCKED ]*\n"
-        if not locked_data:
+        if not locked_xray:
             res += "Tidak ada akun Xray ter-lock.\n"
         else:
-            for u, d in locked_data.items():
+            for u, d in locked_xray.items():
                 res += f"👤 `{u}`\n├ Alasan: {d.get('reason', '-')}\n└ Waktu: {d.get('locked_at', '-')}\n"
         
         res += "\n*[ SSH LOCKED ]*\n"
-        if not ssh_locked:
+        if not locked_ssh:
             res += "Tidak ada akun SSH ter-lock.\n"
         else:
-            for u in ssh_locked:
+            for u in locked_ssh:
                 res += f"👤 `{u}` (Status: LOCKED)\n"
 
-        return jsonify({"status": "success", "locked_xray": locked_data, "locked_ssh": ssh_locked, "stdout": res})
+        return jsonify({"status": "success", "locked_xray": locked_xray, "locked_ssh": locked_ssh, "stdout": res})
     except Exception as e:
         return jsonify({"status": "error", "message": str(e), "stdout": f"Error: {e}"})
 
@@ -420,46 +426,64 @@ def unlock_user_api():
         if not user:
             return jsonify({"status": "error", "message": "Username required"})
 
+        import sqlite3
+        conn = sqlite3.connect('/var/lib/srpcom/srpcom.db')
+        conn.row_factory = sqlite3.Row
+        cur = conn.cursor()
+        
+        cur.execute("SELECT * FROM accounts WHERE username=?", (user,))
+        row = cur.fetchone()
+        
+        if not row:
+            conn.close()
+            return jsonify({"status": "error", "message": f"User {user} tidak ditemukan dalam database."})
+            
         unlocked = False
         msg = ""
-
-        if os.path.exists(LOCKED_FILE):
-            try:
-                with open(LOCKED_FILE, 'r') as f:
-                    locked_data = json.load(f)
-                if user in locked_data:
-                    client_data = locked_data[user].get('client_data')
-                    if client_data:
-                        with open(XRAY_CONF, 'r') as f:
-                            config = json.load(f)
-                        for inb in config.get('inbounds', []):
-                            if inb.get('protocol') in ['vmess', 'vless', 'trojan']:
-                                inb['settings']['clients'].append(client_data)
-                        with open(XRAY_CONF, 'w') as f:
-                            json.dump(config, f, indent=2)
-                        del locked_data[user]
-                        with open(LOCKED_FILE, 'w') as f:
-                            json.dump(locked_data, f, indent=2)
-                        subprocess.run(['systemctl', 'restart', 'xray'])
-                        unlocked = True
-                        msg = f"Akun Xray {user} berhasil di-unlock!"
-            except Exception as ex:
-                msg = f"Gagal unlock Xray: {ex}"
-
-        if not unlocked:
-            try:
-                st = subprocess.run(f"passwd -S {user} 2>/dev/null", shell=True, capture_output=True, text=True).stdout
-                if ' L ' in st or ' LK ' in st:
-                    subprocess.run(['usermod', '-U', user])
+        protocol = row['protocol']
+        
+        if protocol in ['vmess', 'vless', 'trojan']:
+            cur.execute("SELECT client_data FROM lock_history WHERE username=?", (user,))
+            lh_row = cur.fetchone()
+            if lh_row and lh_row['client_data']:
+                try:
+                    client_data = json.loads(lh_row['client_data'])
+                    with open(XRAY_CONF, 'r') as f:
+                        config = json.load(f)
+                    for inb in config.get('inbounds', []):
+                        if inb.get('protocol') == protocol:
+                            inb['settings']['clients'].append(client_data)
+                    with open(XRAY_CONF, 'w') as f:
+                        json.dump(config, f, indent=2)
+                    
+                    cur.execute("UPDATE accounts SET status='ACTIVE' WHERE username=?", (user,))
+                    cur.execute("DELETE FROM lock_history WHERE username=?", (user,))
+                    conn.commit()
+                    
+                    subprocess.run(['systemctl', 'restart', 'xray'])
                     unlocked = True
-                    msg = f"Akun SSH {user} berhasil di-unlock!"
+                    msg = f"Akun Xray {user} berhasil di-unlock!"
+                except Exception as ex:
+                    msg = f"Gagal unlock Xray: {ex}"
+        elif protocol == 'ssh':
+            try:
+                subprocess.run(['usermod', '-U', user])
+                cur.execute("UPDATE accounts SET status='ACTIVE' WHERE username=?", (user,))
+                conn.commit()
+                unlocked = True
+                msg = f"Akun SSH {user} berhasil di-unlock!"
             except Exception as ex:
                 msg = f"Gagal unlock SSH: {ex}"
+        
+        conn.close()
+        
+        # Sinkronisasikan kembali ke file txt demi kompatibilitas
+        subprocess.run(['/usr/local/bin/srpcom/db_helper.sh', 'db_export_to_txt'])
 
         if unlocked:
             return jsonify({"status": "success", "message": msg, "stdout": f"✅ {msg}"})
         else:
-            return jsonify({"status": "error", "message": msg or f"User {user} tidak ditemukan dalam daftar lock."})
+            return jsonify({"status": "error", "message": msg or f"User {user} tidak dapat di-unlock."})
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)})
 
@@ -559,9 +583,12 @@ def run_bandwidth():
 
 @app.route('/srpcom/sys-backup', methods=['GET'])
 def sys_backup():
+    # Sync SQLite data ke txt files sebelum di-backup demi kompatibilitas
+    subprocess.run(['/usr/local/bin/srpcom/db_helper.sh', 'db_export_to_txt'], capture_output=True)
+    
     now_str = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
     backup_file = f"/tmp/srpcom-backup-{now_str}.tar.gz"
-    files = [XRAY_CONF, EXP_FILE, LIMIT_FILE, L2TP_EXP, SSH_EXP, SSH_LIMIT, CHAP_SECRETS]
+    files = [XRAY_CONF, EXP_FILE, LIMIT_FILE, L2TP_EXP, SSH_EXP, SSH_LIMIT, CHAP_SECRETS, '/var/lib/srpcom/srpcom.db']
     valid = [f for f in files if os.path.exists(f)]
     if valid:
         subprocess.run(['tar', '-czf', backup_file, '-C', '/'] + [f.lstrip('/') for f in valid])

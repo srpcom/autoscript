@@ -543,6 +543,7 @@ set_limit_xray_cli() {
         
         sed -i "/^$target_user /d" /usr/local/etc/xray/limit.txt 2>/dev/null
         echo "$target_user $lim_ip $lim_q" >> /usr/local/etc/xray/limit.txt
+        [ -f "/usr/local/bin/srpcom/db_helper.sh" ] && /usr/local/bin/srpcom/db_helper.sh db_import_from_txt 2>/dev/null
         echo -e "\n\e[32m[SUCCESS]\e[0m Limit user \e[33m$target_user\e[0m berhasil diset: \e[36m$lim_ip IP\e[0m | \e[36m$lim_q GB Kuota\e[0m"
     else
         echo -e "\n=> Pilihan tidak valid!"; sleep 1
@@ -583,6 +584,7 @@ set_limit_ssh_cli() {
         
         sed -i "/^$target_user /d" /usr/local/etc/srpcom/ssh_limit.txt 2>/dev/null
         echo "$target_user $lim_ip" >> /usr/local/etc/srpcom/ssh_limit.txt
+        [ -f "/usr/local/bin/srpcom/db_helper.sh" ] && /usr/local/bin/srpcom/db_helper.sh db_import_from_txt 2>/dev/null
         echo -e "\n\e[32m[SUCCESS]\e[0m Limit SSH \e[33m$target_user\e[0m berhasil diset ke \e[36m$lim_ip IP\e[0m"
     else
         echo -e "\n=> Pilihan tidak valid!"; sleep 1
@@ -1158,6 +1160,15 @@ restore_data() {
         fi
     done
     
+    # Restore/Merge srpcom.db
+    if [ -f "/tmp/restore_temp/var/lib/srpcom/srpcom.db" ] && [ "$restore_mode" == "1" ]; then
+        mkdir -p /var/lib/srpcom
+        cp -f "/tmp/restore_temp/var/lib/srpcom/srpcom.db" "/var/lib/srpcom/srpcom.db"
+    elif [ -f "/usr/local/bin/srpcom/db_helper.sh" ]; then
+        # Jika metode merge atau db tidak ada di backup, bangun db dari file txt hasil restore
+        /usr/local/bin/srpcom/db_helper.sh db_import_from_txt 2>/dev/null
+    fi
+    
     if [ -f "/usr/local/etc/srpcom/ssh_expiry.txt" ]; then
         echo "=> Membangun OS User SSH..."
         while read -r user pass exp_date exp_time; do
@@ -1169,6 +1180,10 @@ restore_data() {
     fi
 
     rm -rf /tmp/restore_temp "$target_file" /tmp/backup-ready.tar.gz
+    # Pastikan file db diexport kembali untuk konsistensi text db
+    if [ -f "/usr/local/bin/srpcom/db_helper.sh" ]; then
+        /usr/local/bin/srpcom/db_helper.sh db_export_to_txt 2>/dev/null
+    fi
     systemctl restart xray caddy xray-api ipsec xl2tpd dropbear ssh-ws srpcom-bot
     echo -e "\n\e[32m[SUCCESS]\e[0m Restore Berhasil!"
     pause

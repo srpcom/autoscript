@@ -119,10 +119,15 @@ manual_backup_telegram() {
     
     local BACKUP_PASS="Suruan646$"
     
+    # Sync SQLite data ke txt files sebelum di-backup demi kompatibilitas penuh (backwards compatibility)
+    if [ -f "/usr/local/bin/srpcom/db_helper.sh" ]; then
+        /usr/local/bin/srpcom/db_helper.sh db_export_to_txt 2>/dev/null
+    fi
+    
     echo "SRPCOM_V5_VALID" > /usr/local/etc/srpcom/backup_sign.txt
     
     local valid_files="/usr/local/etc/srpcom/backup_sign.txt"
-    for f in /usr/local/etc/xray/config.json /usr/local/etc/xray/expiry.txt /usr/local/etc/xray/limit.txt /usr/local/etc/srpcom/l2tp_expiry.txt /usr/local/etc/srpcom/ssh_expiry.txt /usr/local/etc/srpcom/ssh_limit.txt /etc/ppp/chap-secrets; do
+    for f in /usr/local/etc/xray/config.json /usr/local/etc/xray/expiry.txt /usr/local/etc/xray/limit.txt /usr/local/etc/srpcom/l2tp_expiry.txt /usr/local/etc/srpcom/ssh_expiry.txt /usr/local/etc/srpcom/ssh_limit.txt /etc/ppp/chap-secrets /var/lib/srpcom/srpcom.db; do
         if [ -f "$f" ]; then valid_files="$valid_files $f"; fi
     done
     tar -czf "$tmp_backup" $valid_files 2>/dev/null

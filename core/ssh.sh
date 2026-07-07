@@ -43,6 +43,7 @@ add_ssh() {
     # Simpan ke database
     echo "$user $password $exp_date $exp_time" >> /usr/local/etc/srpcom/ssh_expiry.txt
     echo "$user $limit_ip" >> /usr/local/etc/srpcom/ssh_limit.txt
+    [ -f "/usr/local/bin/srpcom/db_helper.sh" ] && /usr/local/bin/srpcom/db_helper.sh db_import_from_txt 2>/dev/null
     
     lim_str="${limit_ip} IP"
     if [ "$limit_ip" -eq 0 ]; then lim_str="Not Active (Unli)"; fi
@@ -78,6 +79,7 @@ add_trial_ssh() {
     
     echo "$user $password $exp_date $exp_time" >> /usr/local/etc/srpcom/ssh_expiry.txt
     echo "$user $limit_ip" >> /usr/local/etc/srpcom/ssh_limit.txt
+    [ -f "/usr/local/bin/srpcom/db_helper.sh" ] && /usr/local/bin/srpcom/db_helper.sh db_import_from_txt 2>/dev/null
     
     msg_cli=$(echo -e "Akun Trial Dibuat!\n\n━━━━━━━━━━━━━━━━━━━━\nINFORMASI TRIAL\nSSH & OVPN ACCOUNT\n━━━━━━━━━━━━━━━━━━━━\nIP-Address: ${IP_ADD}\nHostname: ${DOMAIN}\nUsername: ${user}\nPassword: ${password}\nLimit IP: ${limit_ip} IP\n━━━━━━━━━━━━━━━━━━━━\nPort OpenSSH: 22\nPort Dropbear: 109, 143\nPort SSH WS HTTPS (TLS): 443\nPort SSH WS HTTP (NTLS): 80\nPort BadVPN/UDPGW: 7100, 7200, 7300\n━━━━━━━━━━━━━━━━━━━━\nOPENVPN TCP (1194): http://${DOMAIN}/ovpn/tcp.ovpn\nOPENVPN UDP (2200): http://${DOMAIN}/ovpn/udp.ovpn\n━━━━━━━━━━━━━━━━━━━━\nPayload SSH WS: GET /sshws HTTP/1.1[crlf]Host: ${DOMAIN}[crlf]Upgrade: websocket[crlf]Connection: Upgrade[crlf]User-Agent: [ua][crlf][crlf]\n━━━━━━━━━━━━━━━━━━━━\nPayload WS ENHANCED: GET /sshws HTTP/1.1[crlf]Host: ISI_BUG_DISINI[crlf]Upgrade: websocket[crlf]Connection: Upgrade[crlf]User-Agent: [ua][crlf][crlf]\n━━━━━━━━━━━━━━━━━━━━\nExpired on: ${exp_date} ${exp_time} WIB (${masaaktif})")
     
@@ -123,6 +125,7 @@ delete_ssh() {
         userdel -f "$user" 2>/dev/null
         sed -i "/^$user /d" /usr/local/etc/srpcom/ssh_expiry.txt
         sed -i "/^$user /d" /usr/local/etc/srpcom/ssh_limit.txt
+        [ -f "/usr/local/bin/srpcom/db_helper.sh" ] && /usr/local/bin/srpcom/db_helper.sh db_import_from_txt 2>/dev/null
         
         echo -e "\n\e[32m=> Akun SSH '$user' berhasil dihapus!\e[0m"
         sleep 2
@@ -190,6 +193,7 @@ renew_ssh() {
         # Update TXT database
         sed -i "/^$user /d" /usr/local/etc/srpcom/ssh_expiry.txt
         echo "$user $pw $new_exp_date $new_exp_time" >> /usr/local/etc/srpcom/ssh_expiry.txt
+        [ -f "/usr/local/bin/srpcom/db_helper.sh" ] && /usr/local/bin/srpcom/db_helper.sh db_import_from_txt 2>/dev/null
         
         echo -e "\n\e[32m=> Akun SSH '$user' diperpanjang $masaaktif Hari!\e[0m"
         echo "=> Expired Baru: $new_exp_date $new_exp_time WIB"
@@ -344,6 +348,7 @@ unlock_ssh_user() {
     if [ $idx -ge 0 ] && [ $idx -lt ${#locked_ssh_users[@]} ]; then
         target_user="${locked_ssh_users[$idx]}"
         usermod -U "$target_user" 2>/dev/null
+        [ -f "/usr/local/bin/srpcom/db_helper.sh" ] && /usr/local/bin/srpcom/db_helper.sh db_import_from_txt 2>/dev/null
         echo -e "\n\e[32m[SUCCESS]\e[0m Akun SSH \e[33m$target_user\e[0m berhasil di-unlock dan dapat login kembali!"
     else
         echo -e "\n=> Pilihan tidak valid!"; sleep 1

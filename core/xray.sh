@@ -88,6 +88,7 @@ add_vmess_ws() {
     jq '(.inbounds[] | select(.protocol=="vmess") | .settings.clients) += [{"id": "'$uuid'", "alterId": 0, "email": "'$user'"}]' /usr/local/etc/xray/config.json > /tmp/config.json
     if [ -s /tmp/config.json ]; then mv /tmp/config.json /usr/local/etc/xray/config.json; fi
     systemctl restart xray
+    [ -f "/usr/local/bin/srpcom/db_helper.sh" ] && /usr/local/bin/srpcom/db_helper.sh db_import_from_txt 2>/dev/null
     
     tls_json="{\"v\":\"2\",\"ps\":\"${user}\",\"add\":\"${DOMAIN}\",\"port\":\"443\",\"id\":\"${uuid}\",\"aid\":\"0\",\"scy\":\"auto\",\"net\":\"ws\",\"type\":\"none\",\"host\":\"${DOMAIN}\",\"path\":\"/vmessws\",\"tls\":\"tls\",\"sni\":\"${DOMAIN}\"}"
     none_tls_json="{\"v\":\"2\",\"ps\":\"${user}\",\"add\":\"${DOMAIN}\",\"port\":\"80\",\"id\":\"${uuid}\",\"aid\":\"0\",\"scy\":\"auto\",\"net\":\"ws\",\"type\":\"none\",\"host\":\"${DOMAIN}\",\"path\":\"/vmessws\",\"tls\":\"\",\"sni\":\"\"}"
@@ -131,6 +132,7 @@ add_vless_ws() {
     jq '(.inbounds[] | select(.protocol=="vless") | .settings.clients) += [{"id": "'$uuid'", "email": "'$user'"}]' /usr/local/etc/xray/config.json > /tmp/config.json
     if [ -s /tmp/config.json ]; then mv /tmp/config.json /usr/local/etc/xray/config.json; fi
     systemctl restart xray
+    [ -f "/usr/local/bin/srpcom/db_helper.sh" ] && /usr/local/bin/srpcom/db_helper.sh db_import_from_txt 2>/dev/null
     
     link_tls="vless://${uuid}@${DOMAIN}:443?path=/vlessws&security=tls&encryption=none&host=${DOMAIN}&type=ws&sni=${DOMAIN}#${user}"
     link_none_tls="vless://${uuid}@${DOMAIN}:80?path=/vlessws&security=none&encryption=none&host=${DOMAIN}&type=ws#${user}"
@@ -172,6 +174,7 @@ add_trojan_ws() {
     jq '(.inbounds[] | select(.protocol=="trojan") | .settings.clients) += [{"password": "'$uuid'", "email": "'$user'"}]' /usr/local/etc/xray/config.json > /tmp/config.json
     if [ -s /tmp/config.json ]; then mv /tmp/config.json /usr/local/etc/xray/config.json; fi
     systemctl restart xray
+    [ -f "/usr/local/bin/srpcom/db_helper.sh" ] && /usr/local/bin/srpcom/db_helper.sh db_import_from_txt 2>/dev/null
     
     link_tls="trojan://${uuid}@${DOMAIN}:443?path=/trojanws&security=tls&host=${DOMAIN}&type=ws&sni=${DOMAIN}#${user}"
     link_none_tls="trojan://${uuid}@${DOMAIN}:80?path=/trojanws&security=none&host=${DOMAIN}&type=ws#${user}"
@@ -223,6 +226,7 @@ add_trial() {
     if [ -s /tmp/config.json ]; then mv /tmp/config.json /usr/local/etc/xray/config.json; fi
     echo "$user $exp_date $exp_time" >> /usr/local/etc/xray/expiry.txt
     systemctl restart xray
+    [ -f "/usr/local/bin/srpcom/db_helper.sh" ] && /usr/local/bin/srpcom/db_helper.sh db_import_from_txt 2>/dev/null
     
     if [[ "$prot" == "vmess" ]]; then
         tls_json="{\"v\":\"2\",\"ps\":\"${user}\",\"add\":\"${DOMAIN}\",\"port\":\"443\",\"id\":\"${uuid}\",\"aid\":\"0\",\"scy\":\"auto\",\"net\":\"ws\",\"type\":\"none\",\"host\":\"${DOMAIN}\",\"path\":\"/vmessws\",\"tls\":\"tls\",\"sni\":\"${DOMAIN}\"}"
@@ -306,6 +310,7 @@ delete_xray() {
             sed -i "/^$user /d" /usr/local/etc/xray/expiry.txt
             sed -i "/^$user /d" /usr/local/etc/xray/limit.txt
             systemctl restart xray
+            [ -f "/usr/local/bin/srpcom/db_helper.sh" ] && /usr/local/bin/srpcom/db_helper.sh db_import_from_txt 2>/dev/null
             echo -e "\n\e[32m=> Akun '$user' berhasil dihapus!\e[0m"
         else
             echo -e "\n\e[31m[ERROR]\e[0m Gagal menghapus file JSON."
@@ -360,6 +365,7 @@ renew_xray() {
         
         sed -i "/^$user /d" /usr/local/etc/xray/expiry.txt
         echo "$user $new_exp_date $new_exp_time" >> /usr/local/etc/xray/expiry.txt
+        [ -f "/usr/local/bin/srpcom/db_helper.sh" ] && /usr/local/bin/srpcom/db_helper.sh db_import_from_txt 2>/dev/null
         
         echo -e "\n\e[32m=> Akun '$user' diperpanjang $masaaktif Hari!\e[0m"
         echo "=> Expired Baru: $new_exp_date $new_exp_time WIB"
@@ -665,6 +671,7 @@ unlock_xray_user() {
                 mv /tmp/config.json /usr/local/etc/xray/config.json
                 jq --arg u "$target_user" 'del(.[$u])' "$LOCKED_FILE" > /tmp/locked.json && mv /tmp/locked.json "$LOCKED_FILE"
                 systemctl restart xray
+                [ -f "/usr/local/bin/srpcom/db_helper.sh" ] && /usr/local/bin/srpcom/db_helper.sh db_import_from_txt 2>/dev/null
                 echo -e "\n\e[32m[SUCCESS]\e[0m Akun \e[33m$target_user\e[0m berhasil di-unlock dan aktif kembali!"
             else
                 echo -e "\n\e[31m[ERROR]\e[0m Gagal memperbarui config.json Xray."

@@ -105,5 +105,6 @@ if [ -s /tmp/deleted_acc.txt ]; then
     deleted_list=$(cat /tmp/deleted_acc.txt)
     full_msg=$(echo -e "🗑 *AUTO DELETE EXPIRED* 🗑\n━━━━━━━━━━━━━━━━━━━━\nAkun berikut telah dihapus otomatis karena masa aktif (Expired) telah habis:\n\n${deleted_list}\n━━━━━━━━━━━━━━━━━━━━\n_Pesan otomatis dari server_")
     send_telegram "$full_msg"
+    [ -f "/usr/local/bin/srpcom/db_helper.sh" ] && /usr/local/bin/srpcom/db_helper.sh db_import_from_txt 2>/dev/null
 fi
 rm -f /tmp/deleted_acc.txt

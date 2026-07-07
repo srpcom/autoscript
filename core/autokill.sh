@@ -134,6 +134,11 @@ run_autokill() {
         # Bersihkan file log sementara
         rm -f /tmp/xray_access.log
     fi
+    
+    # Sinkronisasi hasil auto-lock ke database SQLite
+    if [ -f "/usr/local/bin/srpcom/db_helper.sh" ]; then
+        /usr/local/bin/srpcom/db_helper.sh db_import_from_txt 2>/dev/null
+    fi
 }
 
 # ==========================================

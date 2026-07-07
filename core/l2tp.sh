@@ -38,6 +38,7 @@ add_l2tp() {
     
     # Restart Service L2TP
     systemctl restart ipsec xl2tpd 2>/dev/null
+    [ -f "/usr/local/bin/srpcom/db_helper.sh" ] && /usr/local/bin/srpcom/db_helper.sh db_import_from_txt 2>/dev/null
     
     msg_cli=$(echo -e "Pembuatan akun baru berhasil\n\n━━━━━━━━━━━━━━━━━━━━\n❖ L2TP / IPsec VPN ❖\n━━━━━━━━━━━━━━━━━━━━\nRemarks : ${user}\nIP Address : ${IP_ADD}\nDomain : ${DOMAIN}\nIPsec PSK : srpcom_vpn\nUsername : ${user}\nPassword : ${password}\n━━━━━━━━━━━━━━━━━━━━\nEXPIRED ON : ${exp_date} ${exp_time} WIB")
     
@@ -81,6 +82,7 @@ delete_l2tp() {
         sed -i "/^\"$user\" l2tpd/d" /etc/ppp/chap-secrets
         sed -i "/^$user /d" /usr/local/etc/srpcom/l2tp_expiry.txt
         systemctl restart ipsec xl2tpd 2>/dev/null
+        [ -f "/usr/local/bin/srpcom/db_helper.sh" ] && /usr/local/bin/srpcom/db_helper.sh db_import_from_txt 2>/dev/null
         
         echo -e "\n\e[32m=> Akun L2TP '$user' berhasil dihapus!\e[0m"
         sleep 2
@@ -141,6 +143,7 @@ renew_l2tp() {
         
         sed -i "/^$user /d" /usr/local/etc/srpcom/l2tp_expiry.txt
         echo "$user $pw $new_exp_date $new_exp_time" >> /usr/local/etc/srpcom/l2tp_expiry.txt
+        [ -f "/usr/local/bin/srpcom/db_helper.sh" ] && /usr/local/bin/srpcom/db_helper.sh db_import_from_txt 2>/dev/null
         
         echo -e "\n\e[32m=> Akun L2TP '$user' diperpanjang $masaaktif Hari!\e[0m"
         echo "=> Expired Baru: $new_exp_date $new_exp_time WIB"
