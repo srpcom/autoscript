@@ -27,7 +27,24 @@ monitor_xray() {
             prot=$(echo "$item" | cut -d':' -f1)
             user=$(echo "$item" | cut -d':' -f2)
             
-            ip_count=$(grep -w "$user" /var/log/xray/access.log 2>/dev/null | grep "accepted" | awk '{for(i=1;i<NF;i++){if($i=="from"){ip=$(i+1);sub(/^tcp:/,"",ip);sub(/^udp:/,"",ip);split(ip,a,":");if(a[1]!=""&&a[1]!="127.0.0.1"){split(a[1],b,".");if(b[1]!=""&&b[2]!=""&&b[3]!="")print b[1]"."b[2]"."b[3]}}}}' | sort -u | wc -l)
+            five_mins_ago=$(date -d "5 minutes ago" "+%Y/%m/%d %H:%M:%S")
+            ip_count=$(tail -n 50000 /var/log/xray/access.log 2>/dev/null | awk -v user="$user" -v limit="$five_mins_ago" '
+                $0 ~ user && $1" "$2 >= limit && $0 ~ "accepted" {
+                    for(i=1;i<NF;i++){
+                        if($i=="from"){
+                            ip=$(i+1);
+                            sub(/^tcp:/,"",ip);
+                            sub(/^udp:/,"",ip);
+                            split(ip,a,":");
+                            if(a[1]!=""&&a[1]!="127.0.0.1"){
+                                split(a[1],b,".");
+                                if(b[1]!=""&&b[2]!=""&&b[3]!="") {
+                                    print b[1]"."b[2]"."b[3]
+                                }
+                            }
+                        }
+                    }
+                }' | sort -u | wc -l)
             
             dl=$(echo "$stats_json" | jq -r '.stat[] | select(.name == "user>>>'${user}'>>>traffic>>>downlink") | .value' 2>/dev/null)
             ul=$(echo "$stats_json" | jq -r '.stat[] | select(.name == "user>>>'${user}'>>>traffic>>>uplink") | .value' 2>/dev/null)

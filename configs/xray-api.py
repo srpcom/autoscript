@@ -263,10 +263,17 @@ def monitor_xray():
         ip_data = {}
         if os.path.exists('/var/log/xray/access.log'):
             try:
-                out = subprocess.run(['tail', '-n', '3000', '/var/log/xray/access.log'], capture_output=True, text=True)
+                import datetime
+                threshold = (datetime.datetime.now() - datetime.timedelta(minutes=5)).strftime("%Y/%m/%d %H:%M:%S")
+                out = subprocess.run(['tail', '-n', '50000', '/var/log/xray/access.log'], capture_output=True, text=True)
                 for line in out.stdout.splitlines():
                     if 'accepted' in line and 'email:' in line:
                         parts = line.split()
+                        if len(parts) < 3:
+                            continue
+                        log_time = f"{parts[0]} {parts[1].split('.')[0]}"
+                        if log_time < threshold:
+                            continue
                         user = ""
                         ip = ""
                         for idx, token in enumerate(parts):

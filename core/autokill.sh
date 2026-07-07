@@ -36,9 +36,8 @@ run_autokill() {
     # ==========================================
     if [ -f "/usr/local/etc/xray/limit.txt" ]; then
         
-        # Salin access log Xray dan bersihkan aslinya agar perhitungan IP akurat di siklus 3 menit berikutnya
+        # Salin snapshot access log Xray agar parsing stabil (tanpa menghapus file aslinya)
         cp /var/log/xray/access.log /tmp/xray_access.log
-        > /var/log/xray/access.log
         
         # Tarik data pemakaian kuota langsung dari API Xray Internal
         stats_json=$(/usr/local/bin/xray api statsquery --server=127.0.0.1:10085 2>/dev/null)
@@ -48,8 +47,25 @@ run_autokill() {
             
             # --- A. CEK LIMIT IP (MULTI LOGIN) ---
             if [[ "$limit_ip" -gt 0 ]]; then
-                # Ekstrak Subnet /24 unik dari log untuk mencegah false-positive akibat rotasi IP seluler 1 HP
-                ip_count=$(grep -w "$user" /tmp/xray_access.log 2>/dev/null | grep "accepted" | awk '{for(i=1;i<NF;i++){if($i=="from"){ip=$(i+1);sub(/^tcp:/,"",ip);sub(/^udp:/,"",ip);split(ip,a,":");if(a[1]!=""&&a[1]!="127.0.0.1"){split(a[1],b,".");if(b[1]!=""&&b[2]!=""&&b[3]!="")print b[1]"."b[2]"."b[3]}}}}' | sort -u | wc -l)
+                five_mins_ago=$(date -d "5 minutes ago" "+%Y/%m/%d %H:%M:%S")
+                # Ekstrak Subnet /24 unik dari log 5 menit terakhir untuk mencegah false-positive akibat rotasi IP seluler
+                ip_count=$(tail -n 50000 /tmp/xray_access.log 2>/dev/null | awk -v user="$user" -v limit="$five_mins_ago" '
+                    $0 ~ user && $1" "$2 >= limit && $0 ~ "accepted" {
+                        for(i=1;i<NF;i++){
+                            if($i=="from"){
+                                ip=$(i+1);
+                                sub(/^tcp:/,"",ip);
+                                sub(/^udp:/,"",ip);
+                                split(ip,a,":");
+                                if(a[1]!=""&&a[1]!="127.0.0.1"){
+                                    split(a[1],b,".");
+                                    if(b[1]!=""&&b[2]!=""&&b[3]!="") {
+                                        print b[1]"."b[2]"."b[3]
+                                    }
+                                }
+                            }
+                        }
+                    }' | sort -u | wc -l)
                 
                 if [[ "$ip_count" -gt "$limit_ip" ]]; then
                     msg="🚫 *AUTO LOCK XRAY (MULTI LOGIN)* 🚫\n━━━━━━━━━━━━━━━━━━━━\nUser : \`$user\`\nLimit IP : $limit_ip IP\nTerdeteksi : $ip_count Subnet/IP\nStatus : *LOCKED*\n━━━━━━━━━━━━━━━━━━━━\n_Gunakan fitur Unlock di Menu / Bot untuk membuka kunci._"
