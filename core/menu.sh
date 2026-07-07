@@ -377,6 +377,15 @@ menu_update() {
                 echo -e "\e[32m[SUCCESS]\e[0m Modul Notifikasi diperbarui!"; sleep 1.5 ;;
             10) 
                 echo -e "\n=> Mengunduh SEMUA modul sistem..."
+                # Pastikan sqlite3 terpasang di sistem
+                if ! command -v sqlite3 &> /dev/null; then
+                    echo "=> Menginstal dependensi sqlite3..."
+                    apt-get update -y -qq && apt-get install sqlite3 -y -qq
+                fi
+                
+                wget -q -O /usr/local/bin/srpcom/db_helper.sh "$GITHUB_RAW/core/db_helper.sh"
+                chmod +x /usr/local/bin/srpcom/db_helper.sh
+                
                 wget -q -O /usr/local/bin/srpcom/utils.sh "$GITHUB_RAW/core/utils.sh"
                 wget -q -O /usr/local/bin/srpcom/telegram.sh "$GITHUB_RAW/core/telegram.sh"
                 wget -q -O /usr/local/bin/srpcom/xray.sh "$GITHUB_RAW/core/xray.sh"
@@ -388,6 +397,10 @@ menu_update() {
                 wget -q -O /usr/local/bin/xray-api.py "$GITHUB_RAW/configs/xray-api.py"
                 wget -q -O /usr/local/bin/bot-admin.py "$GITHUB_RAW/configs/bot-admin.py"
                 chmod +x /usr/local/bin/srpcom/*.sh /usr/local/bin/xray-api.py /usr/local/bin/bot-admin.py
+                
+                # Jalankan migrasi data lama ke SQLite terpusat
+                /usr/local/bin/srpcom/db_helper.sh db_import_from_txt 2>/dev/null
+                
                 systemctl daemon-reload
                 systemctl restart xray-api srpcom-bot
                 wget -q -O /usr/local/bin/srpcom/menu.sh "$GITHUB_RAW/core/menu.sh"
