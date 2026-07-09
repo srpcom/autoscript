@@ -351,6 +351,7 @@ menu_update() {
                 echo -e "\n=> Mengunduh menu.sh..."
                 download_file /usr/local/bin/srpcom/menu.sh core/menu.sh
                 chmod +x /usr/local/bin/srpcom/menu.sh
+                sed -i 's/\r$//' /usr/local/bin/srpcom/menu.sh 2>/dev/null
                 source /usr/local/bin/srpcom/menu.sh
                 rebuild_shortcuts
                 echo -e "\e[32m[SUCCESS]\e[0m Modul Utama diperbarui!"; sleep 1.5; exec menu ;;
@@ -358,38 +359,45 @@ menu_update() {
                 echo -e "\n=> Mengunduh utils.sh..."
                 download_file /usr/local/bin/srpcom/utils.sh core/utils.sh
                 chmod +x /usr/local/bin/srpcom/utils.sh
+                sed -i 's/\r$//' /usr/local/bin/srpcom/utils.sh 2>/dev/null
                 echo -e "\e[32m[SUCCESS]\e[0m Modul Utilitas diperbarui!"; sleep 1.5 ;;
             3) 
                 echo -e "\n=> Mengunduh xray.sh..."
                 download_file /usr/local/bin/srpcom/xray.sh core/xray.sh
                 chmod +x /usr/local/bin/srpcom/xray.sh
+                sed -i 's/\r$//' /usr/local/bin/srpcom/xray.sh 2>/dev/null
                 echo -e "\e[32m[SUCCESS]\e[0m Modul Xray diperbarui!"; sleep 1.5 ;;
             4) 
                 echo -e "\n=> Mengunduh ssh.sh..."
                 download_file /usr/local/bin/srpcom/ssh.sh core/ssh.sh
                 chmod +x /usr/local/bin/srpcom/ssh.sh
+                sed -i 's/\r$//' /usr/local/bin/srpcom/ssh.sh 2>/dev/null
                 echo -e "\e[32m[SUCCESS]\e[0m Modul SSH diperbarui!"; sleep 1.5 ;;
             5) 
                 echo -e "\n=> Mengunduh l2tp.sh..."
                 download_file /usr/local/bin/srpcom/l2tp.sh core/l2tp.sh
                 chmod +x /usr/local/bin/srpcom/l2tp.sh
+                sed -i 's/\r$//' /usr/local/bin/srpcom/l2tp.sh 2>/dev/null
                 echo -e "\e[32m[SUCCESS]\e[0m Modul L2TP diperbarui!"; sleep 1.5 ;;
             6) 
                 echo -e "\n=> Mengunduh monitor.sh..."
                 download_file /usr/local/bin/srpcom/monitor.sh core/monitor.sh
                 chmod +x /usr/local/bin/srpcom/monitor.sh
+                sed -i 's/\r$//' /usr/local/bin/srpcom/monitor.sh 2>/dev/null
                 echo -e "\e[32m[SUCCESS]\e[0m Modul Monitor diperbarui!"; sleep 1.5 ;;
             7) 
                 echo -e "\n=> Mengunduh daemon otomatis..."
                 download_file /usr/local/bin/srpcom/autokill.sh core/autokill.sh
                 download_file /usr/local/bin/srpcom/auto_expired.sh core/auto_expired.sh
                 chmod +x /usr/local/bin/srpcom/autokill.sh /usr/local/bin/srpcom/auto_expired.sh
+                sed -i 's/\r$//' /usr/local/bin/srpcom/autokill.sh /usr/local/bin/srpcom/auto_expired.sh 2>/dev/null
                 echo -e "\e[32m[SUCCESS]\e[0m Fitur Auto diperbarui!"; sleep 1.5 ;;
             8) 
                 echo -e "\n=> Mengunduh API Backend & Bot Telegram..."
                 download_file /usr/local/bin/xray-api.py configs/xray-api.py
                 download_file /usr/local/bin/bot-admin.py configs/bot-admin.py
                 chmod +x /usr/local/bin/xray-api.py /usr/local/bin/bot-admin.py
+                sed -i 's/\r$//' /usr/local/bin/xray-api.py /usr/local/bin/bot-admin.py 2>/dev/null
                 systemctl daemon-reload
                 systemctl restart xray-api srpcom-bot
                 echo -e "\e[32m[SUCCESS]\e[0m API & Bot diperbarui!"; sleep 1.5 ;;
@@ -397,6 +405,7 @@ menu_update() {
                 echo -e "\n=> Mengunduh telegram.sh..."
                 download_file /usr/local/bin/srpcom/telegram.sh core/telegram.sh
                 chmod +x /usr/local/bin/srpcom/telegram.sh
+                sed -i 's/\r$//' /usr/local/bin/srpcom/telegram.sh 2>/dev/null
                 echo -e "\e[32m[SUCCESS]\e[0m Modul Notifikasi diperbarui!"; sleep 1.5 ;;
             10) 
                 echo -e "\n=> Mengunduh SEMUA modul sistem..."
@@ -420,6 +429,7 @@ menu_update() {
                 download_file /usr/local/bin/xray-api.py configs/xray-api.py
                 download_file /usr/local/bin/bot-admin.py configs/bot-admin.py
                 chmod +x /usr/local/bin/srpcom/*.sh /usr/local/bin/xray-api.py /usr/local/bin/bot-admin.py
+                sed -i 's/\r$//' /usr/local/bin/srpcom/*.sh /usr/local/bin/xray-api.py /usr/local/bin/bot-admin.py 2>/dev/null
                 
                 # Jalankan migrasi data lama ke SQLite terpusat
                 /usr/local/bin/srpcom/db_helper.sh db_import_from_txt 2>/dev/null
@@ -428,6 +438,7 @@ menu_update() {
                 systemctl restart xray-api srpcom-bot
                 download_file /usr/local/bin/srpcom/menu.sh core/menu.sh
                 chmod +x /usr/local/bin/srpcom/menu.sh
+                sed -i 's/\r$//' /usr/local/bin/srpcom/menu.sh 2>/dev/null
                 source /usr/local/bin/srpcom/menu.sh
                 rebuild_shortcuts
                 fix_xray_proxy_protocol
