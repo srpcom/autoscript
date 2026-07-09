@@ -111,6 +111,29 @@ else
     echo -e "\e[32m[OK] Terhubung ke GitHub Raw (Bebas Blokir/Limit).\e[0m"
 fi
 
+# ==========================================
+# FUNGSI UNDUH SISTEM DENGAN BACKUP MIRROR & CDN
+# ==========================================
+download_file() {
+    local target_file="$1"
+    local relative_path="$2"
+    
+    # 1. Coba unduh dari GitHub Raw
+    curl -k -sL -o "$target_file" "https://raw.githubusercontent.com/srpcom/autoscript/main/$relative_path"
+    
+    # Cek apakah file kosong atau berisi Too Many Requests
+    if [ ! -s "$target_file" ] || grep -q "Too Many Requests" "$target_file" 2>/dev/null; then
+        # 2. Coba unduh dari GitMirror (Real-time Mirror)
+        curl -k -sL -o "$target_file" "https://raw.gitmirror.com/srpcom/autoscript/main/$relative_path"
+    fi
+    
+    if [ ! -s "$target_file" ] || grep -q "Too Many Requests" "$target_file" 2>/dev/null; then
+        # 3. Coba unduh dari jsDelivr CDN
+        curl -k -sL -o "$target_file" "https://cdn.jsdelivr.net/gh/srpcom/autoscript@main/$relative_path"
+    fi
+}
+
+
 
 # ==========================================
 # PENGECEKAN LISENSI SCRIPT KE DATABASE CLOUDFLARE
@@ -689,18 +712,18 @@ EOF
 
 
 echo -e "\n[7/12] Mendownload Modul Sistem dari GitHub..."
-wget -q --no-check-certificate -O /usr/local/bin/srpcom/utils.sh "$GITHUB_RAW/core/utils.sh"
-wget -q --no-check-certificate -O /usr/local/bin/srpcom/telegram.sh "$GITHUB_RAW/core/telegram.sh"
-wget -q --no-check-certificate -O /usr/local/bin/srpcom/xray.sh "$GITHUB_RAW/core/xray.sh"
-wget -q --no-check-certificate -O /usr/local/bin/srpcom/l2tp.sh "$GITHUB_RAW/core/l2tp.sh"
-wget -q --no-check-certificate -O /usr/local/bin/srpcom/ssh.sh "$GITHUB_RAW/core/ssh.sh"
-wget -q --no-check-certificate -O /usr/local/bin/srpcom/monitor.sh "$GITHUB_RAW/core/monitor.sh"
-wget -q --no-check-certificate -O /usr/local/bin/srpcom/autokill.sh "$GITHUB_RAW/core/autokill.sh"
-wget -q --no-check-certificate -O /usr/local/bin/srpcom/menu.sh "$GITHUB_RAW/core/menu.sh"
-wget -q --no-check-certificate -O /usr/local/bin/srpcom/auto_expired.sh "$GITHUB_RAW/core/auto_expired.sh"
-wget -q --no-check-certificate -O /usr/local/bin/srpcom/db_helper.sh "$GITHUB_RAW/core/db_helper.sh"
-wget -q --no-check-certificate -O /usr/local/bin/xray-api.py "$GITHUB_RAW/configs/xray-api.py"
-wget -q --no-check-certificate -O /usr/local/bin/bot-admin.py "$GITHUB_RAW/configs/bot-admin.py"
+download_file /usr/local/bin/srpcom/utils.sh core/utils.sh
+download_file /usr/local/bin/srpcom/telegram.sh core/telegram.sh
+download_file /usr/local/bin/srpcom/xray.sh core/xray.sh
+download_file /usr/local/bin/srpcom/l2tp.sh core/l2tp.sh
+download_file /usr/local/bin/srpcom/ssh.sh core/ssh.sh
+download_file /usr/local/bin/srpcom/monitor.sh core/monitor.sh
+download_file /usr/local/bin/srpcom/autokill.sh core/autokill.sh
+download_file /usr/local/bin/srpcom/menu.sh core/menu.sh
+download_file /usr/local/bin/srpcom/auto_expired.sh core/auto_expired.sh
+download_file /usr/local/bin/srpcom/db_helper.sh core/db_helper.sh
+download_file /usr/local/bin/xray-api.py configs/xray-api.py
+download_file /usr/local/bin/bot-admin.py configs/bot-admin.py
 
 
 # FIX: Hapus karakter DOS (Carriage Return / \r) akibat edit file di Windows
@@ -789,9 +812,9 @@ sysctl -p
 
 
 echo -e "\n[10/12] Mendownload WEB PANEL & DOKUMENTASI API..."
-wget -q --no-check-certificate -O /usr/local/etc/srpcom/panel/index.html "$GITHUB_RAW/core/index.html"
-wget -q --no-check-certificate -O /usr/local/etc/srpcom/panel/api-docs.html "$GITHUB_RAW/core/api-docs.html"
-if [ ! -s "/usr/local/etc/srpcom/panel/index.html" ]; then
+download_file /usr/local/etc/srpcom/panel/index.html core/index.html
+download_file /usr/local/etc/srpcom/panel/api-docs.html core/api-docs.html
+if [ ! -s "/usr/local/etc/srpcom/panel/index.html" ] || grep -q "Too Many Requests" /usr/local/etc/srpcom/panel/index.html 2>/dev/null; then
     echo -e "\e[33m[WARNING]\e[0m Gagal mengunduh index.html Web Panel. Akan dibuat template dasar."
     echo "<h1>Web Panel Sedang Maintenance</h1>" > /usr/local/etc/srpcom/panel/index.html
 fi
@@ -878,7 +901,7 @@ TEMP_DOMAINS="/tmp/extra_domains_raw.txt"
 TARGET_DOMAINS="/usr/local/etc/srpcom/extra_domains.txt"
 touch "$TARGET_DOMAINS"
 
-wget -q -O "$TEMP_DOMAINS" "$GITHUB_RAW/core/extra_domains.txt"
+download_file "$TEMP_DOMAINS" core/extra_domains.txt
 if [ -s "$TEMP_DOMAINS" ]; then
     # 1. Jalankan Import Wildcard (WC) dengan Validasi IP
     while read -r raw_domain; do

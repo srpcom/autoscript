@@ -19,6 +19,29 @@ source /usr/local/bin/srpcom/monitor.sh 2>/dev/null
 GITHUB_RAW="https://raw.githubusercontent.com/srpcom/autoscript/main"
 
 # ==========================================
+# FUNGSI UNDUH SISTEM DENGAN BACKUP MIRROR & CDN
+# ==========================================
+download_file() {
+    local target_file="$1"
+    local relative_path="$2"
+    
+    # 1. Coba unduh dari GitHub Raw
+    curl -k -sL -o "$target_file" "https://raw.githubusercontent.com/srpcom/autoscript/main/$relative_path"
+    
+    # Cek apakah file kosong atau berisi Too Many Requests
+    if [ ! -s "$target_file" ] || grep -q "Too Many Requests" "$target_file" 2>/dev/null; then
+        # 2. Coba unduh dari GitMirror (Real-time Mirror)
+        curl -k -sL -o "$target_file" "https://raw.gitmirror.com/srpcom/autoscript/main/$relative_path"
+    fi
+    
+    if [ ! -s "$target_file" ] || grep -q "Too Many Requests" "$target_file" 2>/dev/null; then
+        # 3. Coba unduh dari jsDelivr CDN
+        curl -k -sL -o "$target_file" "https://cdn.jsdelivr.net/gh/srpcom/autoscript@main/$relative_path"
+    fi
+}
+
+
+# ==========================================
 # FUNGSI VALIDASI LISENSI GLOBAL (CEGAH BYPASS)
 # ==========================================
 validate_license_cli() {
@@ -326,53 +349,53 @@ menu_update() {
         case $opt in
             1) 
                 echo -e "\n=> Mengunduh menu.sh..."
-                wget -q --no-check-certificate -O /usr/local/bin/srpcom/menu.sh "$GITHUB_RAW/core/menu.sh"
+                download_file /usr/local/bin/srpcom/menu.sh core/menu.sh
                 chmod +x /usr/local/bin/srpcom/menu.sh
                 source /usr/local/bin/srpcom/menu.sh
                 rebuild_shortcuts
                 echo -e "\e[32m[SUCCESS]\e[0m Modul Utama diperbarui!"; sleep 1.5; exec menu ;;
             2) 
                 echo -e "\n=> Mengunduh utils.sh..."
-                wget -q --no-check-certificate -O /usr/local/bin/srpcom/utils.sh "$GITHUB_RAW/core/utils.sh"
+                download_file /usr/local/bin/srpcom/utils.sh core/utils.sh
                 chmod +x /usr/local/bin/srpcom/utils.sh
                 echo -e "\e[32m[SUCCESS]\e[0m Modul Utilitas diperbarui!"; sleep 1.5 ;;
             3) 
                 echo -e "\n=> Mengunduh xray.sh..."
-                wget -q --no-check-certificate -O /usr/local/bin/srpcom/xray.sh "$GITHUB_RAW/core/xray.sh"
+                download_file /usr/local/bin/srpcom/xray.sh core/xray.sh
                 chmod +x /usr/local/bin/srpcom/xray.sh
                 echo -e "\e[32m[SUCCESS]\e[0m Modul Xray diperbarui!"; sleep 1.5 ;;
             4) 
                 echo -e "\n=> Mengunduh ssh.sh..."
-                wget -q --no-check-certificate -O /usr/local/bin/srpcom/ssh.sh "$GITHUB_RAW/core/ssh.sh"
+                download_file /usr/local/bin/srpcom/ssh.sh core/ssh.sh
                 chmod +x /usr/local/bin/srpcom/ssh.sh
                 echo -e "\e[32m[SUCCESS]\e[0m Modul SSH diperbarui!"; sleep 1.5 ;;
             5) 
                 echo -e "\n=> Mengunduh l2tp.sh..."
-                wget -q --no-check-certificate -O /usr/local/bin/srpcom/l2tp.sh "$GITHUB_RAW/core/l2tp.sh"
+                download_file /usr/local/bin/srpcom/l2tp.sh core/l2tp.sh
                 chmod +x /usr/local/bin/srpcom/l2tp.sh
                 echo -e "\e[32m[SUCCESS]\e[0m Modul L2TP diperbarui!"; sleep 1.5 ;;
             6) 
                 echo -e "\n=> Mengunduh monitor.sh..."
-                wget -q --no-check-certificate -O /usr/local/bin/srpcom/monitor.sh "$GITHUB_RAW/core/monitor.sh"
+                download_file /usr/local/bin/srpcom/monitor.sh core/monitor.sh
                 chmod +x /usr/local/bin/srpcom/monitor.sh
                 echo -e "\e[32m[SUCCESS]\e[0m Modul Monitor diperbarui!"; sleep 1.5 ;;
             7) 
                 echo -e "\n=> Mengunduh daemon otomatis..."
-                wget -q --no-check-certificate -O /usr/local/bin/srpcom/autokill.sh "$GITHUB_RAW/core/autokill.sh"
-                wget -q --no-check-certificate -O /usr/local/bin/srpcom/auto_expired.sh "$GITHUB_RAW/core/auto_expired.sh"
+                download_file /usr/local/bin/srpcom/autokill.sh core/autokill.sh
+                download_file /usr/local/bin/srpcom/auto_expired.sh core/auto_expired.sh
                 chmod +x /usr/local/bin/srpcom/autokill.sh /usr/local/bin/srpcom/auto_expired.sh
                 echo -e "\e[32m[SUCCESS]\e[0m Fitur Auto diperbarui!"; sleep 1.5 ;;
             8) 
                 echo -e "\n=> Mengunduh API Backend & Bot Telegram..."
-                wget -q --no-check-certificate -O /usr/local/bin/xray-api.py "$GITHUB_RAW/configs/xray-api.py"
-                wget -q --no-check-certificate -O /usr/local/bin/bot-admin.py "$GITHUB_RAW/configs/bot-admin.py"
+                download_file /usr/local/bin/xray-api.py configs/xray-api.py
+                download_file /usr/local/bin/bot-admin.py configs/bot-admin.py
                 chmod +x /usr/local/bin/xray-api.py /usr/local/bin/bot-admin.py
                 systemctl daemon-reload
                 systemctl restart xray-api srpcom-bot
                 echo -e "\e[32m[SUCCESS]\e[0m API & Bot diperbarui!"; sleep 1.5 ;;
             9) 
                 echo -e "\n=> Mengunduh telegram.sh..."
-                wget -q --no-check-certificate -O /usr/local/bin/srpcom/telegram.sh "$GITHUB_RAW/core/telegram.sh"
+                download_file /usr/local/bin/srpcom/telegram.sh core/telegram.sh
                 chmod +x /usr/local/bin/srpcom/telegram.sh
                 echo -e "\e[32m[SUCCESS]\e[0m Modul Notifikasi diperbarui!"; sleep 1.5 ;;
             10) 
@@ -383,19 +406,19 @@ menu_update() {
                     apt-get update -y -qq && apt-get install sqlite3 -y -qq
                 fi
                 
-                wget -q --no-check-certificate -O /usr/local/bin/srpcom/db_helper.sh "$GITHUB_RAW/core/db_helper.sh"
+                download_file /usr/local/bin/srpcom/db_helper.sh core/db_helper.sh
                 chmod +x /usr/local/bin/srpcom/db_helper.sh
                 
-                wget -q --no-check-certificate -O /usr/local/bin/srpcom/utils.sh "$GITHUB_RAW/core/utils.sh"
-                wget -q --no-check-certificate -O /usr/local/bin/srpcom/telegram.sh "$GITHUB_RAW/core/telegram.sh"
-                wget -q --no-check-certificate -O /usr/local/bin/srpcom/xray.sh "$GITHUB_RAW/core/xray.sh"
-                wget -q --no-check-certificate -O /usr/local/bin/srpcom/l2tp.sh "$GITHUB_RAW/core/l2tp.sh"
-                wget -q --no-check-certificate -O /usr/local/bin/srpcom/ssh.sh "$GITHUB_RAW/core/ssh.sh"
-                wget -q --no-check-certificate -O /usr/local/bin/srpcom/monitor.sh "$GITHUB_RAW/core/monitor.sh"
-                wget -q --no-check-certificate -O /usr/local/bin/srpcom/autokill.sh "$GITHUB_RAW/core/autokill.sh"
-                wget -q --no-check-certificate -O /usr/local/bin/srpcom/auto_expired.sh "$GITHUB_RAW/core/auto_expired.sh"
-                wget -q --no-check-certificate -O /usr/local/bin/xray-api.py "$GITHUB_RAW/configs/xray-api.py"
-                wget -q --no-check-certificate -O /usr/local/bin/bot-admin.py "$GITHUB_RAW/configs/bot-admin.py"
+                download_file /usr/local/bin/srpcom/utils.sh core/utils.sh
+                download_file /usr/local/bin/srpcom/telegram.sh core/telegram.sh
+                download_file /usr/local/bin/srpcom/xray.sh core/xray.sh
+                download_file /usr/local/bin/srpcom/l2tp.sh core/l2tp.sh
+                download_file /usr/local/bin/srpcom/ssh.sh core/ssh.sh
+                download_file /usr/local/bin/srpcom/monitor.sh core/monitor.sh
+                download_file /usr/local/bin/srpcom/autokill.sh core/autokill.sh
+                download_file /usr/local/bin/srpcom/auto_expired.sh core/auto_expired.sh
+                download_file /usr/local/bin/xray-api.py configs/xray-api.py
+                download_file /usr/local/bin/bot-admin.py configs/bot-admin.py
                 chmod +x /usr/local/bin/srpcom/*.sh /usr/local/bin/xray-api.py /usr/local/bin/bot-admin.py
                 
                 # Jalankan migrasi data lama ke SQLite terpusat
@@ -403,7 +426,7 @@ menu_update() {
                 
                 systemctl daemon-reload
                 systemctl restart xray-api srpcom-bot
-                wget -q --no-check-certificate -O /usr/local/bin/srpcom/menu.sh "$GITHUB_RAW/core/menu.sh"
+                download_file /usr/local/bin/srpcom/menu.sh core/menu.sh
                 chmod +x /usr/local/bin/srpcom/menu.sh
                 source /usr/local/bin/srpcom/menu.sh
                 rebuild_shortcuts
@@ -415,9 +438,9 @@ menu_update() {
             11)
                 echo -e "\n=> Mengunduh update UI Web Panel dari GitHub..."
                 mkdir -p /usr/local/etc/srpcom/panel
-                wget -q --no-check-certificate -O /usr/local/etc/srpcom/panel/index.html "$GITHUB_RAW/core/index.html"
-                wget -q --no-check-certificate -O /usr/local/etc/srpcom/panel/api-docs.html "$GITHUB_RAW/core/api-docs.html"
-                if [ -s /usr/local/etc/srpcom/panel/index.html ]; then
+                download_file /usr/local/etc/srpcom/panel/index.html core/index.html
+                download_file /usr/local/etc/srpcom/panel/api-docs.html core/api-docs.html
+                if [ -s /usr/local/etc/srpcom/panel/index.html ] && ! grep -q "Too Many Requests" /usr/local/etc/srpcom/panel/index.html 2>/dev/null; then
                     echo -e "\e[32m[SUCCESS]\e[0m Web Panel & Dokumentasi API berhasil diperbarui!"
                 else
                     echo -e "\e[31m[ERROR]\e[0m Gagal mengunduh file Web Panel!"
@@ -839,8 +862,8 @@ import_github_domain() {
     echo "======================================"
     echo "=> Sedang mengambil data dari GitHub..."
     
-    wget -q -O /tmp/new_domains.txt "$GITHUB_RAW/core/extra_domains.txt"
-    if [ ! -s /tmp/new_domains.txt ]; then
+    download_file /tmp/new_domains.txt core/extra_domains.txt
+    if [ ! -s /tmp/new_domains.txt ] || grep -q "Too Many Requests" /tmp/new_domains.txt 2>/dev/null; then
         echo -e "\e[31m[ERROR]\e[0m Gagal mengambil data dari GitHub!"
         rm -f /tmp/new_domains.txt; sleep 2; return
     fi
@@ -909,9 +932,9 @@ import_bug_murni() {
     echo "=> Sedang mengambil data dari GitHub..."
 
     local temp_file="/tmp/bug_murni_temp.txt"
-    wget -q -O "$temp_file" "$GITHUB_RAW/core/extra_domains.txt"
+    download_file "$temp_file" core/extra_domains.txt
 
-    if [[ ! -s "$temp_file" ]]; then
+    if [[ ! -s "$temp_file" ]] || grep -q "Too Many Requests" "$temp_file" 2>/dev/null; then
         echo -e "\e[31m[ERROR]\e[0m Gagal mengambil data dari GitHub!"
         rm -f "$temp_file"
         sleep 2
