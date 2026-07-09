@@ -79,8 +79,7 @@ echo -e "\nMemeriksa konektivitas ke server GitHub..."
 GITHUB_TEST_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 5 "https://raw.githubusercontent.com/srpcom/autoscript/main/core/extra_domains.txt")
 GITHUB_TEST_BODY=$(curl -s --max-time 5 "https://raw.githubusercontent.com/srpcom/autoscript/main/core/extra_domains.txt")
 
-if [ "$GITHUB_TEST_CODE" -eq 429 ] || [[ "$GITHUB_TEST_BODY" == *"Too Many Requests"* ]] || [[ "$GITHUB_TEST_BODY" == *"scraping GitHub"* ]]; then
-    clear
+if [ "$GITHUB_TEST_CODE" = "429" ] || [[ "$GITHUB_TEST_BODY" == *"Too Many Requests"* ]] || [[ "$GITHUB_TEST_BODY" == *"scraping GitHub"* ]]; then
     echo -e "\e[31m=====================================================\e[0m"
     echo -e "\e[31m[ERROR] IP VPS ANDA DIBLOKIR/LIMIT OLEH GITHUB\e[0m"
     echo -e "\e[31m=====================================================\e[0m"
@@ -98,8 +97,7 @@ if [ "$GITHUB_TEST_CODE" -eq 429 ] || [[ "$GITHUB_TEST_BODY" == *"Too Many Reque
     echo -e "\e[31m=====================================================\e[0m"
     echo -e "Proses instalasi tidak dapat dilanjutkan untuk mencegah kerusakan file."
     exit 1
-elif [ "$GITHUB_TEST_CODE" -eq 0 ] || [ "$GITHUB_TEST_CODE" -eq 000 ] || [ -z "$GITHUB_TEST_CODE" ]; then
-    clear
+elif [ "$GITHUB_TEST_CODE" = "0" ] || [ "$GITHUB_TEST_CODE" = "000" ] || [ -z "$GITHUB_TEST_CODE" ]; then
     echo -e "\e[31m=====================================================\e[0m"
     echo -e "\e[31m[ERROR] GAGAL MENGHUBUNGI SERVER GITHUB\e[0m"
     echo -e "\e[31m=====================================================\e[0m"
