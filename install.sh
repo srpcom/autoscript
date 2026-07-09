@@ -72,6 +72,45 @@ echo "=========================================="
 
 VPS_IP=$(curl -sS --max-time 5 ipv4.icanhazip.com || curl -sS --max-time 5 ifconfig.me)
 
+# ==========================================
+# PENGECEKAN BLOKIR IP OLEH GITHUB
+# ==========================================
+echo -e "\nMemeriksa konektivitas ke server GitHub..."
+GITHUB_TEST_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 5 "https://raw.githubusercontent.com/srpcom/autoscript/main/core/extra_domains.txt")
+GITHUB_TEST_BODY=$(curl -s --max-time 5 "https://raw.githubusercontent.com/srpcom/autoscript/main/core/extra_domains.txt")
+
+if [ "$GITHUB_TEST_CODE" -eq 429 ] || [[ "$GITHUB_TEST_BODY" == *"Too Many Requests"* ]] || [[ "$GITHUB_TEST_BODY" == *"scraping GitHub"* ]]; then
+    clear
+    echo -e "\e[31m=====================================================\e[0m"
+    echo -e "\e[31m[ERROR] IP VPS ANDA DIBLOKIR/LIMIT OLEH GITHUB\e[0m"
+    echo -e "\e[31m=====================================================\e[0m"
+    echo -e "IP VPS Anda ($VPS_IP) saat ini sedang dibatasi/diblokir oleh GitHub"
+    echo -e "(HTTP 429 Too Many Requests / Rate Limit)."
+    echo -e ""
+    echo -e "Hal ini biasanya terjadi karena IP VPS Anda berada dalam satu subnet"
+    echo -e "dengan pengguna lain yang melakukan spamming/scraping ke GitHub."
+    echo -e ""
+    echo -e "\e[33m[SOLUSI DAN TINDAKAN]:\e[0m"
+    echo -e "1. Hubungi provider VPS Anda untuk meminta pergantian IP baru."
+    echo -e "2. Coba ubah DNS VPS ke Google DNS dengan perintah:"
+    echo -e "   echo -e \"nameserver 8.8.8.8\\nnameserver 8.8.4.4\" > /etc/resolv.conf"
+    echo -e "3. Atau coba jalankan kembali instalasi beberapa saat lagi."
+    echo -e "\e[31m=====================================================\e[0m"
+    echo -e "Proses instalasi tidak dapat dilanjutkan untuk mencegah kerusakan file."
+    exit 1
+elif [ "$GITHUB_TEST_CODE" -eq 0 ] || [ "$GITHUB_TEST_CODE" -eq 000 ] || [ -z "$GITHUB_TEST_CODE" ]; then
+    clear
+    echo -e "\e[31m=====================================================\e[0m"
+    echo -e "\e[31m[ERROR] GAGAL MENGHUBUNGI SERVER GITHUB\e[0m"
+    echo -e "\e[31m=====================================================\e[0m"
+    echo -e "VPS Anda sama sekali tidak dapat terhubung ke GitHub Raw."
+    echo -e ""
+    echo -e "Silakan periksa koneksi internet VPS Anda atau pastikan"
+    echo -e "DNS resolver Anda sudah terkonfigurasi dengan benar."
+    echo -e "\e[31m=====================================================\e[0m"
+    exit 1
+fi
+
 
 # ==========================================
 # PENGECEKAN LISENSI SCRIPT KE DATABASE CLOUDFLARE
