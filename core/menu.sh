@@ -326,53 +326,53 @@ menu_update() {
         case $opt in
             1) 
                 echo -e "\n=> Mengunduh menu.sh..."
-                wget -q -O /usr/local/bin/srpcom/menu.sh "$GITHUB_RAW/core/menu.sh"
+                wget -q --no-check-certificate -O /usr/local/bin/srpcom/menu.sh "$GITHUB_RAW/core/menu.sh"
                 chmod +x /usr/local/bin/srpcom/menu.sh
                 source /usr/local/bin/srpcom/menu.sh
                 rebuild_shortcuts
                 echo -e "\e[32m[SUCCESS]\e[0m Modul Utama diperbarui!"; sleep 1.5; exec menu ;;
             2) 
                 echo -e "\n=> Mengunduh utils.sh..."
-                wget -q -O /usr/local/bin/srpcom/utils.sh "$GITHUB_RAW/core/utils.sh"
+                wget -q --no-check-certificate -O /usr/local/bin/srpcom/utils.sh "$GITHUB_RAW/core/utils.sh"
                 chmod +x /usr/local/bin/srpcom/utils.sh
                 echo -e "\e[32m[SUCCESS]\e[0m Modul Utilitas diperbarui!"; sleep 1.5 ;;
             3) 
                 echo -e "\n=> Mengunduh xray.sh..."
-                wget -q -O /usr/local/bin/srpcom/xray.sh "$GITHUB_RAW/core/xray.sh"
+                wget -q --no-check-certificate -O /usr/local/bin/srpcom/xray.sh "$GITHUB_RAW/core/xray.sh"
                 chmod +x /usr/local/bin/srpcom/xray.sh
                 echo -e "\e[32m[SUCCESS]\e[0m Modul Xray diperbarui!"; sleep 1.5 ;;
             4) 
                 echo -e "\n=> Mengunduh ssh.sh..."
-                wget -q -O /usr/local/bin/srpcom/ssh.sh "$GITHUB_RAW/core/ssh.sh"
+                wget -q --no-check-certificate -O /usr/local/bin/srpcom/ssh.sh "$GITHUB_RAW/core/ssh.sh"
                 chmod +x /usr/local/bin/srpcom/ssh.sh
                 echo -e "\e[32m[SUCCESS]\e[0m Modul SSH diperbarui!"; sleep 1.5 ;;
             5) 
                 echo -e "\n=> Mengunduh l2tp.sh..."
-                wget -q -O /usr/local/bin/srpcom/l2tp.sh "$GITHUB_RAW/core/l2tp.sh"
+                wget -q --no-check-certificate -O /usr/local/bin/srpcom/l2tp.sh "$GITHUB_RAW/core/l2tp.sh"
                 chmod +x /usr/local/bin/srpcom/l2tp.sh
                 echo -e "\e[32m[SUCCESS]\e[0m Modul L2TP diperbarui!"; sleep 1.5 ;;
             6) 
                 echo -e "\n=> Mengunduh monitor.sh..."
-                wget -q -O /usr/local/bin/srpcom/monitor.sh "$GITHUB_RAW/core/monitor.sh"
+                wget -q --no-check-certificate -O /usr/local/bin/srpcom/monitor.sh "$GITHUB_RAW/core/monitor.sh"
                 chmod +x /usr/local/bin/srpcom/monitor.sh
                 echo -e "\e[32m[SUCCESS]\e[0m Modul Monitor diperbarui!"; sleep 1.5 ;;
             7) 
                 echo -e "\n=> Mengunduh daemon otomatis..."
-                wget -q -O /usr/local/bin/srpcom/autokill.sh "$GITHUB_RAW/core/autokill.sh"
-                wget -q -O /usr/local/bin/srpcom/auto_expired.sh "$GITHUB_RAW/core/auto_expired.sh"
+                wget -q --no-check-certificate -O /usr/local/bin/srpcom/autokill.sh "$GITHUB_RAW/core/autokill.sh"
+                wget -q --no-check-certificate -O /usr/local/bin/srpcom/auto_expired.sh "$GITHUB_RAW/core/auto_expired.sh"
                 chmod +x /usr/local/bin/srpcom/autokill.sh /usr/local/bin/srpcom/auto_expired.sh
                 echo -e "\e[32m[SUCCESS]\e[0m Fitur Auto diperbarui!"; sleep 1.5 ;;
             8) 
                 echo -e "\n=> Mengunduh API Backend & Bot Telegram..."
-                wget -q -O /usr/local/bin/xray-api.py "$GITHUB_RAW/configs/xray-api.py"
-                wget -q -O /usr/local/bin/bot-admin.py "$GITHUB_RAW/configs/bot-admin.py"
+                wget -q --no-check-certificate -O /usr/local/bin/xray-api.py "$GITHUB_RAW/configs/xray-api.py"
+                wget -q --no-check-certificate -O /usr/local/bin/bot-admin.py "$GITHUB_RAW/configs/bot-admin.py"
                 chmod +x /usr/local/bin/xray-api.py /usr/local/bin/bot-admin.py
                 systemctl daemon-reload
                 systemctl restart xray-api srpcom-bot
                 echo -e "\e[32m[SUCCESS]\e[0m API & Bot diperbarui!"; sleep 1.5 ;;
             9) 
                 echo -e "\n=> Mengunduh telegram.sh..."
-                wget -q -O /usr/local/bin/srpcom/telegram.sh "$GITHUB_RAW/core/telegram.sh"
+                wget -q --no-check-certificate -O /usr/local/bin/srpcom/telegram.sh "$GITHUB_RAW/core/telegram.sh"
                 chmod +x /usr/local/bin/srpcom/telegram.sh
                 echo -e "\e[32m[SUCCESS]\e[0m Modul Notifikasi diperbarui!"; sleep 1.5 ;;
             10) 
@@ -383,19 +383,19 @@ menu_update() {
                     apt-get update -y -qq && apt-get install sqlite3 -y -qq
                 fi
                 
-                wget -q -O /usr/local/bin/srpcom/db_helper.sh "$GITHUB_RAW/core/db_helper.sh"
+                wget -q --no-check-certificate -O /usr/local/bin/srpcom/db_helper.sh "$GITHUB_RAW/core/db_helper.sh"
                 chmod +x /usr/local/bin/srpcom/db_helper.sh
                 
-                wget -q -O /usr/local/bin/srpcom/utils.sh "$GITHUB_RAW/core/utils.sh"
-                wget -q -O /usr/local/bin/srpcom/telegram.sh "$GITHUB_RAW/core/telegram.sh"
-                wget -q -O /usr/local/bin/srpcom/xray.sh "$GITHUB_RAW/core/xray.sh"
-                wget -q -O /usr/local/bin/srpcom/l2tp.sh "$GITHUB_RAW/core/l2tp.sh"
-                wget -q -O /usr/local/bin/srpcom/ssh.sh "$GITHUB_RAW/core/ssh.sh"
-                wget -q -O /usr/local/bin/srpcom/monitor.sh "$GITHUB_RAW/core/monitor.sh"
-                wget -q -O /usr/local/bin/srpcom/autokill.sh "$GITHUB_RAW/core/autokill.sh"
-                wget -q -O /usr/local/bin/srpcom/auto_expired.sh "$GITHUB_RAW/core/auto_expired.sh"
-                wget -q -O /usr/local/bin/xray-api.py "$GITHUB_RAW/configs/xray-api.py"
-                wget -q -O /usr/local/bin/bot-admin.py "$GITHUB_RAW/configs/bot-admin.py"
+                wget -q --no-check-certificate -O /usr/local/bin/srpcom/utils.sh "$GITHUB_RAW/core/utils.sh"
+                wget -q --no-check-certificate -O /usr/local/bin/srpcom/telegram.sh "$GITHUB_RAW/core/telegram.sh"
+                wget -q --no-check-certificate -O /usr/local/bin/srpcom/xray.sh "$GITHUB_RAW/core/xray.sh"
+                wget -q --no-check-certificate -O /usr/local/bin/srpcom/l2tp.sh "$GITHUB_RAW/core/l2tp.sh"
+                wget -q --no-check-certificate -O /usr/local/bin/srpcom/ssh.sh "$GITHUB_RAW/core/ssh.sh"
+                wget -q --no-check-certificate -O /usr/local/bin/srpcom/monitor.sh "$GITHUB_RAW/core/monitor.sh"
+                wget -q --no-check-certificate -O /usr/local/bin/srpcom/autokill.sh "$GITHUB_RAW/core/autokill.sh"
+                wget -q --no-check-certificate -O /usr/local/bin/srpcom/auto_expired.sh "$GITHUB_RAW/core/auto_expired.sh"
+                wget -q --no-check-certificate -O /usr/local/bin/xray-api.py "$GITHUB_RAW/configs/xray-api.py"
+                wget -q --no-check-certificate -O /usr/local/bin/bot-admin.py "$GITHUB_RAW/configs/bot-admin.py"
                 chmod +x /usr/local/bin/srpcom/*.sh /usr/local/bin/xray-api.py /usr/local/bin/bot-admin.py
                 
                 # Jalankan migrasi data lama ke SQLite terpusat
@@ -403,7 +403,7 @@ menu_update() {
                 
                 systemctl daemon-reload
                 systemctl restart xray-api srpcom-bot
-                wget -q -O /usr/local/bin/srpcom/menu.sh "$GITHUB_RAW/core/menu.sh"
+                wget -q --no-check-certificate -O /usr/local/bin/srpcom/menu.sh "$GITHUB_RAW/core/menu.sh"
                 chmod +x /usr/local/bin/srpcom/menu.sh
                 source /usr/local/bin/srpcom/menu.sh
                 rebuild_shortcuts
@@ -415,8 +415,8 @@ menu_update() {
             11)
                 echo -e "\n=> Mengunduh update UI Web Panel dari GitHub..."
                 mkdir -p /usr/local/etc/srpcom/panel
-                wget -q -O /usr/local/etc/srpcom/panel/index.html "$GITHUB_RAW/core/index.html"
-                wget -q -O /usr/local/etc/srpcom/panel/api-docs.html "$GITHUB_RAW/core/api-docs.html"
+                wget -q --no-check-certificate -O /usr/local/etc/srpcom/panel/index.html "$GITHUB_RAW/core/index.html"
+                wget -q --no-check-certificate -O /usr/local/etc/srpcom/panel/api-docs.html "$GITHUB_RAW/core/api-docs.html"
                 if [ -s /usr/local/etc/srpcom/panel/index.html ]; then
                     echo -e "\e[32m[SUCCESS]\e[0m Web Panel & Dokumentasi API berhasil diperbarui!"
                 else

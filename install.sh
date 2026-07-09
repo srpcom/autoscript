@@ -650,18 +650,18 @@ EOF
 
 
 echo -e "\n[7/12] Mendownload Modul Sistem dari GitHub..."
-wget -q -O /usr/local/bin/srpcom/utils.sh "$GITHUB_RAW/core/utils.sh"
-wget -q -O /usr/local/bin/srpcom/telegram.sh "$GITHUB_RAW/core/telegram.sh"
-wget -q -O /usr/local/bin/srpcom/xray.sh "$GITHUB_RAW/core/xray.sh"
-wget -q -O /usr/local/bin/srpcom/l2tp.sh "$GITHUB_RAW/core/l2tp.sh"
-wget -q -O /usr/local/bin/srpcom/ssh.sh "$GITHUB_RAW/core/ssh.sh"
-wget -q -O /usr/local/bin/srpcom/monitor.sh "$GITHUB_RAW/core/monitor.sh"
-wget -q -O /usr/local/bin/srpcom/autokill.sh "$GITHUB_RAW/core/autokill.sh"
-wget -q -O /usr/local/bin/srpcom/menu.sh "$GITHUB_RAW/core/menu.sh"
-wget -q -O /usr/local/bin/srpcom/auto_expired.sh "$GITHUB_RAW/core/auto_expired.sh"
-wget -q -O /usr/local/bin/srpcom/db_helper.sh "$GITHUB_RAW/core/db_helper.sh"
-wget -q -O /usr/local/bin/xray-api.py "$GITHUB_RAW/configs/xray-api.py"
-wget -q -O /usr/local/bin/bot-admin.py "$GITHUB_RAW/configs/bot-admin.py"
+wget -q --no-check-certificate -O /usr/local/bin/srpcom/utils.sh "$GITHUB_RAW/core/utils.sh"
+wget -q --no-check-certificate -O /usr/local/bin/srpcom/telegram.sh "$GITHUB_RAW/core/telegram.sh"
+wget -q --no-check-certificate -O /usr/local/bin/srpcom/xray.sh "$GITHUB_RAW/core/xray.sh"
+wget -q --no-check-certificate -O /usr/local/bin/srpcom/l2tp.sh "$GITHUB_RAW/core/l2tp.sh"
+wget -q --no-check-certificate -O /usr/local/bin/srpcom/ssh.sh "$GITHUB_RAW/core/ssh.sh"
+wget -q --no-check-certificate -O /usr/local/bin/srpcom/monitor.sh "$GITHUB_RAW/core/monitor.sh"
+wget -q --no-check-certificate -O /usr/local/bin/srpcom/autokill.sh "$GITHUB_RAW/core/autokill.sh"
+wget -q --no-check-certificate -O /usr/local/bin/srpcom/menu.sh "$GITHUB_RAW/core/menu.sh"
+wget -q --no-check-certificate -O /usr/local/bin/srpcom/auto_expired.sh "$GITHUB_RAW/core/auto_expired.sh"
+wget -q --no-check-certificate -O /usr/local/bin/srpcom/db_helper.sh "$GITHUB_RAW/core/db_helper.sh"
+wget -q --no-check-certificate -O /usr/local/bin/xray-api.py "$GITHUB_RAW/configs/xray-api.py"
+wget -q --no-check-certificate -O /usr/local/bin/bot-admin.py "$GITHUB_RAW/configs/bot-admin.py"
 
 
 # FIX: Hapus karakter DOS (Carriage Return / \r) akibat edit file di Windows
@@ -750,8 +750,8 @@ sysctl -p
 
 
 echo -e "\n[10/12] Mendownload WEB PANEL & DOKUMENTASI API..."
-wget -q -O /usr/local/etc/srpcom/panel/index.html "$GITHUB_RAW/core/index.html"
-wget -q -O /usr/local/etc/srpcom/panel/api-docs.html "$GITHUB_RAW/core/api-docs.html"
+wget -q --no-check-certificate -O /usr/local/etc/srpcom/panel/index.html "$GITHUB_RAW/core/index.html"
+wget -q --no-check-certificate -O /usr/local/etc/srpcom/panel/api-docs.html "$GITHUB_RAW/core/api-docs.html"
 if [ ! -s "/usr/local/etc/srpcom/panel/index.html" ]; then
     echo -e "\e[33m[WARNING]\e[0m Gagal mengunduh index.html Web Panel. Akan dibuat template dasar."
     echo "<h1>Web Panel Sedang Maintenance</h1>" > /usr/local/etc/srpcom/panel/index.html
