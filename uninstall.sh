@@ -36,8 +36,8 @@ systemctl stop xray-api srpcom-bot ssh-ws badvpn-7100 badvpn-7200 badvpn-7300 vp
 systemctl disable xray-api srpcom-bot ssh-ws badvpn-7100 badvpn-7200 badvpn-7300 vpn-nat 2>/dev/null
 
 # Stop Core Services
-systemctl stop xray caddy ipsec xl2tpd dropbear openvpn-server@server-udp openvpn-server@server-tcp 2>/dev/null
-systemctl disable xray caddy ipsec xl2tpd dropbear openvpn-server@server-udp openvpn-server@server-tcp 2>/dev/null
+systemctl stop xray caddy ipsec xl2tpd dropbear openvpn-server@server-udp openvpn-server@server-tcp vnstat 2>/dev/null
+systemctl disable xray caddy ipsec xl2tpd dropbear openvpn-server@server-udp openvpn-server@server-tcp vnstat 2>/dev/null
 
 echo -e "\n[2/7] Menghapus Akun SSH/Dropbear yang Dibuat..."
 if [ -f "/usr/local/etc/srpcom/ssh_expiry.txt" ]; then
@@ -52,8 +52,8 @@ echo -e "\n[3/7] Menghapus Xray Core..."
 # Menjalankan script uninstaller resmi dari XTLS
 bash -c "$(curl -L https://github.com/XTLS/Xray-install/raw/main/install-release.sh)" @ remove >/dev/null 2>&1
 
-echo -e "\n[4/7] Menghapus Paket VPN (Caddy, Dropbear, OpenVPN, Speedtest, dll)..."
-apt-get purge -y caddy dropbear openvpn xl2tpd strongswan speedtest >/dev/null 2>&1
+echo -e "\n[4/7] Menghapus Paket VPN (Caddy, Dropbear, OpenVPN, Speedtest, VnStat, dll)..."
+apt-get purge -y caddy dropbear openvpn xl2tpd strongswan speedtest vnstat >/dev/null 2>&1
 apt-get autoremove -y >/dev/null 2>&1
 
 echo -e "\n[5/7] Membersihkan Aturan Firewall & Jaringan..."
@@ -71,6 +71,7 @@ rm -rf /usr/local/etc/srpcom
 rm -rf /usr/local/bin/srpcom
 rm -rf /usr/local/etc/xray
 rm -rf /var/log/xray
+rm -rf /var/lib/srpcom
 rm -rf /etc/caddy
 rm -rf /etc/openvpn
 rm -rf /etc/xl2tpd
@@ -81,7 +82,14 @@ rm -f /usr/local/bin/xray-api.py
 rm -f /usr/local/bin/bot-admin.py
 rm -f /usr/local/bin/ssh-ws.py
 rm -f /usr/local/bin/badvpn-udpgw
-rm -f /usr/bin/menu
+rm -f /etc/apt/keyrings/caddy-stable-archive-keyring.gpg
+
+# Menghapus Shortcut Wrappers
+rm -f /usr/bin/add-vmess /usr/bin/add-vless /usr/bin/add-trojan /usr/bin/trial-xray /usr/bin/del-xray /usr/bin/renew-xray /usr/bin/cek-xray /usr/bin/list-xray /usr/bin/uuid-xray
+rm -f /usr/bin/add-ssh /usr/bin/trial-ssh /usr/bin/del-ssh /usr/bin/renew-ssh /usr/bin/cek-ssh /usr/bin/list-ssh
+rm -f /usr/bin/add-l2tp /usr/bin/del-l2tp /usr/bin/renew-l2tp /usr/bin/cek-l2tp /usr/bin/list-l2tp
+rm -f /usr/bin/mon-xray /usr/bin/mon-ssh /usr/bin/backup /usr/bin/restore /usr/bin/set-domain /usr/bin/set-sni /usr/bin/set-apikey /usr/bin/set-bot /usr/bin/set-notif /usr/bin/set-node /usr/bin/set-autokill /usr/bin/set-autoexp /usr/bin/set-autobackup /usr/bin/set-autosend /usr/bin/set-banner
+rm -f /usr/bin/menu /usr/bin/srpcom
 
 # Membersihkan Repositori pihak ketiga yang ditambahkan (Speedtest & Caddy)
 rm -f /etc/apt/sources.list.d/ookla_speedtest-cli.list
