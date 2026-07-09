@@ -890,8 +890,13 @@ import_github_domain() {
 
     echo -e "\n=> Memproses import dan validasi DNS..."
     local has_new=false
-    while read -r raw_domain; do
-        if [ -z "$raw_domain" ]; then continue; fi
+    # Hapus karakter DOS (Carriage Return / \r) dari file unduhan
+    sed -i 's/\r$//' /tmp/new_domains.txt 2>/dev/null
+    
+    while read -r raw_domain || [[ -n "$raw_domain" ]]; do
+        # Bersihkan spasi dan karakter carriage return (\r)
+        raw_domain=$(echo "$raw_domain" | tr -d '\r' | xargs)
+        if [[ -z "$raw_domain" || "$raw_domain" == \#* ]]; then continue; fi
         
         # Skenario 1: Cek apakah raw_domain adalah Full Domain
         domain_ip=$(getent ahostsv4 "$raw_domain" | awk '{ print $1 }' | head -n 1)
