@@ -24,19 +24,21 @@ GITHUB_RAW="https://raw.githubusercontent.com/srpcom/autoscript/main"
 download_file() {
     local target_file="$1"
     local relative_path="$2"
+    local cache_buster
+    cache_buster=$(date +%s 2>/dev/null || echo "12345")
     
-    # 1. Coba unduh dari GitHub Raw
-    curl -k -sL -o "$target_file" "https://raw.githubusercontent.com/srpcom/autoscript/main/$relative_path"
+    # 1. Coba unduh dari GitHub Raw (dengan cache buster)
+    curl -k -sL -o "$target_file" "https://raw.githubusercontent.com/srpcom/autoscript/main/$relative_path?t=$cache_buster"
     
     # Cek apakah file kosong atau berisi Too Many Requests
     if [ ! -s "$target_file" ] || grep -q "Too Many Requests" "$target_file" 2>/dev/null; then
         # 2. Coba unduh dari GitMirror (Real-time Mirror)
-        curl -k -sL -o "$target_file" "https://raw.gitmirror.com/srpcom/autoscript/main/$relative_path"
+        curl -k -sL -o "$target_file" "https://raw.gitmirror.com/srpcom/autoscript/main/$relative_path?t=$cache_buster"
     fi
     
     if [ ! -s "$target_file" ] || grep -q "Too Many Requests" "$target_file" 2>/dev/null; then
         # 3. Coba unduh dari jsDelivr CDN
-        curl -k -sL -o "$target_file" "https://cdn.jsdelivr.net/gh/srpcom/autoscript@main/$relative_path"
+        curl -k -sL -o "$target_file" "https://cdn.jsdelivr.net/gh/srpcom/autoscript@main/$relative_path?t=$cache_buster"
     fi
 }
 
