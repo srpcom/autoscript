@@ -37,12 +37,14 @@ if [[ -z "$STY" ]]; then
     
     # Pengecekan apakah script dijalankan dari file lokal (bukan via pipe curl)
     if [[ -f "$0" ]]; then
+        # Dapatkan path absolut dari file script agar screen tidak gagal mencari file jika direktori kerja berubah
+        SCRIPT_PATH=$(readlink -f "$0" 2>/dev/null || realpath "$0" 2>/dev/null || echo "$0")
         # Jika berupa shell script biasa (*.sh), jalankan dengan bash.
         # Jika berupa file binary hasil kompilasi shc (seperti installx), jalankan langsung.
         if [[ "$0" == *.sh ]]; then
-            exec screen -S srpcom_install bash "$0" "$@"
+            exec screen -S srpcom_install bash "$SCRIPT_PATH" "$@"
         else
-            exec screen -S srpcom_install "$0" "$@"
+            exec screen -S srpcom_install "$SCRIPT_PATH" "$@"
         fi
     else
         echo -e "\e[31m[WARNING]\e[0m Script dijalankan via pipe. Fitur Anti-Diskonek tidak maksimal."
