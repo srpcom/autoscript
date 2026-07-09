@@ -107,6 +107,8 @@ elif [ "$GITHUB_TEST_CODE" = "0" ] || [ "$GITHUB_TEST_CODE" = "000" ] || [ -z "$
     echo -e "DNS resolver Anda sudah terkonfigurasi dengan benar."
     echo -e "\e[31m=====================================================\e[0m"
     exit 1
+else
+    echo -e "\e[32m[OK] Terhubung ke GitHub Raw (Bebas Blokir/Limit).\e[0m"
 fi
 
 
