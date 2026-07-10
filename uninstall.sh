@@ -73,6 +73,10 @@ rm -rf /usr/local/etc/xray
 rm -rf /var/log/xray
 rm -rf /var/lib/srpcom
 rm -rf /etc/caddy
+rm -rf /var/lib/caddy
+rm -rf /var/log/caddy
+rm -rf /var/lib/vnstat
+rm -rf /etc/dropbear
 rm -rf /etc/openvpn
 rm -rf /etc/xl2tpd
 rm -rf /etc/ipsec.*
