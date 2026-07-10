@@ -487,6 +487,8 @@ DROPBEAR_EXTRA_ARGS="-p 143"
 DROPBEAR_BANNER="/etc/issue.net"
 DROPBEAR_RECEIVE_WINDOW=65536
 EOF
+systemctl stop dropbear.socket >/dev/null 2>&1
+systemctl disable dropbear.socket >/dev/null 2>&1
 systemctl restart dropbear
 systemctl enable dropbear
 

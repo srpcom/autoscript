@@ -36,8 +36,8 @@ systemctl stop xray-api srpcom-bot ssh-ws badvpn-7100 badvpn-7200 badvpn-7300 vp
 systemctl disable xray-api srpcom-bot ssh-ws badvpn-7100 badvpn-7200 badvpn-7300 vpn-nat 2>/dev/null
 
 # Stop Core Services
-systemctl stop xray caddy ipsec xl2tpd dropbear openvpn-server@server-udp openvpn-server@server-tcp vnstat 2>/dev/null
-systemctl disable xray caddy ipsec xl2tpd dropbear openvpn-server@server-udp openvpn-server@server-tcp vnstat 2>/dev/null
+systemctl stop xray caddy ipsec xl2tpd dropbear dropbear.socket openvpn-server@server-udp openvpn-server@server-tcp vnstat 2>/dev/null
+systemctl disable xray caddy ipsec xl2tpd dropbear dropbear.socket openvpn-server@server-udp openvpn-server@server-tcp vnstat 2>/dev/null
 
 echo -e "\n[2/7] Menghapus Akun SSH/Dropbear yang Dibuat..."
 if [ -f "/usr/local/etc/srpcom/ssh_expiry.txt" ]; then
