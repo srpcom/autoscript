@@ -187,6 +187,134 @@ add_trojan_ws() {
     pause
 }
 
+add_vmess_grpc() {
+    clear
+    echo "======================================"
+    echo "      CREATE VMESS GRPC ACCOUNT       "
+    echo "======================================"
+    read -p "Username (x = Batal) : " user
+    if [[ "$user" == "x" || "$user" == "X" ]]; then return; fi
+    
+    # Cek apakah user sudah ada di config.json, jika ada tambahkan angka berurutan
+    original_user="$user"
+    counter=2
+    while grep -q "\"email\": \"$user\"" /usr/local/etc/xray/config.json; do
+        user="${original_user}${counter}"
+        ((counter++))
+    done
+    if [[ "$original_user" != "$user" ]]; then
+        echo -e "\n\e[33m[INFO]\e[0m Username '$original_user' sudah digunakan. Akun akan dibuat dengan nama: $user"
+    fi
+    
+    read -p "Expired (Days) : " masaaktif
+    uuid=$(uuidgen)
+    
+    exp_date=$(date -d "$masaaktif days" +"%Y-%m-%d")
+    exp_time=$(date -d "$masaaktif days" +"%H:%M:%S")
+    echo "$user $exp_date $exp_time" >> /usr/local/etc/xray/expiry.txt
+
+    jq '(.inbounds[] | select(.protocol=="vmess") | .settings.clients) += [{"id": "'$uuid'", "alterId": 0, "email": "'$user'"}]' /usr/local/etc/xray/config.json > /tmp/config.json
+    if [ -s /tmp/config.json ]; then mv /tmp/config.json /usr/local/etc/xray/config.json; fi
+    systemctl restart xray
+    [ -f "/usr/local/bin/srpcom/db_helper.sh" ] && /usr/local/bin/srpcom/db_helper.sh db_import_from_txt 2>/dev/null
+    
+    tls_json="{\"v\":\"2\",\"ps\":\"${user}\",\"add\":\"${DOMAIN}\",\"port\":\"443\",\"id\":\"${uuid}\",\"aid\":\"0\",\"scy\":\"auto\",\"net\":\"grpc\",\"type\":\"none\",\"host\":\"${DOMAIN}\",\"path\":\"vmessgrpc\",\"tls\":\"tls\",\"sni\":\"${DOMAIN}\"}"
+    none_tls_json="{\"v\":\"2\",\"ps\":\"${user}\",\"add\":\"${DOMAIN}\",\"port\":\"80\",\"id\":\"${uuid}\",\"aid\":\"0\",\"scy\":\"auto\",\"net\":\"grpc\",\"type\":\"none\",\"host\":\"${DOMAIN}\",\"path\":\"vmessgrpc\",\"tls\":\"\",\"sni\":\"\"}"
+    link_tls="vmess://$(echo -n "$tls_json" | jq -c . | base64 -w 0)"
+    link_none_tls="vmess://$(echo -n "$none_tls_json" | jq -c . | base64 -w 0)"
+    
+    msg_cli=$(echo -e "Pembuatan akun baru berhasil\n\n━━━━━━━━━━━━━━━━━━━━\n❖ XRAY/VMESS GRPC ❖\n━━━━━━━━━━━━━━━━━━━━\nRemarks : ${user}\nIP Address : ${IP_ADD}\nDomain : ${DOMAIN}\nPort TLS : 443\nPort NONE-TLS : 80\nID : ${uuid}\nNetwork : gRPC\nService Name : vmessgrpc\n━━━━━━━━━━━━━━━━━━━━\nLimit IP : Unlimited\nLimit Kuota : Unlimited\n━━━━━━━━━━━━━━━━━━━━\nLINK GRPC TLS : ${link_tls}\n━━━━━━━━━━━━━━━━━━━━\nLINK GRPC NONE-TLS : ${link_none_tls}\n━━━━━━━━━━━━━━━━━━━━\nExpired On : ${exp_date} ${exp_time} WIB")
+    msg_tg=$(echo -e "Pembuatan akun baru berhasil\n\n━━━━━━━━━━━━━━━━━━━━\n❖ XRAY/VMESS GRPC ❖\n━━━━━━━━━━━━━━━━━━━━\nRemarks : \`${user}\`\nIP Address : ${IP_ADD}\nDomain : ${DOMAIN}\nPort TLS : 443\nPort NONE-TLS : 80\nID : \`${uuid}\`\nNetwork : gRPC\nService Name : vmessgrpc\n━━━━━━━━━━━━━━━━━━━━\nLimit IP : Unlimited\nLimit Kuota : Unlimited\n━━━━━━━━━━━━━━━━━━━━\nLINK GRPC TLS : \`${link_tls}\`\n━━━━━━━━━━━━━━━━━━━━\nLINK GRPC NONE-TLS : \`${link_none_tls}\`\n━━━━━━━━━━━━━━━━━━━━\nExpired On : ${exp_date} ${exp_time} WIB")
+    
+    clear; echo "$msg_cli"
+    send_telegram "$msg_tg"
+    pause
+}
+
+add_vless_grpc() {
+    clear
+    echo "======================================"
+    echo "      CREATE VLESS GRPC ACCOUNT       "
+    echo "======================================"
+    read -p "Username (x = Batal) : " user
+    if [[ "$user" == "x" || "$user" == "X" ]]; then return; fi
+    
+    # Cek apakah user sudah ada di config.json, jika ada tambahkan angka berurutan
+    original_user="$user"
+    counter=2
+    while grep -q "\"email\": \"$user\"" /usr/local/etc/xray/config.json; do
+        user="${original_user}${counter}"
+        ((counter++))
+    done
+    if [[ "$original_user" != "$user" ]]; then
+        echo -e "\n\e[33m[INFO]\e[0m Username '$original_user' sudah digunakan. Akun akan dibuat dengan nama: $user"
+    fi
+    
+    read -p "Expired (Days) : " masaaktif
+    uuid=$(uuidgen)
+    
+    exp_date=$(date -d "$masaaktif days" +"%Y-%m-%d")
+    exp_time=$(date -d "$masaaktif days" +"%H:%M:%S")
+    echo "$user $exp_date $exp_time" >> /usr/local/etc/xray/expiry.txt
+
+    jq '(.inbounds[] | select(.protocol=="vless") | .settings.clients) += [{"id": "'$uuid'", "email": "'$user'"}]' /usr/local/etc/xray/config.json > /tmp/config.json
+    if [ -s /tmp/config.json ]; then mv /tmp/config.json /usr/local/etc/xray/config.json; fi
+    systemctl restart xray
+    [ -f "/usr/local/bin/srpcom/db_helper.sh" ] && /usr/local/bin/srpcom/db_helper.sh db_import_from_txt 2>/dev/null
+    
+    link_tls="vless://${uuid}@${DOMAIN}:443?mode=gun&security=tls&encryption=none&host=${DOMAIN}&type=grpc&serviceName=vlessgrpc&sni=${DOMAIN}#${user}"
+    link_none_tls="vless://${uuid}@${DOMAIN}:80?mode=gun&security=none&encryption=none&host=${DOMAIN}&type=grpc&serviceName=vlessgrpc#${user}"
+    
+    msg_cli=$(echo -e "Pembuatan akun baru berhasil\n\n━━━━━━━━━━━━━━━━━━━━\n❖ XRAY/VLESS GRPC ❖\n━━━━━━━━━━━━━━━━━━━━\nRemarks : ${user}\nIP Address : ${IP_ADD}\nDomain : ${DOMAIN}\nPort TLS : 443\nPort NONE-TLS : 80\nID : ${uuid}\nNetwork : gRPC\nService Name : vlessgrpc\n━━━━━━━━━━━━━━━━━━━━\nLimit IP : Unlimited\nLimit Kuota : Unlimited\n━━━━━━━━━━━━━━━━━━━━\nLINK GRPC TLS : ${link_tls}\n━━━━━━━━━━━━━━━━━━━━\nLINK GRPC NONE-TLS : ${link_none_tls}\n━━━━━━━━━━━━━━━━━━━━\nExpired On : ${exp_date} ${exp_time} WIB")
+    msg_tg=$(echo -e "Pembuatan akun baru berhasil\n\n━━━━━━━━━━━━━━━━━━━━\n❖ XRAY/VLESS GRPC ❖\n━━━━━━━━━━━━━━━━━━━━\nRemarks : \`${user}\`\nIP Address : ${IP_ADD}\nDomain : ${DOMAIN}\nPort TLS : 443\nPort NONE-TLS : 80\nID : \`${uuid}\`\nNetwork : gRPC\nService Name : vlessgrpc\n━━━━━━━━━━━━━━━━━━━━\nLimit IP : Unlimited\nLimit Kuota : Unlimited\n━━━━━━━━━━━━━━━━━━━━\nLINK GRPC TLS : \`${link_tls}\`\n━━━━━━━━━━━━━━━━━━━━\nLINK GRPC NONE-TLS : \`${link_none_tls}\`\n━━━━━━━━━━━━━━━━━━━━\nExpired On : ${exp_date} ${exp_time} WIB")
+    
+    clear; echo "$msg_cli"
+    send_telegram "$msg_tg"
+    pause
+}
+
+add_trojan_grpc() {
+    clear
+    echo "======================================"
+    echo "      CREATE TROJAN GRPC ACCOUNT      "
+    echo "======================================"
+    read -p "Username (x = Batal) : " user
+    if [[ "$user" == "x" || "$user" == "X" ]]; then return; fi
+    
+    # Cek apakah user sudah ada di config.json, jika ada tambahkan angka berurutan
+    original_user="$user"
+    counter=2
+    while grep -q "\"email\": \"$user\"" /usr/local/etc/xray/config.json; do
+        user="${original_user}${counter}"
+        ((counter++))
+    done
+    if [[ "$original_user" != "$user" ]]; then
+        echo -e "\n\e[33m[INFO]\e[0m Username '$original_user' sudah digunakan. Akun akan dibuat dengan nama: $user"
+    fi
+    
+    read -p "Expired (Days) : " masaaktif
+    uuid=$(uuidgen)
+    
+    exp_date=$(date -d "$masaaktif days" +"%Y-%m-%d")
+    exp_time=$(date -d "$masaaktif days" +"%H:%M:%S")
+    echo "$user $exp_date $exp_time" >> /usr/local/etc/xray/expiry.txt
+
+    jq '(.inbounds[] | select(.protocol=="trojan") | .settings.clients) += [{"password": "'$uuid'", "email": "'$user'"}]' /usr/local/etc/xray/config.json > /tmp/config.json
+    if [ -s /tmp/config.json ]; then mv /tmp/config.json /usr/local/etc/xray/config.json; fi
+    systemctl restart xray
+    [ -f "/usr/local/bin/srpcom/db_helper.sh" ] && /usr/local/bin/srpcom/db_helper.sh db_import_from_txt 2>/dev/null
+    
+    link_tls="trojan://${uuid}@${DOMAIN}:443?mode=gun&security=tls&host=${DOMAIN}&type=grpc&serviceName=trojangrpc&sni=${DOMAIN}#${user}"
+    link_none_tls="trojan://${uuid}@${DOMAIN}:80?mode=gun&security=none&type=grpc&serviceName=trojangrpc#${user}"
+    
+    msg_cli=$(echo -e "Pembuatan akun baru berhasil\n\n━━━━━━━━━━━━━━━━━━━━\n❖ XRAY/TROJAN GRPC ❖\n━━━━━━━━━━━━━━━━━━━━\nRemarks : ${user}\nIP Address : ${IP_ADD}\nDomain : ${DOMAIN}\nPort TLS : 443\nPort NONE-TLS : 80\nPassword : ${uuid}\nNetwork : gRPC\nService Name : trojangrpc\n━━━━━━━━━━━━━━━━━━━━\nLimit IP : Unlimited\nLimit Kuota : Unlimited\n━━━━━━━━━━━━━━━━━━━━\nLINK GRPC TLS : ${link_tls}\n━━━━━━━━━━━━━━━━━━━━\nLINK GRPC NONE-TLS : ${link_none_tls}\n━━━━━━━━━━━━━━━━━━━━\nExpired On : ${exp_date} ${exp_time} WIB")
+    msg_tg=$(echo -e "Pembuatan akun baru berhasil\n\n━━━━━━━━━━━━━━━━━━━━\n❖ XRAY/TROJAN GRPC ❖\n━━━━━━━━━━━━━━━━━━━━\nRemarks : \`${user}\`\nIP Address : ${IP_ADD}\nDomain : ${DOMAIN}\nPort TLS : 443\nPort NONE-TLS : 80\nPassword : \`${uuid}\`\nNetwork : gRPC\nService Name : trojangrpc\n━━━━━━━━━━━━━━━━━━━━\nLimit IP : Unlimited\nLimit Kuota : Unlimited\n━━━━━━━━━━━━━━━━━━━━\nLINK GRPC TLS : \`${link_tls}\`\n━━━━━━━━━━━━━━━━━━━━\nLINK GRPC NONE-TLS : \`${link_none_tls}\`\n━━━━━━━━━━━━━━━━━━━━\nExpired On : ${exp_date} ${exp_time} WIB")
+    
+    clear; echo "$msg_cli"
+    send_telegram "$msg_tg"
+    pause
+}
+
 add_trial() {
     clear
     echo "======================================"
@@ -195,9 +323,12 @@ add_trial() {
     echo " 1. VMESS WS"
     echo " 2. VLESS WS"
     echo " 3. TROJAN WS"
+    echo " 4. VMESS GRPC"
+    echo " 5. VLESS GRPC"
+    echo " 6. TROJAN GRPC"
     echo " 0. Kembali"
     echo "======================================"
-    read -p "Select Protocol [1-3 or 0]: " prot_opt
+    read -p "Select Protocol [1-6 or 0]: " prot_opt
     
     if [[ "$prot_opt" == "0" ]]; then return; fi
     
@@ -218,6 +349,15 @@ add_trial() {
         jq '(.inbounds[] | select(.protocol=="vless") | .settings.clients) += [{"id": "'$uuid'", "email": "'$user'"}]' /usr/local/etc/xray/config.json > /tmp/config.json
     elif [[ "$prot_opt" == "3" ]]; then
         prot="trojan"
+        jq '(.inbounds[] | select(.protocol=="trojan") | .settings.clients) += [{"password": "'$uuid'", "email": "'$user'"}]' /usr/local/etc/xray/config.json > /tmp/config.json
+    elif [[ "$prot_opt" == "4" ]]; then
+        prot="vmess_grpc"
+        jq '(.inbounds[] | select(.protocol=="vmess") | .settings.clients) += [{"id": "'$uuid'", "alterId": 0, "email": "'$user'"}]' /usr/local/etc/xray/config.json > /tmp/config.json
+    elif [[ "$prot_opt" == "5" ]]; then
+        prot="vless_grpc"
+        jq '(.inbounds[] | select(.protocol=="vless") | .settings.clients) += [{"id": "'$uuid'", "email": "'$user'"}]' /usr/local/etc/xray/config.json > /tmp/config.json
+    elif [[ "$prot_opt" == "6" ]]; then
+        prot="trojan_grpc"
         jq '(.inbounds[] | select(.protocol=="trojan") | .settings.clients) += [{"password": "'$uuid'", "email": "'$user'"}]' /usr/local/etc/xray/config.json > /tmp/config.json
     else
         echo -e "\n=> Pilihan tidak valid!"; sleep 1; add_trial; return
@@ -245,11 +385,33 @@ add_trial() {
         link_none_tls="trojan://${uuid}@${DOMAIN}:80?path=/trojanws&security=none&host=${DOMAIN}&type=ws#${user}"
         port_none="80"
         path="/trojanws"
+    elif [[ "$prot" == "vmess_grpc" ]]; then
+        tls_json="{\"v\":\"2\",\"ps\":\"${user}\",\"add\":\"${DOMAIN}\",\"port\":\"443\",\"id\":\"${uuid}\",\"aid\":\"0\",\"scy\":\"auto\",\"net\":\"grpc\",\"type\":\"none\",\"host\":\"${DOMAIN}\",\"path\":\"vmessgrpc\",\"tls\":\"tls\",\"sni\":\"${DOMAIN}\"}"
+        none_tls_json="{\"v\":\"2\",\"ps\":\"${user}\",\"add\":\"${DOMAIN}\",\"port\":\"80\",\"id\":\"${uuid}\",\"aid\":\"0\",\"scy\":\"auto\",\"net\":\"grpc\",\"type\":\"none\",\"host\":\"${DOMAIN}\",\"path\":\"vmessgrpc\",\"tls\":\"\",\"sni\":\"\"}"
+        link_tls="vmess://$(echo -n "$tls_json" | jq -c . | base64 -w 0)"
+        link_none_tls="vmess://$(echo -n "$none_tls_json" | jq -c . | base64 -w 0)"
+        port_none="80"
+        path="vmessgrpc"
+    elif [[ "$prot" == "vless_grpc" ]]; then
+        link_tls="vless://${uuid}@${DOMAIN}:443?mode=gun&security=tls&encryption=none&host=${DOMAIN}&type=grpc&serviceName=vlessgrpc&sni=${DOMAIN}#${user}"
+        link_none_tls="vless://${uuid}@${DOMAIN}:80?mode=gun&security=none&encryption=none&host=${DOMAIN}&type=grpc&serviceName=vlessgrpc#${user}"
+        port_none="80"
+        path="vlessgrpc"
+    elif [[ "$prot" == "trojan_grpc" ]]; then
+        link_tls="trojan://${uuid}@${DOMAIN}:443?mode=gun&security=tls&host=${DOMAIN}&type=grpc&serviceName=trojangrpc&sni=${DOMAIN}#${user}"
+        link_none_tls="trojan://${uuid}@${DOMAIN}:80?mode=gun&security=none&type=grpc&serviceName=trojangrpc#${user}"
+        port_none="80"
+        path="trojangrpc"
     fi
 
-    msg_str_cli="Pembuatan akun trial berhasil\n\n━━━━━━━━━━━━━━━━━━━━\n❖ XRAY/${prot^^} WS TRIAL ❖\n━━━━━━━━━━━━━━━━━━━━\nRemarks : ${user}\nIP Address : ${IP_ADD}\nDomain : ${DOMAIN}\nPort TLS : 443\nPort NONE-TLS : ${port_none}\nID/PW : ${uuid}\nNetwork : Websocket\nWebsocket Path : ${path}\n━━━━━━━━━━━━━━━━━━━━\nLimit IP : 1 IP\nLimit Kuota : Unlimited\n━━━━━━━━━━━━━━━━━━━━\nLINK WS TLS : ${link_tls}\n━━━━━━━━━━━━━━━━━━━━\nLINK WS NONE-TLS : ${link_none_tls}\n━━━━━━━━━━━━━━━━━━━━\nExpired On : ${exp_date} ${exp_time} WIB (${masaaktif})"
-    
-    msg_str_tg="Pembuatan akun trial berhasil\n\n━━━━━━━━━━━━━━━━━━━━\n❖ XRAY/${prot^^} WS TRIAL ❖\n━━━━━━━━━━━━━━━━━━━━\nRemarks : \`${user}\`\nIP Address : ${IP_ADD}\nDomain : ${DOMAIN}\nPort TLS : 443\nPort NONE-TLS : ${port_none}\nID/PW : \`${uuid}\`\nNetwork : Websocket\nWebsocket Path : ${path}\n━━━━━━━━━━━━━━━━━━━━\nLimit IP : 1 IP\nLimit Kuota : Unlimited\n━━━━━━━━━━━━━━━━━━━━\nLINK WS TLS : \`${link_tls}\`\n━━━━━━━━━━━━━━━━━━━━\nLINK WS NONE-TLS : \`${link_none_tls}\`\n━━━━━━━━━━━━━━━━━━━━\nExpired On : ${exp_date} ${exp_time} WIB (${masaaktif})"
+    if [[ "$prot" == *"grpc"* ]]; then
+        local display_prot=$(echo "$prot" | cut -d'_' -f1 | tr 'a-z' 'A-Z')
+        msg_str_cli="Pembuatan akun trial berhasil\n\n━━━━━━━━━━━━━━━━━━━━\n❖ XRAY/${display_prot} GRPC TRIAL ❖\n━━━━━━━━━━━━━━━━━━━━\nRemarks : ${user}\nIP Address : ${IP_ADD}\nDomain : ${DOMAIN}\nPort TLS : 443\nPort NONE-TLS : ${port_none}\nID/PW : ${uuid}\nNetwork : gRPC\nService Name : ${path}\n━━━━━━━━━━━━━━━━━━━━\nLimit IP : 1 IP\nLimit Kuota : Unlimited\n━━━━━━━━━━━━━━━━━━━━\nLINK GRPC TLS : ${link_tls}\n━━━━━━━━━━━━━━━━━━━━\nLINK GRPC NONE-TLS : ${link_none_tls}\n━━━━━━━━━━━━━━━━━━━━\nExpired On : ${exp_date} ${exp_time} WIB (${masaaktif})"
+        msg_str_tg="Pembuatan akun trial berhasil\n\n━━━━━━━━━━━━━━━━━━━━\n❖ XRAY/${display_prot} GRPC TRIAL ❖\n━━━━━━━━━━━━━━━━━━━━\nRemarks : \`${user}\`\nIP Address : ${IP_ADD}\nDomain : ${DOMAIN}\nPort TLS : 443\nPort NONE-TLS : ${port_none}\nID/PW : \`${uuid}\`\nNetwork : gRPC\nService Name : \`${path}\`\n━━━━━━━━━━━━━━━━━━━━\nLimit IP : 1 IP\nLimit Kuota : Unlimited\n━━━━━━━━━━━━━━━━━━━━\nLINK GRPC TLS : \`${link_tls}\`\n━━━━━━━━━━━━━━━━━━━━\nLINK GRPC NONE-TLS : \`${link_none_tls}\`\n━━━━━━━━━━━━━━━━━━━━\nExpired On : ${exp_date} ${exp_time} WIB (${masaaktif})"
+    else
+        msg_str_cli="Pembuatan akun trial berhasil\n\n━━━━━━━━━━━━━━━━━━━━\n❖ XRAY/${prot^^} WS TRIAL ❖\n━━━━━━━━━━━━━━━━━━━━\nRemarks : ${user}\nIP Address : ${IP_ADD}\nDomain : ${DOMAIN}\nPort TLS : 443\nPort NONE-TLS : ${port_none}\nID/PW : ${uuid}\nNetwork : Websocket\nWebsocket Path : ${path}\n━━━━━━━━━━━━━━━━━━━━\nLimit IP : 1 IP\nLimit Kuota : Unlimited\n━━━━━━━━━━━━━━━━━━━━\nLINK WS TLS : ${link_tls}\n━━━━━━━━━━━━━━━━━━━━\nLINK WS NONE-TLS : ${link_none_tls}\n━━━━━━━━━━━━━━━━━━━━\nExpired On : ${exp_date} ${exp_time} WIB (${masaaktif})"
+        msg_str_tg="Pembuatan akun trial berhasil\n\n━━━━━━━━━━━━━━━━━━━━\n❖ XRAY/${prot^^} WS TRIAL ❖\n━━━━━━━━━━━━━━━━━━━━\nRemarks : \`${user}\`\nIP Address : ${IP_ADD}\nDomain : ${DOMAIN}\nPort TLS : 443\nPort NONE-TLS : ${port_none}\nID/PW : \`${uuid}\`\nNetwork : Websocket\nWebsocket Path : ${path}\n━━━━━━━━━━━━━━━━━━━━\nLimit IP : 1 IP\nLimit Kuota : Unlimited\n━━━━━━━━━━━━━━━━━━━━\nLINK WS TLS : \`${link_tls}\`\n━━━━━━━━━━━━━━━━━━━━\nLINK WS NONE-TLS : \`${link_none_tls}\`\n━━━━━━━━━━━━━━━━━━━━\nExpired On : ${exp_date} ${exp_time} WIB (${masaaktif})"
+    fi
     
     msg_cli=$(echo -e "$msg_str_cli")
     msg_tg=$(echo -e "$msg_str_tg")
@@ -267,16 +429,22 @@ create_xray() {
     echo " 1. VMESS WS"
     echo " 2. VLESS WS"
     echo " 3. TROJAN WS"
-    echo " 4. TRIAL ACCOUNT (60 Minutes)"
+    echo " 4. VMESS gRPC"
+    echo " 5. VLESS gRPC"
+    echo " 6. TROJAN gRPC"
+    echo " 7. TRIAL ACCOUNT (60 Minutes)"
     echo "--------------------------------------"
     echo " 0. Kembali"
     echo "======================================"
-    read -p " Pilih opsi [0-4]: " opt
+    read -p " Pilih opsi [0-7]: " opt
     case $opt in
         1) add_vmess_ws ;;
         2) add_vless_ws ;;
         3) add_trojan_ws ;;
-        4) add_trial ;;
+        4) add_vmess_grpc ;;
+        5) add_vless_grpc ;;
+        6) add_trojan_grpc ;;
+        7) add_trial ;;
         0) return ;;
         *) echo "Pilihan tidak valid!"; sleep 1; create_xray ;;
     esac
@@ -413,7 +581,7 @@ show_detail() {
     from_menu=$3
     clear
     echo "━━━━━━━━━━━━━━━━━━━━"
-    echo "❖ XRAY/${prot^^} WS ❖"
+    echo "❖ XRAY/${prot^^} CONFIG DETAILS ❖"
     echo "━━━━━━━━━━━━━━━━━━━━"
     echo "Remarks : ${user}"
     echo "IP Address : ${IP_ADD}"
@@ -424,32 +592,42 @@ show_detail() {
     if [[ "$prot" == "vmess" ]]; then
         uuid=$(jq -r '.inbounds[] | select(.protocol=="vmess") | .settings.clients[] | select(.email=="'$user'") | .id' /usr/local/etc/xray/config.json 2>/dev/null)
         echo "ID : ${uuid}"
-        echo "Network : Websocket"
-        echo "Websocket Path : /vmessws"
         echo "━━━━━━━━━━━━━━━━━━━━"
+        echo "--- WEBSOCKET CONFIG ---"
         tls_json="{\"v\":\"2\",\"ps\":\"${user}\",\"add\":\"${DOMAIN}\",\"port\":\"443\",\"id\":\"${uuid}\",\"aid\":\"0\",\"scy\":\"auto\",\"net\":\"ws\",\"type\":\"none\",\"host\":\"${DOMAIN}\",\"path\":\"/vmessws\",\"tls\":\"tls\",\"sni\":\"${DOMAIN}\"}"
         none_tls_json="{\"v\":\"2\",\"ps\":\"${user}\",\"add\":\"${DOMAIN}\",\"port\":\"80\",\"id\":\"${uuid}\",\"aid\":\"0\",\"scy\":\"auto\",\"net\":\"ws\",\"type\":\"none\",\"host\":\"${DOMAIN}\",\"path\":\"/vmessws\",\"tls\":\"\",\"sni\":\"\"}"
         echo "LINK WS TLS : vmess://$(echo -n "$tls_json" | jq -c . | base64 -w 0)"
-        echo "━━━━━━━━━━━━━━━━━━━━"
         echo "LINK WS NONE-TLS : vmess://$(echo -n "$none_tls_json" | jq -c . | base64 -w 0)"
+        echo "━━━━━━━━━━━━━━━━━━━━"
+        echo "--- gRPC CONFIG ---"
+        tls_grpc="{\"v\":\"2\",\"ps\":\"${user}\",\"add\":\"${DOMAIN}\",\"port\":\"443\",\"id\":\"${uuid}\",\"aid\":\"0\",\"scy\":\"auto\",\"net\":\"grpc\",\"type\":\"none\",\"host\":\"${DOMAIN}\",\"path\":\"vmessgrpc\",\"tls\":\"tls\",\"sni\":\"${DOMAIN}\"}"
+        none_tls_grpc="{\"v\":\"2\",\"ps\":\"${user}\",\"add\":\"${DOMAIN}\",\"port\":\"80\",\"id\":\"${uuid}\",\"aid\":\"0\",\"scy\":\"auto\",\"net\":\"grpc\",\"type\":\"none\",\"host\":\"${DOMAIN}\",\"path\":\"vmessgrpc\",\"tls\":\"\",\"sni\":\"\"}"
+        echo "LINK GRPC TLS : vmess://$(echo -n "$tls_grpc" | jq -c . | base64 -w 0)"
+        echo "LINK GRPC NONE-TLS : vmess://$(echo -n "$none_tls_grpc" | jq -c . | base64 -w 0)"
+        
     elif [[ "$prot" == "vless" ]]; then
         uuid=$(jq -r '.inbounds[] | select(.protocol=="vless") | .settings.clients[] | select(.email=="'$user'") | .id' /usr/local/etc/xray/config.json 2>/dev/null)
         echo "ID : ${uuid}"
-        echo "Network : Websocket"
-        echo "Websocket Path : /vlessws"
         echo "━━━━━━━━━━━━━━━━━━━━"
+        echo "--- WEBSOCKET CONFIG ---"
         echo "LINK WS TLS : vless://${uuid}@${DOMAIN}:443?path=/vlessws&security=tls&encryption=none&host=${DOMAIN}&type=ws&sni=${DOMAIN}#${user}"
-        echo "━━━━━━━━━━━━━━━━━━━━"
         echo "LINK WS NONE-TLS : vless://${uuid}@${DOMAIN}:80?path=/vlessws&security=none&encryption=none&host=${DOMAIN}&type=ws#${user}"
+        echo "━━━━━━━━━━━━━━━━━━━━"
+        echo "--- gRPC CONFIG ---"
+        echo "LINK GRPC TLS : vless://${uuid}@${DOMAIN}:443?mode=gun&security=tls&encryption=none&host=${DOMAIN}&type=grpc&serviceName=vlessgrpc&sni=${DOMAIN}#${user}"
+        echo "LINK GRPC NONE-TLS : vless://${uuid}@${DOMAIN}:80?mode=gun&security=none&encryption=none&host=${DOMAIN}&type=grpc&serviceName=vlessgrpc#${user}"
+        
     elif [[ "$prot" == "trojan" ]]; then
         uuid=$(jq -r '.inbounds[] | select(.protocol=="trojan") | .settings.clients[] | select(.email=="'$user'") | .password' /usr/local/etc/xray/config.json 2>/dev/null)
         echo "Password : ${uuid}"
-        echo "Network : Websocket"
-        echo "Websocket Path : /trojanws"
         echo "━━━━━━━━━━━━━━━━━━━━"
+        echo "--- WEBSOCKET CONFIG ---"
         echo "LINK WS TLS : trojan://${uuid}@${DOMAIN}:443?path=/trojanws&security=tls&host=${DOMAIN}&type=ws&sni=${DOMAIN}#${user}"
-        echo "━━━━━━━━━━━━━━━━━━━━"
         echo "LINK WS NONE-TLS : trojan://${uuid}@${DOMAIN}:80?path=/trojanws&security=none&host=${DOMAIN}&type=ws#${user}"
+        echo "━━━━━━━━━━━━━━━━━━━━"
+        echo "--- gRPC CONFIG ---"
+        echo "LINK GRPC TLS : trojan://${uuid}@${DOMAIN}:443?mode=gun&security=tls&host=${DOMAIN}&type=grpc&serviceName=trojangrpc&sni=${DOMAIN}#${user}"
+        echo "LINK GRPC NONE-TLS : trojan://${uuid}@${DOMAIN}:80?mode=gun&security=none&type=grpc&serviceName=trojangrpc#${user}"
     fi
     echo "━━━━━━━━━━━━━━━━━━━━"
     exp_date=$(grep "^$user " /usr/local/etc/xray/expiry.txt | cut -d' ' -f2-)

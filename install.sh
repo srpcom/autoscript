@@ -362,6 +362,9 @@ cat > /usr/local/etc/xray/config.json << EOF
     {"port": 10001, "listen": "127.0.0.1", "protocol": "vmess", "settings": {"clients": []}, "streamSettings": {"network": "ws", "sockopt": {"acceptProxyProtocol": true}, "wsSettings": {"path": "/vmessws"}}},
     {"port": 10002, "listen": "127.0.0.1", "protocol": "vless", "settings": {"clients": [], "decryption": "none"}, "streamSettings": {"network": "ws", "sockopt": {"acceptProxyProtocol": true}, "wsSettings": {"path": "/vlessws"}}},
     {"port": 10003, "listen": "127.0.0.1", "protocol": "trojan", "settings": {"clients": []}, "streamSettings": {"network": "ws", "sockopt": {"acceptProxyProtocol": true}, "wsSettings": {"path": "/trojanws"}}},
+    {"port": 10005, "listen": "127.0.0.1", "protocol": "vmess", "settings": {"clients": []}, "streamSettings": {"network": "grpc", "sockopt": {"acceptProxyProtocol": true}, "grpcSettings": {"serviceName": "vmessgrpc"}}},
+    {"port": 10006, "listen": "127.0.0.1", "protocol": "vless", "settings": {"clients": [], "decryption": "none"}, "streamSettings": {"network": "grpc", "sockopt": {"acceptProxyProtocol": true}, "grpcSettings": {"serviceName": "vlessgrpc"}}},
+    {"port": 10007, "listen": "127.0.0.1", "protocol": "trojan", "settings": {"clients": []}, "streamSettings": {"network": "grpc", "sockopt": {"acceptProxyProtocol": true}, "grpcSettings": {"serviceName": "trojangrpc"}}},
     {"port": 10085, "listen": "127.0.0.1", "protocol": "dokodemo-door", "settings": {"address": "127.0.0.1"}, "tag": "api"}
   ],
   "outbounds": [{"protocol": "freedom"}],
@@ -870,6 +873,30 @@ $DOMAINS_STR {
     handle /trojanws* {
         reverse_proxy localhost:10003 {
             transport http {
+                proxy_protocol v2
+            }
+        }
+    }
+    handle /vmessgrpc/* {
+        reverse_proxy localhost:10005 {
+            transport http {
+                versions h2c
+                proxy_protocol v2
+            }
+        }
+    }
+    handle /vlessgrpc/* {
+        reverse_proxy localhost:10006 {
+            transport http {
+                versions h2c
+                proxy_protocol v2
+            }
+        }
+    }
+    handle /trojangrpc/* {
+        reverse_proxy localhost:10007 {
+            transport http {
+                versions h2c
                 proxy_protocol v2
             }
         }

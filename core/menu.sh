@@ -121,6 +121,9 @@ EOFSC
     build_sc "add-vmess" "add_vmess_ws"
     build_sc "add-vless" "add_vless_ws"
     build_sc "add-trojan" "add_trojan_ws"
+    build_sc "add-vmessgrpc" "add_vmess_grpc"
+    build_sc "add-vlessgrpc" "add_vless_grpc"
+    build_sc "add-trojangrpc" "add_trojan_grpc"
     build_sc "trial-xray" "add_trial"
     build_sc "del-xray" "delete_xray"
     build_sc "renew-xray" "renew_xray"
@@ -268,6 +271,30 @@ rebuild_caddyfile() {
     handle /trojanws* {
         reverse_proxy localhost:10003 {
             transport http {
+                proxy_protocol v2
+            }
+        }
+    }
+    handle /vmessgrpc/* {
+        reverse_proxy localhost:10005 {
+            transport http {
+                versions h2c
+                proxy_protocol v2
+            }
+        }
+    }
+    handle /vlessgrpc/* {
+        reverse_proxy localhost:10006 {
+            transport http {
+                versions h2c
+                proxy_protocol v2
+            }
+        }
+    }
+    handle /trojangrpc/* {
+        reverse_proxy localhost:10007 {
+            transport http {
+                versions h2c
                 proxy_protocol v2
             }
         }
