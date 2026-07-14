@@ -15,7 +15,7 @@ monitor_xray() {
     printf " %-2s | %-12s | %-3s | %-8s\n" "No" "User" "IP" "Usage"
     echo "--------------------------------------"
     
-    mapfile -t xray_users < <(jq -r '.inbounds[] | select(.protocol=="vmess" or .protocol=="vless" or .protocol=="trojan") | .protocol as $prot | .settings.clients[].email | "\($prot):\(.)"' /usr/local/etc/xray/config.json 2>/dev/null)
+    mapfile -t xray_users < <(jq -r '.inbounds[] | select(.protocol=="vmess" or .protocol=="vless" or .protocol=="trojan") | .protocol as $prot | .settings.clients[].email | "\($prot):\(.)"' /usr/local/etc/xray/config.json 2>/dev/null | sort -u)
     
     if [ ${#xray_users[@]} -eq 0 ] || [ -z "${xray_users[0]}" ]; then
         echo " Belum ada akun Xray yang dibuat."
