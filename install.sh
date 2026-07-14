@@ -9,7 +9,7 @@
 GITHUB_RAW="https://raw.githubusercontent.com/srpcom/autoscript/main"
 
 
-if [ "${EUID}" -ne 0 ] || [ -n "$SUDO_USER" ] || [ "$USER" != "root" ] || [ "$HOME" != "/root" ]; then
+if [ "${EUID}" -ne 0 ] || { [ -n "$SUDO_USER" ] && [ "$SUDO_USER" != "root" ]; } || [ "$USER" != "root" ] || [ "$HOME" != "/root" ]; then
     echo -e "\e[31m[ERROR]\e[0m Script ini harus dijalankan oleh user ROOT MURNI demi kelancaran instalasi."
     echo -e "Saat ini Anda terdeteksi login melalui user biasa (sudo/escalated) atau non-root."
     echo ""
