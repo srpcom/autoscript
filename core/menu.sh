@@ -3,10 +3,10 @@
 # menu.sh
 # MODULE: MAIN MENU (ROUTER)
 # Menampilkan antarmuka CLI utama dan perutean menu
-# Versi : 1.5 (Fitur: Dual Bot Architecture + Bug Murni)
+# Versi : 1.6 (Fitur: Dual Bot Architecture + Add xray gRPC)
 # ==========================================
 
-SCRIPT_VERSION="1.5 (Dual Bot Arch)"
+SCRIPT_VERSION="1.6 (Add xray gRPC)"
 
 source /usr/local/etc/srpcom/env.conf 2>/dev/null
 source /usr/local/bin/srpcom/utils.sh 2>/dev/null
