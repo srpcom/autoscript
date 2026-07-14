@@ -446,8 +446,14 @@ menu_update() {
                 download_file /usr/local/bin/srpcom/auto_expired.sh core/auto_expired.sh
                 download_file /usr/local/bin/xray-api.py configs/xray-api.py
                 download_file /usr/local/bin/bot-admin.py configs/bot-admin.py
+                
+                # Unduh berkas UI Web Panel
+                mkdir -p /usr/local/etc/srpcom/panel
+                download_file /usr/local/etc/srpcom/panel/index.html core/index.html
+                download_file /usr/local/etc/srpcom/panel/api-docs.html core/api-docs.html
+                
                 chmod +x /usr/local/bin/srpcom/*.sh /usr/local/bin/xray-api.py /usr/local/bin/bot-admin.py
-                sed -i 's/\r$//' /usr/local/bin/srpcom/*.sh /usr/local/bin/xray-api.py /usr/local/bin/bot-admin.py 2>/dev/null
+                sed -i 's/\r$//' /usr/local/bin/srpcom/*.sh /usr/local/bin/xray-api.py /usr/local/bin/bot-admin.py /usr/local/etc/srpcom/panel/*.html 2>/dev/null
                 
                 # Jalankan migrasi data lama ke SQLite terpusat
                 /usr/local/bin/srpcom/db_helper.sh db_import_from_txt 2>/dev/null
