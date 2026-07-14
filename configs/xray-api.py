@@ -58,6 +58,9 @@ def is_license_active():
 # ==========================================
 @app.before_request
 def enforce_security():
+    if request.method == 'OPTIONS':
+        return '', 204
+        
     if not request.path.startswith('/srpcom/'):
         return
         
@@ -113,6 +116,9 @@ def export_db_to_txt():
 
 @app.after_request
 def after_request_callback(response):
+    response.headers.add('Access-Control-Allow-Origin', '*')
+    response.headers.add('Access-Control-Allow-Headers', 'Content-Type,x-api-key')
+    response.headers.add('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS')
     if request.path.startswith('/srpcom/') and request.method == 'POST':
         sync_to_db()
     return response
