@@ -917,8 +917,8 @@
             
             if(mode === 'xray') {
                 document.getElementById('mode-title').innerText = 'Manajemen Xray';
-                document.getElementById('mode-desc').innerText = 'Kelola akun VMess, VLess, dan Trojan (WebSocket).';
-                protSelect.innerHTML = '<option value="vmessws">VMess WS</option><option value="vlessws">VLess WS</option><option value="trojanws">Trojan WS</option>';
+                document.getElementById('mode-desc').innerText = 'Kelola akun VMess, VLess, dan Trojan (WebSocket & gRPC).';
+                protSelect.innerHTML = '<option value="vmessws">VMess WS</option><option value="vlessws">VLess WS</option><option value="trojanws">Trojan WS</option><option value="vmessgrpc">VMess gRPC</option><option value="vlessgrpc">VLess gRPC</option><option value="trojangrpc">Trojan gRPC</option>';
             } else if(mode === 'ssh') {
                 document.getElementById('mode-title').innerText = 'Manajemen SSH & OVPN';
                 document.getElementById('mode-desc').innerText = 'Kelola akun OpenSSH, Dropbear, SSH-WS, dan OpenVPN.';
@@ -946,7 +946,7 @@
             let endpoint = `/srpcom/${act}-${prot}`;
             
             if (act === 'list-accounts') {
-                const cleanProt = prot.replace('ws', '');
+                const cleanProt = prot.replace('ws', '').replace('grpc', '');
                 endpoint = `/srpcom/list-accounts/${cleanProt}`;
             } else if (act === 'change-uuid') {
                 endpoint = '/srpcom/change-uuid'; // Change UUID pakai endpoint universal
