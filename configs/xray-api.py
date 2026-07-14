@@ -88,11 +88,28 @@ def load_json(p):
 def save_json(p, d):
     with open(p, 'w') as f: json.dump(d, f, indent=2)
 
-def restart_xray(): subprocess.run(['systemctl', 'restart', 'xray'])
-def restart_l2tp(): subprocess.run(['systemctl', 'restart', 'ipsec', 'xl2tpd'])
+import threading
+
+def restart_xray():
+    def run():
+        subprocess.run(['systemctl', 'restart', 'xray'])
+    threading.Thread(target=run).start()
+
+def restart_l2tp():
+    def run():
+        subprocess.run(['systemctl', 'restart', 'ipsec', 'xl2tpd'])
+    threading.Thread(target=run).start()
+
 def sync_to_db():
-    try: subprocess.run(['/usr/local/bin/srpcom/db_helper.sh', 'db_import_from_txt'], capture_output=True)
-    except: pass
+    def run():
+        try: subprocess.run(['/usr/local/bin/srpcom/db_helper.sh', 'db_import_from_txt'], capture_output=True)
+        except: pass
+    threading.Thread(target=run).start()
+
+def export_db_to_txt():
+    def run():
+        subprocess.run(['/usr/local/bin/srpcom/db_helper.sh', 'db_export_to_txt'])
+    threading.Thread(target=run).start()
 
 @app.after_request
 def after_request_callback(response):
@@ -460,7 +477,7 @@ def unlock_user_api():
                     cur.execute("DELETE FROM lock_history WHERE username=?", (user,))
                     conn.commit()
                     
-                    subprocess.run(['systemctl', 'restart', 'xray'])
+                    restart_xray()
                     unlocked = True
                     msg = f"Akun Xray {user} berhasil di-unlock!"
                 except Exception as ex:
@@ -478,7 +495,7 @@ def unlock_user_api():
         conn.close()
         
         # Sinkronisasikan kembali ke file txt demi kompatibilitas
-        subprocess.run(['/usr/local/bin/srpcom/db_helper.sh', 'db_export_to_txt'])
+        export_db_to_txt()
 
         if unlocked:
             return jsonify({"status": "success", "message": msg, "stdout": f"✅ {msg}"})
