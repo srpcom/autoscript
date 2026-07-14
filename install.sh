@@ -9,9 +9,73 @@
 GITHUB_RAW="https://raw.githubusercontent.com/srpcom/autoscript/main"
 
 
-if [ "${EUID}" -ne 0 ]; then
-    echo -e "\e[31m[ERROR]\e[0m Script ini harus dijalankan sebagai root (Gunakan 'sudo su' terlebih dahulu)."
-    exit 1
+if [ "${EUID}" -ne 0 ] || [ -n "$SUDO_USER" ] || [ "$USER" != "root" ] || [ "$HOME" != "/root" ]; then
+    echo -e "\e[31m[ERROR]\e[0m Script ini harus dijalankan oleh user ROOT MURNI demi kelancaran instalasi."
+    echo -e "Saat ini Anda terdeteksi login melalui user biasa (sudo/escalated) atau non-root."
+    echo ""
+    read -p "Apakah Anda ingin mengaktifkan akses ROOT MURNI & Password SSH sekarang? (y/n): " set_root
+    if [[ "$set_root" =~ ^[Yy]$ ]]; then
+        clear
+        echo "=========================================="
+        echo "      SETTING AKSES ROOT VPS             "
+        echo "=========================================="
+        echo " PERINGATAN: Password akan terlihat saat "
+        echo " diketik untuk menghindari salah ketik.   "
+        echo "=========================================="
+        
+        while true; do
+            echo -n "Masukkan Password Root Baru : "
+            read NEW_PASS < /dev/tty
+            echo -n "Konfirmasi Password Root    : "
+            read CONFIRM_PASS < /dev/tty
+
+            if [[ -z "$NEW_PASS" ]]; then
+                echo -e "\n\e[31m[ERROR]\e[0m Password tidak boleh kosong!\n"
+            elif [[ "$NEW_PASS" != "$CONFIRM_PASS" ]]; then
+                echo -e "\n\e[31m[ERROR]\e[0m Password tidak cocok! Silakan coba lagi.\n"
+            else
+                break
+            fi
+        done
+
+        echo -e "\n[1/3] Mengatur password untuk user root..."
+        echo "root:$NEW_PASS" | chpasswd
+
+        echo -e "[2/3] Memperbarui konfigurasi SSH..."
+        sed -i 's/^#\?PermitRootLogin.*/PermitRootLogin yes/g' /etc/ssh/sshd_config
+        sed -i 's/^#\?PasswordAuthentication.*/PasswordAuthentication yes/g' /etc/ssh/sshd_config
+
+        if ! grep -q "^PermitRootLogin yes" /etc/ssh/sshd_config; then
+            echo "PermitRootLogin yes" >> /etc/ssh/sshd_config
+        fi
+
+        if ! grep -q "^PasswordAuthentication yes" /etc/ssh/sshd_config; then
+            echo "PasswordAuthentication yes" >> /etc/ssh/sshd_config
+        fi
+
+        echo -e "[3/3] Menyiapkan reboot sistem..."
+        sleep 1
+
+        echo -e "\n=========================================="
+        echo "      KONFIRMASI AKSES ROOT VPS          "
+        echo "=========================================="
+        echo " AKUN LOGIN ANDA TELAH SIAP:              "
+        echo "                                          "
+        echo " Username : root                          "
+        echo " Password : $NEW_PASS                     "
+        echo "                                          "
+        echo " CATATAN: Pastikan Anda mencatat password "
+        echo " di atas sebelum VPS melakukan reboot.    "
+        echo "=========================================="
+        echo " Server akan reboot dalam 10 detik...     "
+        echo "=========================================="
+        sleep 10
+        reboot
+        exit 0
+    else
+        echo -e "\n\e[31m[ERROR]\e[0m Instalasi dibatalkan. Silakan login sebagai root murni untuk menjalankan script."
+        exit 1
+    fi
 fi
 
 
