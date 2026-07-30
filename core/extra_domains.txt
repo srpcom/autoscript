@@ -19,6 +19,7 @@ api.quipper.com
 untar.ac.id
 ganecadigital.com
 telkomuniversity.ac.id
+support.udemy.com
 investor.fb.com
 collection.linefriends.com
 api24-normal.tiktokv.com
