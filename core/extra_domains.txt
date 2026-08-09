@@ -41,3 +41,4 @@ media-sin6-3.cdn.whatsapp.net
 api.quipper.com
 classroom.google.com
 io.ruangguru.com
+listen.noice.id
