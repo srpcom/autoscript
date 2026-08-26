@@ -36,7 +36,7 @@ print_header() {
     REG=$(curl -sS --max-time 3 ipinfo.io/city)
     TZ=$(cat /etc/timezone)
 
-    XRAY_C=$(jq '[.inbounds[] | select(.protocol=="vmess" or .protocol=="vless" or .protocol=="trojan") | .settings.clients | length] | add' /usr/local/etc/xray/config.json 2>/dev/null || echo 0)
+    XRAY_C=$(jq '[.inbounds[] | select(.protocol=="vmess" or .protocol=="vless" or .protocol=="trojan") | .settings.clients[]?.email] | unique | length' /usr/local/etc/xray/config.json 2>/dev/null || echo 0)
     SSH_C=$(wc -l < /usr/local/etc/srpcom/ssh_expiry.txt 2>/dev/null || echo 0)
     L2TP_C=$(wc -l < /usr/local/etc/srpcom/l2tp_expiry.txt 2>/dev/null || echo 0)
 
