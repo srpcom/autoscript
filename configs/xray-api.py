@@ -197,7 +197,8 @@ def list_accounts(protocol):
             if ib.get('protocol') == protocol:
                 for c in ib['settings'].get('clients', []):
                     email = c.get('email')
-                    if email: target_users.append(email)
+                    if email and email not in target_users:
+                        target_users.append(email)
         exp_data = {}
         if os.path.exists(EXP_FILE):
             with open(EXP_FILE, 'r') as f:
@@ -212,22 +213,28 @@ def list_accounts(protocol):
             raw_results.append((u, exp, protocol))
             
     elif protocol == 'ssh' and os.path.exists(SSH_EXP):
+        seen_ssh = set()
         with open(SSH_EXP, 'r') as f:
             for line in f:
                 p = line.strip().split()
-                if len(p) >= 4:
-                    raw_results.append((p[0], f"{p[2]} {p[3]}", "ssh"))
-                elif len(p) >= 3:
-                    raw_results.append((p[0], p[2], "ssh"))
+                if p and p[0] not in seen_ssh:
+                    seen_ssh.add(p[0])
+                    if len(p) >= 4:
+                        raw_results.append((p[0], f"{p[2]} {p[3]}", "ssh"))
+                    elif len(p) >= 3:
+                        raw_results.append((p[0], p[2], "ssh"))
                     
     elif protocol == 'l2tp' and os.path.exists(L2TP_EXP):
+        seen_l2tp = set()
         with open(L2TP_EXP, 'r') as f:
             for line in f:
                 p = line.strip().split()
-                if len(p) >= 4:
-                    raw_results.append((p[0], f"{p[2]} {p[3]}", "l2tp"))
-                elif len(p) >= 3:
-                    raw_results.append((p[0], p[2], "l2tp"))
+                if p and p[0] not in seen_l2tp:
+                    seen_l2tp.add(p[0])
+                    if len(p) >= 4:
+                        raw_results.append((p[0], f"{p[2]} {p[3]}", "l2tp"))
+                    elif len(p) >= 3:
+                        raw_results.append((p[0], p[2], "l2tp"))
 
     if not raw_results:
         msg = f"❌ Belum ada akun aktif untuk protokol {protocol.upper()}."
