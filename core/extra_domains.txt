@@ -43,3 +43,4 @@ classroom.google.com
 io.ruangguru.com
 listen.noice.id
 chat.whatsapp.com
+business.whatsapp.com
