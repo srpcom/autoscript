@@ -540,11 +540,28 @@ def unlock_user_api():
                 try:
                     with open(XRAY_CONF, 'r') as f:
                         config = json.load(f)
+
+                    # Normalisasi format client agar sesuai dengan spesifikasi inbound protokol
+                    clean_client = dict(client_data)
+                    c_secret = clean_client.get('id') or clean_client.get('password')
+                    if protocol in ['vmess', 'vless']:
+                        clean_client.pop('password', None)
+                        clean_client['id'] = c_secret
+                        clean_client['email'] = user
+                        if protocol == 'vmess':
+                            clean_client.setdefault('alterId', 0)
+                    elif protocol == 'trojan':
+                        clean_client.pop('id', None)
+                        clean_client.pop('alterId', None)
+                        clean_client['password'] = c_secret
+                        clean_client['email'] = user
+
                     for inb in config.get('inbounds', []):
                         if inb.get('protocol') == protocol:
                             existing_emails = [c.get('email') for c in inb.get('settings', {}).get('clients', [])]
-                            if client_data.get('email') not in existing_emails:
-                                inb['settings']['clients'].append(client_data)
+                            if user not in existing_emails:
+                                inb['settings']['clients'].append(clean_client)
+
                     with open(XRAY_CONF, 'w') as f:
                         json.dump(config, f, indent=2)
                     
