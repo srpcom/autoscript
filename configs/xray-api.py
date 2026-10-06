@@ -437,6 +437,20 @@ def get_locked_users():
         
         conn.close()
 
+        # Gabungkan dari LOCKED_FILE jika ada
+        if os.path.exists(LOCKED_FILE):
+            try:
+                with open(LOCKED_FILE, 'r') as f:
+                    lj = json.load(f)
+                    for u, d in lj.items():
+                        if u != 'dummy' and u not in locked_xray and isinstance(d, dict):
+                            locked_xray[u] = {
+                                'user': u,
+                                'reason': d.get('reason', 'Manual Lock via Bot Admin'),
+                                'locked_at': d.get('locked_at', '-')
+                            }
+            except: pass
+
         res = "🔒 *DAFTAR AKUN TERKUNCI (LOCKED)*\n━━━━━━━━━━━━━━━━━━━━\n"
         res += "*[ XRAY LOCKED ]*\n"
         if not locked_xray:
