@@ -448,66 +448,128 @@ def get_locked_users():
         return jsonify({"status": "error", "message": str(e), "stdout": f"Error: {e}"})
 
 @app.route('/srpcom/unlock-user', methods=['POST'])
+@app.route('/srpcom/unlock-xray', methods=['POST', 'GET'])
+@app.route('/srpcom/unlock-ssh', methods=['POST', 'GET'])
 def unlock_user_api():
     try:
         data = request.json or {}
         user = data.get('username') or data.get('user')
+        if not user and request.args:
+            user = request.args.get('username') or request.args.get('user')
 
         if not user:
             return jsonify({"status": "error", "message": "Username required"})
 
-        import sqlite3
-        conn = sqlite3.connect('/var/lib/srpcom/srpcom.db')
-        conn.row_factory = sqlite3.Row
-        cur = conn.cursor()
-        
-        cur.execute("SELECT * FROM accounts WHERE username=?", (user,))
-        row = cur.fetchone()
-        
-        if not row:
-            conn.close()
-            return jsonify({"status": "error", "message": f"User {user} tidak ditemukan dalam database."})
-            
+        client_data = None
+        protocol = None
+
+        # 1. Coba ambil dari SQLite Database
+        conn = None
+        cur = None
+        if os.path.exists('/var/lib/srpcom/srpcom.db'):
+            try:
+                import sqlite3
+                conn = sqlite3.connect('/var/lib/srpcom/srpcom.db')
+                conn.row_factory = sqlite3.Row
+                cur = conn.cursor()
+                
+                cur.execute("SELECT * FROM accounts WHERE username=?", (user,))
+                row = cur.fetchone()
+                if row:
+                    protocol = row['protocol']
+                    
+                cur.execute("SELECT client_data FROM lock_history WHERE username=?", (user,))
+                lh_row = cur.fetchone()
+                if lh_row and lh_row['client_data']:
+                    try:
+                        client_data = json.loads(lh_row['client_data'])
+                    except:
+                        pass
+            except:
+                pass
+
+        # 2. Fallback: Coba ambil dari LOCKED_FILE jika client_data belum ada
+        if not client_data and os.path.exists(LOCKED_FILE):
+            try:
+                with open(LOCKED_FILE, 'r') as f:
+                    locked_all = json.load(f)
+                if user in locked_all and isinstance(locked_all[user], dict):
+                    client_data = locked_all[user].get('client_data')
+                    if not protocol:
+                        protocol = locked_all[user].get('protocol')
+            except:
+                pass
+
+        # 3. Deteksi protocol jika belum diketahui
+        if not protocol:
+            if client_data:
+                protocol = 'trojan' if 'password' in client_data else 'vmess'
+            else:
+                chk = subprocess.run(['id', user], capture_output=True, text=True)
+                if chk.returncode == 0:
+                    protocol = 'ssh'
+
         unlocked = False
         msg = ""
-        protocol = row['protocol']
-        
+
         if protocol in ['vmess', 'vless', 'trojan']:
-            cur.execute("SELECT client_data FROM lock_history WHERE username=?", (user,))
-            lh_row = cur.fetchone()
-            if lh_row and lh_row['client_data']:
+            if client_data:
                 try:
-                    client_data = json.loads(lh_row['client_data'])
                     with open(XRAY_CONF, 'r') as f:
                         config = json.load(f)
                     for inb in config.get('inbounds', []):
                         if inb.get('protocol') == protocol:
-                            inb['settings']['clients'].append(client_data)
+                            existing_emails = [c.get('email') for c in inb.get('settings', {}).get('clients', [])]
+                            if client_data.get('email') not in existing_emails:
+                                inb['settings']['clients'].append(client_data)
                     with open(XRAY_CONF, 'w') as f:
                         json.dump(config, f, indent=2)
                     
-                    cur.execute("UPDATE accounts SET status='ACTIVE' WHERE username=?", (user,))
-                    cur.execute("DELETE FROM lock_history WHERE username=?", (user,))
-                    conn.commit()
+                    if conn and cur:
+                        try:
+                            cur.execute("UPDATE accounts SET status='ACTIVE' WHERE username=?", (user,))
+                            cur.execute("DELETE FROM lock_history WHERE username=?", (user,))
+                            conn.commit()
+                        except:
+                            pass
                     
+                    if os.path.exists(LOCKED_FILE):
+                        try:
+                            with open(LOCKED_FILE, 'r') as f:
+                                lk = json.load(f)
+                            if user in lk:
+                                del lk[user]
+                                save_json(LOCKED_FILE, lk)
+                        except:
+                            pass
+
                     restart_xray()
                     unlocked = True
                     msg = f"Akun Xray {user} berhasil di-unlock!"
                 except Exception as ex:
                     msg = f"Gagal unlock Xray: {ex}"
+            else:
+                msg = f"Data client untuk Xray {user} tidak ditemukan dalam riwayat lock."
         elif protocol == 'ssh':
             try:
                 subprocess.run(['usermod', '-U', user])
-                cur.execute("UPDATE accounts SET status='ACTIVE' WHERE username=?", (user,))
-                conn.commit()
+                if conn and cur:
+                    try:
+                        cur.execute("UPDATE accounts SET status='ACTIVE' WHERE username=?", (user,))
+                        conn.commit()
+                    except:
+                        pass
                 unlocked = True
                 msg = f"Akun SSH {user} berhasil di-unlock!"
             except Exception as ex:
                 msg = f"Gagal unlock SSH: {ex}"
-        
-        conn.close()
-        
-        # Sinkronisasikan kembali ke file txt demi kompatibilitas
+        else:
+            msg = f"User {user} tidak ditemukan dalam database atau riwayat lock."
+
+        if conn:
+            try: conn.close()
+            except: pass
+
         export_db_to_txt()
 
         if unlocked:
@@ -1494,23 +1556,92 @@ def trial_l2tp():
 # ==========================================
 @app.route('/srpcom/lock-ssh', methods=['POST'])
 def lock_ssh():
-    user = (request.json or {}).get('user')
-    if user: subprocess.run(['usermod', '-L', user])
+    user = (request.json or {}).get('user') or (request.json or {}).get('username')
+    if user:
+        subprocess.run(['usermod', '-L', user])
+        subprocess.run(['killall', '-u', user])
+        if os.path.exists('/var/lib/srpcom/srpcom.db'):
+            try:
+                import sqlite3
+                conn = sqlite3.connect('/var/lib/srpcom/srpcom.db')
+                cur = conn.cursor()
+                cur.execute("UPDATE accounts SET status='LOCKED' WHERE username=?", (user,))
+                conn.commit()
+                conn.close()
+            except:
+                pass
     return jsonify({"stdout": "Locked"})
 
 @app.route('/srpcom/lock-xray', methods=['POST', 'GET'])
 def lock_xray():
     user = (request.json or {}).get('user') if request.method == 'POST' else request.args.get('user')
     if not user and request.json: user = request.json.get('user')
-    if user:
+    if not user and request.args: user = request.args.get('user')
+    if not user:
+        return jsonify({"stdout": "Error: user required"}), 400
+
+    try:
+        now_date = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        lock_reason = "Manual Lock via Bot Admin"
+
+        # 1. Cari data client di config.json Xray
+        cfg = load_json(XRAY_CONF)
+        client_obj = None
+        target_protocol = None
+
+        for ib in cfg.get('inbounds', []):
+            proto = ib.get('protocol')
+            if proto in ['vmess', 'vless', 'trojan']:
+                for c in ib.get('settings', {}).get('clients', []):
+                    if c.get('email') == user:
+                        client_obj = c
+                        target_protocol = proto
+                        break
+            if client_obj:
+                break
+
+        # 2. Simpan ke locked.json dengan client_data lengkap
         locked = {}
         if os.path.exists(LOCKED_FILE):
             with open(LOCKED_FILE, 'r') as f:
                 try: locked = json.load(f)
                 except: pass
-        locked[user] = "Locked by Autokill"
+
+        locked[user] = {
+            "user": user,
+            "protocol": target_protocol,
+            "reason": lock_reason,
+            "locked_at": now_date,
+            "client_data": client_obj
+        }
         save_json(LOCKED_FILE, locked)
-    return jsonify({"stdout": "Locked"})
+
+        # 3. Update SQLite Database /var/lib/srpcom/srpcom.db jika ada
+        if os.path.exists('/var/lib/srpcom/srpcom.db'):
+            try:
+                import sqlite3
+                conn = sqlite3.connect('/var/lib/srpcom/srpcom.db')
+                cur = conn.cursor()
+                cur.execute("UPDATE accounts SET status='LOCKED' WHERE username=?", (user,))
+                client_data_str = json.dumps(client_obj) if client_obj else ""
+                cur.execute("INSERT OR REPLACE INTO lock_history (username, reason, locked_at, client_data) VALUES (?, ?, ?, ?)",
+                            (user, lock_reason, now_date, client_data_str))
+                conn.commit()
+                conn.close()
+            except:
+                pass
+
+        # 4. Lepas client dari inbounds config.json Xray & restart Xray seketika
+        if client_obj:
+            for ib in cfg.get('inbounds', []):
+                if ib.get('protocol') in ['vmess', 'vless', 'trojan']:
+                    ib['settings']['clients'] = [c for c in ib.get('settings', {}).get('clients', []) if c.get('email') != user]
+            save_json(XRAY_CONF, cfg)
+            restart_xray()
+
+        return jsonify({"stdout": "Locked"})
+    except Exception as e:
+        return jsonify({"stdout": f"Error: {e}"})
 
 @app.route('/srpcom/cek-xray', methods=['GET'])
 def cek_xray():
