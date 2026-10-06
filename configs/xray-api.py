@@ -347,7 +347,16 @@ def monitor_xray():
                     p = line.strip().split()
                     if len(p) >= 3: limits[p[0]] = {'ip': int(p[1]), 'quota': int(p[2])}
 
+        locked_set = set()
+        if os.path.exists(LOCKED_FILE):
+            try:
+                with open(LOCKED_FILE, 'r') as f:
+                    locked_data = json.load(f)
+                    locked_set = set(locked_data.keys())
+            except: pass
+
         all_users = set(list(stats.keys()) + list(ip_data.keys()))
+        all_users = {u for u in all_users if u not in locked_set}
         if not all_users: return jsonify({"stdout": "Belum ada data pemakaian Xray."})
 
         res = "📈 *XRAY MONITORING*\n━━━━━━━━━━━━━━━━━━━━\n"
