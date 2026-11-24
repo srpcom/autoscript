@@ -358,6 +358,9 @@ cat > /usr/local/etc/srpcom/env.conf << EOF
 DOMAIN="$DOMAIN"
 IP_ADD="$VPS_IP"
 VPS_NAME="$VPS_NAME"
+CF_DOMAIN=""
+CF_BUG="static.wetvinfo.com"
+CF_QUOTA_GB="100"
 EOF
 
 
@@ -429,6 +432,12 @@ cat > /usr/local/etc/xray/config.json << EOF
     {"port": 10005, "listen": "127.0.0.1", "protocol": "vmess", "settings": {"clients": []}, "streamSettings": {"network": "grpc", "sockopt": {"acceptProxyProtocol": true}, "grpcSettings": {"serviceName": "vmessgrpc"}}},
     {"port": 10006, "listen": "127.0.0.1", "protocol": "vless", "settings": {"clients": [], "decryption": "none"}, "streamSettings": {"network": "grpc", "sockopt": {"acceptProxyProtocol": true}, "grpcSettings": {"serviceName": "vlessgrpc"}}},
     {"port": 10007, "listen": "127.0.0.1", "protocol": "trojan", "settings": {"clients": []}, "streamSettings": {"network": "grpc", "sockopt": {"acceptProxyProtocol": true}, "grpcSettings": {"serviceName": "trojangrpc"}}},
+    {"port": 10011, "listen": "127.0.0.1", "protocol": "vmess", "settings": {"clients": []}, "streamSettings": {"network": "ws", "sockopt": {"acceptProxyProtocol": true}, "wsSettings": {"path": "/cf-vmess"}}},
+    {"port": 10012, "listen": "127.0.0.1", "protocol": "vless", "settings": {"clients": [], "decryption": "none"}, "streamSettings": {"network": "ws", "sockopt": {"acceptProxyProtocol": true}, "wsSettings": {"path": "/cf-vless"}}},
+    {"port": 10013, "listen": "127.0.0.1", "protocol": "trojan", "settings": {"clients": []}, "streamSettings": {"network": "ws", "sockopt": {"acceptProxyProtocol": true}, "wsSettings": {"path": "/cf-trojan"}}},
+    {"port": 10014, "listen": "127.0.0.1", "protocol": "vmess", "settings": {"clients": []}, "streamSettings": {"network": "grpc", "sockopt": {"acceptProxyProtocol": true}, "grpcSettings": {"serviceName": "cf-vmessgrpc"}}},
+    {"port": 10015, "listen": "127.0.0.1", "protocol": "vless", "settings": {"clients": [], "decryption": "none"}, "streamSettings": {"network": "grpc", "sockopt": {"acceptProxyProtocol": true}, "grpcSettings": {"serviceName": "cf-vlessgrpc"}}},
+    {"port": 10016, "listen": "127.0.0.1", "protocol": "trojan", "settings": {"clients": []}, "streamSettings": {"network": "grpc", "sockopt": {"acceptProxyProtocol": true}, "grpcSettings": {"serviceName": "cf-trojangrpc"}}},
     {"port": 10085, "listen": "127.0.0.1", "protocol": "dokodemo-door", "settings": {"address": "127.0.0.1"}, "tag": "api"}
   ],
   "outbounds": [{"protocol": "freedom"}],
@@ -777,6 +786,7 @@ echo -e "\n[7/12] Mendownload Modul Sistem dari GitHub..."
 download_file /usr/local/bin/srpcom/utils.sh core/utils.sh
 download_file /usr/local/bin/srpcom/telegram.sh core/telegram.sh
 download_file /usr/local/bin/srpcom/xray.sh core/xray.sh
+download_file /usr/local/bin/srpcom/cloudfront.sh core/cloudfront.sh
 download_file /usr/local/bin/srpcom/l2tp.sh core/l2tp.sh
 download_file /usr/local/bin/srpcom/ssh.sh core/ssh.sh
 download_file /usr/local/bin/srpcom/monitor.sh core/monitor.sh
@@ -904,6 +914,8 @@ cat > /etc/caddy/Caddyfile << EOF
 }
 
 $DOMAINS_STR {
+    @is_cloudfront header X-Amz-Cf-Id *
+
     handle /srpcom/* {
         reverse_proxy localhost:5000
     }
@@ -921,6 +933,7 @@ $DOMAINS_STR {
         respond "Server is running normally." 200
     }
     handle /vmessws* {
+        respond @is_cloudfront "CloudFront not allowed on standard path" 403
         reverse_proxy localhost:10001 {
             transport http {
                 proxy_protocol v2
@@ -928,6 +941,7 @@ $DOMAINS_STR {
         }
     }
     handle /vlessws* {
+        respond @is_cloudfront "CloudFront not allowed on standard path" 403
         reverse_proxy localhost:10002 {
             transport http {
                 proxy_protocol v2
@@ -935,6 +949,7 @@ $DOMAINS_STR {
         }
     }
     handle /trojanws* {
+        respond @is_cloudfront "CloudFront not allowed on standard path" 403
         reverse_proxy localhost:10003 {
             transport http {
                 proxy_protocol v2
@@ -942,6 +957,7 @@ $DOMAINS_STR {
         }
     }
     handle /vmessgrpc/* {
+        respond @is_cloudfront "CloudFront not allowed on standard path" 403
         reverse_proxy localhost:10005 {
             transport http {
                 versions h2c
@@ -950,6 +966,7 @@ $DOMAINS_STR {
         }
     }
     handle /vlessgrpc/* {
+        respond @is_cloudfront "CloudFront not allowed on standard path" 403
         reverse_proxy localhost:10006 {
             transport http {
                 versions h2c
@@ -958,7 +975,53 @@ $DOMAINS_STR {
         }
     }
     handle /trojangrpc/* {
+        respond @is_cloudfront "CloudFront not allowed on standard path" 403
         reverse_proxy localhost:10007 {
+            transport http {
+                versions h2c
+                proxy_protocol v2
+            }
+        }
+    }
+    handle /cf-vmess* {
+        reverse_proxy localhost:10011 {
+            transport http {
+                proxy_protocol v2
+            }
+        }
+    }
+    handle /cf-vless* {
+        reverse_proxy localhost:10012 {
+            transport http {
+                proxy_protocol v2
+            }
+        }
+    }
+    handle /cf-trojan* {
+        reverse_proxy localhost:10013 {
+            transport http {
+                proxy_protocol v2
+            }
+        }
+    }
+    handle /cf-vmessgrpc/* {
+        reverse_proxy localhost:10014 {
+            transport http {
+                versions h2c
+                proxy_protocol v2
+            }
+        }
+    }
+    handle /cf-vlessgrpc/* {
+        reverse_proxy localhost:10015 {
+            transport http {
+                versions h2c
+                proxy_protocol v2
+            }
+        }
+    }
+    handle /cf-trojangrpc/* {
+        reverse_proxy localhost:10016 {
             transport http {
                 versions h2c
                 proxy_protocol v2

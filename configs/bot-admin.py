@@ -54,7 +54,7 @@ if not BOT_TOKEN or not ADMIN_ID:
 bot = telebot.TeleBot(BOT_TOKEN)
 telebot.logger.setLevel(logging.DEBUG)
 
-PROT_MAP = {'vmess': 'vmessws', 'vless': 'vlessws', 'trojan': 'trojanws', 'ssh': 'ssh', 'l2tp': 'l2tp'}
+PROT_MAP = {'vmess': 'vmessws', 'vless': 'vlessws', 'trojan': 'trojanws', 'vmesscf': 'vmesscf', 'vlesscf': 'vlesscf', 'trojancf': 'trojancf', 'ssh': 'ssh', 'l2tp': 'l2tp'}
 
 def is_admin(message):
     return str(message.chat.id) == ADMIN_ID
@@ -149,6 +149,7 @@ def main_menu_keyboard():
         InlineKeyboardButton("🚀 VLESS", callback_data="prot_vless"),
         InlineKeyboardButton("🚀 TROJAN", callback_data="prot_trojan")
     )
+    markup.add(InlineKeyboardButton("☁️ XRAY CLOUDFRONT", callback_data="menu_cf_prots"))
     markup.add(
         InlineKeyboardButton("🔐 SSH / OVPN", callback_data="prot_ssh"),
         InlineKeyboardButton("🛡️ L2TP IPsec", callback_data="prot_l2tp")
@@ -158,6 +159,18 @@ def main_menu_keyboard():
         InlineKeyboardButton("⚙️ STATUS & BACKUP", callback_data="menu_status")
     )
     markup.add(InlineKeyboardButton("🔄 Ganti Node Server", callback_data="menu_server_selection"))
+    return markup
+
+def cf_menu_keyboard():
+    markup = InlineKeyboardMarkup(row_width=3)
+    markup.add(
+        InlineKeyboardButton("☁️ VMESS CF", callback_data="prot_vmesscf"),
+        InlineKeyboardButton("☁️ VLESS CF", callback_data="prot_vlesscf"),
+        InlineKeyboardButton("☁️ TROJAN CF", callback_data="prot_trojancf")
+    )
+    markup.add(InlineKeyboardButton("⚙️ SET KUOTA CF", callback_data="act_cf_quota"))
+    markup.add(InlineKeyboardButton("ℹ️ INFO & PATH CLOUDFRONT", callback_data="sys_cf_info"))
+    markup.add(InlineKeyboardButton("🔙 KEMBALI", callback_data="menu_main"))
     return markup
 
 def protocol_menu_keyboard(prot):
@@ -174,7 +187,8 @@ def protocol_menu_keyboard(prot):
         InlineKeyboardButton("🗑️ Del", callback_data=f"act_del_{prot}"),
         InlineKeyboardButton("🔄 Renew", callback_data=f"act_renew_{prot}")
     )
-    markup.add(InlineKeyboardButton("🔙 Back", callback_data="menu_main"))
+    back_cb = "menu_cf_prots" if prot.endswith("cf") else "menu_main"
+    markup.add(InlineKeyboardButton("🔙 Back", callback_data=back_cb))
     return markup
 
 def status_menu_keyboard():
@@ -290,10 +304,24 @@ def callback_inline(call):
         elif data == "sys_backup":
             bot.answer_callback_query(call.id, "Memproses Data Backup...")
             handle_backup_bot(chat_id)
+
+        elif data == "menu_cf_prots":
+            bot.edit_message_text("☁️ *MENU XRAY CLOUDFRONT (ISOLATED)*\nPilih protokol khusus CloudFront (Port 10011-10016):", chat_id, msg_id, reply_markup=cf_menu_keyboard(), parse_mode="Markdown")
+
+        elif data == "act_cf_quota":
+            msg = bot.send_message(chat_id, "💾 Masukkan *Kuota Fixed CloudFront (GB)*:\n_(Contoh: 100 | Ketik 0 untuk Unlimited, atau 'x' untuk batal)_", parse_mode="Markdown", reply_markup=ForceReply())
+            bot.register_next_step_handler(msg, step_cf_quota)
+
+        elif data == "sys_cf_info":
+            bot.answer_callback_query(call.id, "Mengambil info CloudFront...")
+            res_txt = api_req("cf-info", "GET", chat_id=chat_id)
+            kb = InlineKeyboardMarkup().add(InlineKeyboardButton("🔙 KEMBALI", callback_data="menu_cf_prots"))
+            send_safe_message(chat_id, res_txt, parse_mode="Markdown", reply_markup=kb)
             
         elif data.startswith("prot_"):
             prot = data.split("_")[1]
-            bot.edit_message_text(f"🔧 *MANAGE {prot.upper()}*", chat_id, msg_id, reply_markup=protocol_menu_keyboard(prot), parse_mode="Markdown")
+            prot_label = prot.replace("cf", " CLOUDFRONT").upper() if prot.endswith("cf") else f"{prot.upper()} (CLOUDFLARE)"
+            bot.edit_message_text(f"🔧 *MANAGE {prot_label}*", chat_id, msg_id, reply_markup=protocol_menu_keyboard(prot), parse_mode="Markdown")
             
         elif data.startswith("act_"):
             p = data.split("_")
@@ -382,9 +410,9 @@ def step_limit_ip(message, act, prot, api_ep, data):
         bot.send_message(message.chat.id, "❌ Error: Limit IP harus berupa Angka!")
         return
         
-    if prot == "ssh":
+    if prot == "ssh" or prot.endswith("cf"):
         execute_api(message, act, api_ep, data)
-    else: # add untuk xray yang punya Limit Kuota
+    else: # add untuk xray standar yang punya Limit Kuota
         msg = bot.send_message(message.chat.id, "💾 Berapa *Limit Kuota (GB)*?\n_(Ketik 0 untuk Unlimited, atau 'x' untuk batal)_", parse_mode="Markdown", reply_markup=ForceReply())
         bot.register_next_step_handler(msg, step_limit_quota, act, prot, api_ep, data)
 
@@ -416,6 +444,22 @@ def step_unlock_user(message):
         return
     bot.send_message(message.chat.id, "⏳ Memproses unlock ke Node Server...", parse_mode="Markdown")
     response = api_req("unlock-user", "POST", {"username": text}, chat_id=message.chat.id)
+    send_safe_message(message.chat.id, response, parse_mode="Markdown")
+
+def step_cf_quota(message):
+    text = message.text.strip()
+    if text.lower() == 'x':
+        bot.send_message(message.chat.id, "🚫 Operasi dibatalkan.")
+        return
+    try:
+        q = int(text)
+        if q < 0:
+            raise ValueError()
+    except ValueError:
+        bot.send_message(message.chat.id, "❌ Error: Kuota Fixed CF harus berupa angka bulat >= 0!")
+        return
+    bot.send_message(message.chat.id, "⏳ Menyimpan Kuota Fixed CloudFront...", parse_mode="Markdown")
+    response = api_req("cf-set-quota", "POST", {"quota_gb": q}, chat_id=message.chat.id)
     send_safe_message(message.chat.id, response, parse_mode="Markdown")
 
 if __name__ == '__main__':

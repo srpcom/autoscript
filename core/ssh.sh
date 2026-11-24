@@ -52,6 +52,12 @@ add_ssh() {
     
     msg_tg=$(echo -e "Akun Berhasil Dibuat!\n\n━━━━━━━━━━━━━━━━━━━━\nINFORMASI PREMIUM\nSSH & OVPN ACCOUNT\n━━━━━━━━━━━━━━━━━━━━\nIP-Address: ${IP_ADD}\nHostname: ${DOMAIN}\nUsername: \`${user}\`\nPassword: \`${password}\`\nLimit IP: ${lim_str}\n━━━━━━━━━━━━━━━━━━━━\nPort OpenSSH: 22\nPort Dropbear: 109, 143\nPort SSH WS HTTPS (TLS): 443\nPort SSH WS HTTP (NTLS): 80\nPort BadVPN/UDPGW: 7100, 7200, 7300\n━━━━━━━━━━━━━━━━━━━━\nOPENVPN TCP (1194): \`http://${DOMAIN}/ovpn/tcp.ovpn\`\nOPENVPN UDP (2200): \`http://${DOMAIN}/ovpn/udp.ovpn\`\n━━━━━━━━━━━━━━━━━━━━\nPayload SSH WS: \`GET /sshws HTTP/1.1[crlf]Host: ${DOMAIN}[crlf]Upgrade: websocket[crlf]Connection: Upgrade[crlf]User-Agent: [ua][crlf][crlf]\`\n━━━━━━━━━━━━━━━━━━━━\nPayload WS ENHANCED: \`GET /sshws HTTP/1.1[crlf]Host: ISI_BUG_DISINI[crlf]Upgrade: websocket[crlf]Connection: Upgrade[crlf]User-Agent: [ua][crlf][crlf]\`\n━━━━━━━━━━━━━━━━━━━━\nExpired on: ${exp_date} ${exp_time} WIB (${masaaktif} Hari)")
     
+    source /usr/local/etc/srpcom/env.conf 2>/dev/null
+    if [ -n "$CF_DOMAIN" ]; then
+        CF_BUG="${CF_BUG:-static.wetvinfo.com}"
+        msg_cli="${msg_cli}"$'\n'"━━━━━━━━━━━━━━━━━━━━"$'\n'"CLOUDFRONT SSH WS : ${CF_DOMAIN} (Bug: ${CF_BUG})"$'\n'"Payload SSH WS CF : GET /sshws HTTP/1.1[crlf]Host: ${CF_DOMAIN}[crlf]Upgrade: websocket[crlf]Connection: Upgrade[crlf]User-Agent: [ua][crlf][crlf]"
+        msg_tg="${msg_tg}"$'\n'"━━━━━━━━━━━━━━━━━━━━"$'\n'"☁️ CLOUDFRONT SSH WS : \`${CF_DOMAIN}\` (Bug: \`${CF_BUG}\`)"$'\n'"Payload SSH WS CF : \`GET /sshws HTTP/1.1[crlf]Host: ${CF_DOMAIN}[crlf]Upgrade: websocket[crlf]Connection: Upgrade[crlf]User-Agent: [ua][crlf][crlf]\`"
+    fi
     clear; echo "$msg_cli"
     send_telegram "$msg_tg"
     pause
@@ -85,6 +91,12 @@ add_trial_ssh() {
     
     msg_tg=$(echo -e "Akun Trial Dibuat!\n\n━━━━━━━━━━━━━━━━━━━━\nINFORMASI TRIAL\nSSH & OVPN ACCOUNT\n━━━━━━━━━━━━━━━━━━━━\nIP-Address: ${IP_ADD}\nHostname: ${DOMAIN}\nUsername: \`${user}\`\nPassword: \`${password}\`\nLimit IP: ${limit_ip} IP\n━━━━━━━━━━━━━━━━━━━━\nPort OpenSSH: 22\nPort Dropbear: 109, 143\nPort SSH WS HTTPS (TLS): 443\nPort SSH WS HTTP (NTLS): 80\nPort BadVPN/UDPGW: 7100, 7200, 7300\n━━━━━━━━━━━━━━━━━━━━\nOPENVPN TCP (1194): \`http://${DOMAIN}/ovpn/tcp.ovpn\`\nOPENVPN UDP (2200): \`http://${DOMAIN}/ovpn/udp.ovpn\`\n━━━━━━━━━━━━━━━━━━━━\nPayload SSH WS: \`GET /sshws HTTP/1.1[crlf]Host: ${DOMAIN}[crlf]Upgrade: websocket[crlf]Connection: Upgrade[crlf]User-Agent: [ua][crlf][crlf]\`\n━━━━━━━━━━━━━━━━━━━━\nPayload WS ENHANCED: \`GET /sshws HTTP/1.1[crlf]Host: ISI_BUG_DISINI[crlf]Upgrade: websocket[crlf]Connection: Upgrade[crlf]User-Agent: [ua][crlf][crlf]\`\n━━━━━━━━━━━━━━━━━━━━\nExpired on: ${exp_date} ${exp_time} WIB (${masaaktif})")
     
+    source /usr/local/etc/srpcom/env.conf 2>/dev/null
+    if [ -n "$CF_DOMAIN" ]; then
+        CF_BUG="${CF_BUG:-static.wetvinfo.com}"
+        msg_cli="${msg_cli}"$'\n'"━━━━━━━━━━━━━━━━━━━━"$'\n'"CLOUDFRONT SSH WS : ${CF_DOMAIN} (Bug: ${CF_BUG})"$'\n'"Payload SSH WS CF : GET /sshws HTTP/1.1[crlf]Host: ${CF_DOMAIN}[crlf]Upgrade: websocket[crlf]Connection: Upgrade[crlf]User-Agent: [ua][crlf][crlf]"
+        msg_tg="${msg_tg}"$'\n'"━━━━━━━━━━━━━━━━━━━━"$'\n'"☁️ CLOUDFRONT SSH WS : \`${CF_DOMAIN}\` (Bug: \`${CF_BUG}\`)"$'\n'"Payload SSH WS CF : \`GET /sshws HTTP/1.1[crlf]Host: ${CF_DOMAIN}[crlf]Upgrade: websocket[crlf]Connection: Upgrade[crlf]User-Agent: [ua][crlf][crlf]\`"
+    fi
     clear; echo "$msg_cli"
     send_telegram "$msg_tg"
     pause
@@ -264,6 +276,11 @@ detail_ssh() {
 
         msg_cli=$(echo -e "━━━━━━━━━━━━━━━━━━━━\nINFORMASI PREMIUM\nSSH & OVPN ACCOUNT\n━━━━━━━━━━━━━━━━━━━━\nIP-Address: ${IP_ADD}\nHostname: ${DOMAIN}\nUsername: ${user}\nPassword: ${pw}\nLimit IP: ${lim_str}\n━━━━━━━━━━━━━━━━━━━━\nPort OpenSSH: 22\nPort Dropbear: 109, 143\nPort SSH WS HTTPS (TLS): 443\nPort SSH WS HTTP (NTLS): 80\nPort BadVPN/UDPGW: 7100, 7200, 7300\n━━━━━━━━━━━━━━━━━━━━\nOPENVPN TCP (1194): http://${DOMAIN}/ovpn/tcp.ovpn\nOPENVPN UDP (2200): http://${DOMAIN}/ovpn/udp.ovpn\n━━━━━━━━━━━━━━━━━━━━\nPayload SSH WS: GET /sshws HTTP/1.1[crlf]Host: ${DOMAIN}[crlf]Upgrade: websocket[crlf]Connection: Upgrade[crlf]User-Agent: [ua][crlf][crlf]\n━━━━━━━━━━━━━━━━━━━━\nPayload WS ENHANCED: GET /sshws HTTP/1.1[crlf]Host: ISI_BUG_DISINI[crlf]Upgrade: websocket[crlf]Connection: Upgrade[crlf]User-Agent: [ua][crlf][crlf]\n━━━━━━━━━━━━━━━━━━━━\nExpired on: ${dt_str} WIB")
 
+        source /usr/local/etc/srpcom/env.conf 2>/dev/null
+        if [ -n "$CF_DOMAIN" ]; then
+            CF_BUG="${CF_BUG:-static.wetvinfo.com}"
+            msg_cli="${msg_cli}"$'\n'"━━━━━━━━━━━━━━━━━━━━"$'\n'"CLOUDFRONT SSH WS : ${CF_DOMAIN} (Bug: ${CF_BUG})"$'\n'"Payload SSH WS CF : GET /sshws HTTP/1.1[crlf]Host: ${CF_DOMAIN}[crlf]Upgrade: websocket[crlf]Connection: Upgrade[crlf]User-Agent: [ua][crlf][crlf]"
+        fi
         clear
         echo "$msg_cli"
         echo ""

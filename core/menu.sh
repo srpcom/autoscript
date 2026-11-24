@@ -6,7 +6,7 @@
 # Versi : 1.6 (Fitur: Dual Bot Architecture + Add xray gRPC)
 # ==========================================
 
-SCRIPT_VERSION="1.6 (Add xray gRPC)"
+SCRIPT_VERSION="1.7 (CloudFront Isolated + Fixed Quota)"
 
 source /usr/local/etc/srpcom/env.conf 2>/dev/null
 source /usr/local/bin/srpcom/utils.sh 2>/dev/null
@@ -15,6 +15,7 @@ source /usr/local/bin/srpcom/xray.sh 2>/dev/null
 source /usr/local/bin/srpcom/l2tp.sh 2>/dev/null
 source /usr/local/bin/srpcom/ssh.sh 2>/dev/null
 source /usr/local/bin/srpcom/monitor.sh 2>/dev/null
+source /usr/local/bin/srpcom/cloudfront.sh 2>/dev/null
 
 GITHUB_RAW="https://raw.githubusercontent.com/srpcom/autoscript/main"
 
@@ -225,8 +226,56 @@ fix_xray_proxy_protocol() {
     fi
 }
 
+migrate_cloudfront_backend() {
+    mkdir -p /usr/local/etc/srpcom
+    touch /usr/local/etc/srpcom/env.conf
+    grep -q '^CF_DOMAIN=' /usr/local/etc/srpcom/env.conf || echo 'CF_DOMAIN=""' >> /usr/local/etc/srpcom/env.conf
+    grep -q '^CF_BUG=' /usr/local/etc/srpcom/env.conf || echo 'CF_BUG="static.wetvinfo.com"' >> /usr/local/etc/srpcom/env.conf
+    grep -q '^CF_QUOTA_GB=' /usr/local/etc/srpcom/env.conf || echo 'CF_QUOTA_GB="100"' >> /usr/local/etc/srpcom/env.conf
+
+    if [ -f "/usr/local/etc/xray/config.json" ]; then
+        local added
+        added=$(python3 - << 'PY'
+import json
+p = "/usr/local/etc/xray/config.json"
+with open(p, "r") as f:
+    cfg = json.load(f)
+existing = {ib.get("port") for ib in cfg.get("inbounds", [])}
+cf_inbounds = [
+    {"port": 10011, "listen": "127.0.0.1", "protocol": "vmess", "settings": {"clients": []}, "streamSettings": {"network": "ws", "sockopt": {"acceptProxyProtocol": True}, "wsSettings": {"path": "/cf-vmess"}}},
+    {"port": 10012, "listen": "127.0.0.1", "protocol": "vless", "settings": {"clients": [], "decryption": "none"}, "streamSettings": {"network": "ws", "sockopt": {"acceptProxyProtocol": True}, "wsSettings": {"path": "/cf-vless"}}},
+    {"port": 10013, "listen": "127.0.0.1", "protocol": "trojan", "settings": {"clients": []}, "streamSettings": {"network": "ws", "sockopt": {"acceptProxyProtocol": True}, "wsSettings": {"path": "/cf-trojan"}}},
+    {"port": 10014, "listen": "127.0.0.1", "protocol": "vmess", "settings": {"clients": []}, "streamSettings": {"network": "grpc", "sockopt": {"acceptProxyProtocol": True}, "grpcSettings": {"serviceName": "cf-vmessgrpc"}}},
+    {"port": 10015, "listen": "127.0.0.1", "protocol": "vless", "settings": {"clients": [], "decryption": "none"}, "streamSettings": {"network": "grpc", "sockopt": {"acceptProxyProtocol": True}, "grpcSettings": {"serviceName": "cf-vlessgrpc"}}},
+    {"port": 10016, "listen": "127.0.0.1", "protocol": "trojan", "settings": {"clients": []}, "streamSettings": {"network": "grpc", "sockopt": {"acceptProxyProtocol": True}, "grpcSettings": {"serviceName": "cf-trojangrpc"}}}
+]
+cnt = 0
+for ib in cf_inbounds:
+    if ib["port"] not in existing:
+        cfg.setdefault("inbounds", []).append(ib)
+        cnt += 1
+if cnt > 0:
+    with open("/tmp/config_cf_mig.json", "w") as f:
+        json.dump(cfg, f, indent=2)
+print(cnt)
+PY
+)
+        if [ "${added:-0}" -gt 0 ] && [ -s /tmp/config_cf_mig.json ]; then
+            if /usr/local/bin/xray run -test -config /tmp/config_cf_mig.json >/dev/null 2>&1; then
+                mv /tmp/config_cf_mig.json /usr/local/etc/xray/config.json
+                systemctl restart xray >/dev/null 2>&1
+            else
+                rm -f /tmp/config_cf_mig.json
+            fi
+        else
+            rm -f /tmp/config_cf_mig.json 2>/dev/null
+        fi
+    fi
+}
+
 rebuild_caddyfile() {
     fix_xray_proxy_protocol
+    migrate_cloudfront_backend
     local main_domain="$DOMAIN"
     local main_str="http://$main_domain, https://$main_domain"
     
@@ -238,6 +287,8 @@ rebuild_caddyfile() {
 }
 
 (proxy_rules) {
+    @is_cloudfront header X-Amz-Cf-Id *
+
     handle /srpcom/* {
         reverse_proxy localhost:5000
     }
@@ -255,6 +306,7 @@ rebuild_caddyfile() {
         respond "Server is running normally." 200
     }
     handle /vmessws* {
+        respond @is_cloudfront "CloudFront not allowed on standard path" 403
         reverse_proxy localhost:10001 {
             transport http {
                 proxy_protocol v2
@@ -262,6 +314,7 @@ rebuild_caddyfile() {
         }
     }
     handle /vlessws* {
+        respond @is_cloudfront "CloudFront not allowed on standard path" 403
         reverse_proxy localhost:10002 {
             transport http {
                 proxy_protocol v2
@@ -269,6 +322,7 @@ rebuild_caddyfile() {
         }
     }
     handle /trojanws* {
+        respond @is_cloudfront "CloudFront not allowed on standard path" 403
         reverse_proxy localhost:10003 {
             transport http {
                 proxy_protocol v2
@@ -276,6 +330,7 @@ rebuild_caddyfile() {
         }
     }
     handle /vmessgrpc/* {
+        respond @is_cloudfront "CloudFront not allowed on standard path" 403
         reverse_proxy localhost:10005 {
             transport http {
                 versions h2c
@@ -284,6 +339,7 @@ rebuild_caddyfile() {
         }
     }
     handle /vlessgrpc/* {
+        respond @is_cloudfront "CloudFront not allowed on standard path" 403
         reverse_proxy localhost:10006 {
             transport http {
                 versions h2c
@@ -292,7 +348,53 @@ rebuild_caddyfile() {
         }
     }
     handle /trojangrpc/* {
+        respond @is_cloudfront "CloudFront not allowed on standard path" 403
         reverse_proxy localhost:10007 {
+            transport http {
+                versions h2c
+                proxy_protocol v2
+            }
+        }
+    }
+    handle /cf-vmess* {
+        reverse_proxy localhost:10011 {
+            transport http {
+                proxy_protocol v2
+            }
+        }
+    }
+    handle /cf-vless* {
+        reverse_proxy localhost:10012 {
+            transport http {
+                proxy_protocol v2
+            }
+        }
+    }
+    handle /cf-trojan* {
+        reverse_proxy localhost:10013 {
+            transport http {
+                proxy_protocol v2
+            }
+        }
+    }
+    handle /cf-vmessgrpc/* {
+        reverse_proxy localhost:10014 {
+            transport http {
+                versions h2c
+                proxy_protocol v2
+            }
+        }
+    }
+    handle /cf-vlessgrpc/* {
+        reverse_proxy localhost:10015 {
+            transport http {
+                versions h2c
+                proxy_protocol v2
+            }
+        }
+    }
+    handle /cf-trojangrpc/* {
+        reverse_proxy localhost:10016 {
             transport http {
                 versions h2c
                 proxy_protocol v2
@@ -333,8 +435,12 @@ EOF
     fi
 
     if ! cmp -s /etc/caddy/Caddyfile /tmp/temp_caddyfile; then
-        mv /tmp/temp_caddyfile /etc/caddy/Caddyfile
-        nohup bash -c "sleep 2; systemctl reload caddy" >/dev/null 2>&1 &
+        if caddy validate --config /tmp/temp_caddyfile --adapter caddyfile >/dev/null 2>&1; then
+            mv /tmp/temp_caddyfile /etc/caddy/Caddyfile
+            nohup bash -c "sleep 2; systemctl reload caddy" >/dev/null 2>&1 &
+        else
+            rm -f /tmp/temp_caddyfile
+        fi
     else
         rm -f /tmp/temp_caddyfile
     fi
@@ -380,11 +486,12 @@ menu_update() {
                 sed -i 's/\r$//' /usr/local/bin/srpcom/utils.sh 2>/dev/null
                 echo -e "\e[32m[SUCCESS]\e[0m Modul Utilitas diperbarui!"; sleep 1.5 ;;
             3) 
-                echo -e "\n=> Mengunduh xray.sh..."
+                echo -e "\n=> Mengunduh xray.sh & cloudfront.sh..."
                 download_file /usr/local/bin/srpcom/xray.sh core/xray.sh
-                chmod +x /usr/local/bin/srpcom/xray.sh
-                sed -i 's/\r$//' /usr/local/bin/srpcom/xray.sh 2>/dev/null
-                echo -e "\e[32m[SUCCESS]\e[0m Modul Xray diperbarui!"; sleep 1.5 ;;
+                download_file /usr/local/bin/srpcom/cloudfront.sh core/cloudfront.sh
+                chmod +x /usr/local/bin/srpcom/xray.sh /usr/local/bin/srpcom/cloudfront.sh
+                sed -i 's/\r$//' /usr/local/bin/srpcom/xray.sh /usr/local/bin/srpcom/cloudfront.sh 2>/dev/null
+                echo -e "\e[32m[SUCCESS]\e[0m Modul Xray & CloudFront diperbarui!"; sleep 1.5 ;;
             4) 
                 echo -e "\n=> Mengunduh ssh.sh..."
                 download_file /usr/local/bin/srpcom/ssh.sh core/ssh.sh
@@ -439,6 +546,7 @@ menu_update() {
                 download_file /usr/local/bin/srpcom/utils.sh core/utils.sh
                 download_file /usr/local/bin/srpcom/telegram.sh core/telegram.sh
                 download_file /usr/local/bin/srpcom/xray.sh core/xray.sh
+                download_file /usr/local/bin/srpcom/cloudfront.sh core/cloudfront.sh
                 download_file /usr/local/bin/srpcom/l2tp.sh core/l2tp.sh
                 download_file /usr/local/bin/srpcom/ssh.sh core/ssh.sh
                 download_file /usr/local/bin/srpcom/monitor.sh core/monitor.sh
@@ -466,8 +574,9 @@ menu_update() {
                 source /usr/local/bin/srpcom/menu.sh
                 rebuild_shortcuts
                 fix_xray_proxy_protocol
+                migrate_cloudfront_backend
                 rebuild_caddyfile
-                systemctl restart caddy xray >/dev/null 2>&1
+                systemctl restart caddy xray xray-api srpcom-bot >/dev/null 2>&1
                 echo -e "\e[32m[SUCCESS]\e[0m Seluruh sistem berhasil diperbarui!"
                 sleep 2; exec menu ;;
             11)
@@ -1393,10 +1502,11 @@ menu_settings() {
         echo " 11. Manajemen Bug / SNI"
         echo " 12. Manajemen Node Server"
         echo " 13. Rubah Banner Login SSH/VPN"
+        echo " 14. CloudFront Settings (Domain/Bug/Kuota)"
         echo "--------------------------------------"
         echo " 0/x. Kembali ke Menu Utama"
         echo "======================================"
-        read -p " Pilih opsi [0-13 or x]: " opt
+        read -p " Pilih opsi [0-14 or x]: " opt
         case $opt in
             1) menu_autobackup ;;
             2) menu_autosend ;;
@@ -1411,6 +1521,7 @@ menu_settings() {
             11) menu_extra_domain ;;
             12) menu_node_server ;;
             13) change_banner ;;
+            14) menu_cf_settings ;;
             0|x|X) break ;;
             *) echo "Pilihan tidak valid!"; sleep 1 ;;
         esac
@@ -1429,9 +1540,10 @@ main_menu() {
         echo " 6. RESTART SERVICES (All)"
         echo " 7. CEK STATUS SERVICES"
         echo " 8. UPDATE SCRIPT"
+        echo " 9. MENU CLOUDFRONT (VPN & SSH CF)"
         echo " 0/x. Exit CLI"
         echo ""
-        read -p " Pilih opsi [0-8 or x]: " opt
+        read -p " Pilih opsi [0-9 or x]: " opt
         case $opt in
             1) menu_xray ;;
             2) menu_ssh ;;
@@ -1472,6 +1584,7 @@ main_menu() {
                 echo "======================================"
                 pause ;;
             8) menu_update ;;
+            9) menu_cloudfront ;;
             0|x|X) clear; exit 0 ;;
             *) echo "Tidak valid!"; sleep 1 ;;
         esac

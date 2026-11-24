@@ -12,8 +12,11 @@ print_user_table() {
     local back_type=$1
     printf " %-3s | %-16s | %-10s\n" "No" "Username" "Sisa Hari"
     echo "--------------------------------------"
+    local cf_emails=$(jq -r '.inbounds[] | select(.port >= 10010) | .settings.clients[]?.email' /usr/local/etc/xray/config.json 2>/dev/null | sort -u)
     for i in "${!users[@]}"; do
         local user="${users[$i]}"
+        local type_tag="STD"
+        if echo "$cf_emails" | grep -qx "$user"; then type_tag="CF"; fi
         local exp_data=$(grep "^$user " /usr/local/etc/xray/expiry.txt 2>/dev/null)
         local exp_date=""
         local sisa_hari=""
@@ -44,8 +47,8 @@ print_user_table() {
         fi
         
         # Potong panjang string user max 16 char agar tabel HP tidak pecah
-        local display_user="${user:0:16}"
-        printf " %-3s | %-16s | %-10s\n" "$((i+1))." "$display_user" "$sisa_hari"
+        local display_user="${user:0:11} [${type_tag}]"
+        printf " %-3s | %-18s | %-10s\n" "$((i+1))." "$display_user" "$sisa_hari"
     done
     
     if [ "$back_type" == "hide_back" ]; then
@@ -85,7 +88,7 @@ add_vmess_ws() {
     exp_time=$(date -d "$masaaktif days" +"%H:%M:%S")
     echo "$user $exp_date $exp_time" >> /usr/local/etc/xray/expiry.txt
 
-    jq '(.inbounds[] | select(.protocol=="vmess") | .settings.clients) += [{"id": "'$uuid'", "alterId": 0, "email": "'$user'"}]' /usr/local/etc/xray/config.json > /tmp/config.json
+    jq '(.inbounds[] | select(.protocol=="vmess" and .port < 10010) | .settings.clients) += [{"id": "'$uuid'", "alterId": 0, "email": "'$user'"}]' /usr/local/etc/xray/config.json > /tmp/config.json
     if [ -s /tmp/config.json ]; then mv /tmp/config.json /usr/local/etc/xray/config.json; fi
     systemctl restart xray
     [ -f "/usr/local/bin/srpcom/db_helper.sh" ] && /usr/local/bin/srpcom/db_helper.sh db_import_from_txt 2>/dev/null
@@ -129,7 +132,7 @@ add_vless_ws() {
     exp_time=$(date -d "$masaaktif days" +"%H:%M:%S")
     echo "$user $exp_date $exp_time" >> /usr/local/etc/xray/expiry.txt
 
-    jq '(.inbounds[] | select(.protocol=="vless") | .settings.clients) += [{"id": "'$uuid'", "email": "'$user'"}]' /usr/local/etc/xray/config.json > /tmp/config.json
+    jq '(.inbounds[] | select(.protocol=="vless" and .port < 10010) | .settings.clients) += [{"id": "'$uuid'", "email": "'$user'"}]' /usr/local/etc/xray/config.json > /tmp/config.json
     if [ -s /tmp/config.json ]; then mv /tmp/config.json /usr/local/etc/xray/config.json; fi
     systemctl restart xray
     [ -f "/usr/local/bin/srpcom/db_helper.sh" ] && /usr/local/bin/srpcom/db_helper.sh db_import_from_txt 2>/dev/null
@@ -171,7 +174,7 @@ add_trojan_ws() {
     exp_time=$(date -d "$masaaktif days" +"%H:%M:%S")
     echo "$user $exp_date $exp_time" >> /usr/local/etc/xray/expiry.txt
 
-    jq '(.inbounds[] | select(.protocol=="trojan") | .settings.clients) += [{"password": "'$uuid'", "email": "'$user'"}]' /usr/local/etc/xray/config.json > /tmp/config.json
+    jq '(.inbounds[] | select(.protocol=="trojan" and .port < 10010) | .settings.clients) += [{"password": "'$uuid'", "email": "'$user'"}]' /usr/local/etc/xray/config.json > /tmp/config.json
     if [ -s /tmp/config.json ]; then mv /tmp/config.json /usr/local/etc/xray/config.json; fi
     systemctl restart xray
     [ -f "/usr/local/bin/srpcom/db_helper.sh" ] && /usr/local/bin/srpcom/db_helper.sh db_import_from_txt 2>/dev/null
@@ -213,7 +216,7 @@ add_vmess_grpc() {
     exp_time=$(date -d "$masaaktif days" +"%H:%M:%S")
     echo "$user $exp_date $exp_time" >> /usr/local/etc/xray/expiry.txt
 
-    jq '(.inbounds[] | select(.protocol=="vmess") | .settings.clients) += [{"id": "'$uuid'", "alterId": 0, "email": "'$user'"}]' /usr/local/etc/xray/config.json > /tmp/config.json
+    jq '(.inbounds[] | select(.protocol=="vmess" and .port < 10010) | .settings.clients) += [{"id": "'$uuid'", "alterId": 0, "email": "'$user'"}]' /usr/local/etc/xray/config.json > /tmp/config.json
     if [ -s /tmp/config.json ]; then mv /tmp/config.json /usr/local/etc/xray/config.json; fi
     systemctl restart xray
     [ -f "/usr/local/bin/srpcom/db_helper.sh" ] && /usr/local/bin/srpcom/db_helper.sh db_import_from_txt 2>/dev/null
@@ -257,7 +260,7 @@ add_vless_grpc() {
     exp_time=$(date -d "$masaaktif days" +"%H:%M:%S")
     echo "$user $exp_date $exp_time" >> /usr/local/etc/xray/expiry.txt
 
-    jq '(.inbounds[] | select(.protocol=="vless") | .settings.clients) += [{"id": "'$uuid'", "email": "'$user'"}]' /usr/local/etc/xray/config.json > /tmp/config.json
+    jq '(.inbounds[] | select(.protocol=="vless" and .port < 10010) | .settings.clients) += [{"id": "'$uuid'", "email": "'$user'"}]' /usr/local/etc/xray/config.json > /tmp/config.json
     if [ -s /tmp/config.json ]; then mv /tmp/config.json /usr/local/etc/xray/config.json; fi
     systemctl restart xray
     [ -f "/usr/local/bin/srpcom/db_helper.sh" ] && /usr/local/bin/srpcom/db_helper.sh db_import_from_txt 2>/dev/null
@@ -299,7 +302,7 @@ add_trojan_grpc() {
     exp_time=$(date -d "$masaaktif days" +"%H:%M:%S")
     echo "$user $exp_date $exp_time" >> /usr/local/etc/xray/expiry.txt
 
-    jq '(.inbounds[] | select(.protocol=="trojan") | .settings.clients) += [{"password": "'$uuid'", "email": "'$user'"}]' /usr/local/etc/xray/config.json > /tmp/config.json
+    jq '(.inbounds[] | select(.protocol=="trojan" and .port < 10010) | .settings.clients) += [{"password": "'$uuid'", "email": "'$user'"}]' /usr/local/etc/xray/config.json > /tmp/config.json
     if [ -s /tmp/config.json ]; then mv /tmp/config.json /usr/local/etc/xray/config.json; fi
     systemctl restart xray
     [ -f "/usr/local/bin/srpcom/db_helper.sh" ] && /usr/local/bin/srpcom/db_helper.sh db_import_from_txt 2>/dev/null
@@ -343,22 +346,22 @@ add_trial() {
     
     if [[ "$prot_opt" == "1" ]]; then
         prot="vmess"
-        jq '(.inbounds[] | select(.protocol=="vmess") | .settings.clients) += [{"id": "'$uuid'", "alterId": 0, "email": "'$user'"}]' /usr/local/etc/xray/config.json > /tmp/config.json
+        jq '(.inbounds[] | select(.protocol=="vmess" and .port < 10010) | .settings.clients) += [{"id": "'$uuid'", "alterId": 0, "email": "'$user'"}]' /usr/local/etc/xray/config.json > /tmp/config.json
     elif [[ "$prot_opt" == "2" ]]; then
         prot="vless"
-        jq '(.inbounds[] | select(.protocol=="vless") | .settings.clients) += [{"id": "'$uuid'", "email": "'$user'"}]' /usr/local/etc/xray/config.json > /tmp/config.json
+        jq '(.inbounds[] | select(.protocol=="vless" and .port < 10010) | .settings.clients) += [{"id": "'$uuid'", "email": "'$user'"}]' /usr/local/etc/xray/config.json > /tmp/config.json
     elif [[ "$prot_opt" == "3" ]]; then
         prot="trojan"
-        jq '(.inbounds[] | select(.protocol=="trojan") | .settings.clients) += [{"password": "'$uuid'", "email": "'$user'"}]' /usr/local/etc/xray/config.json > /tmp/config.json
+        jq '(.inbounds[] | select(.protocol=="trojan" and .port < 10010) | .settings.clients) += [{"password": "'$uuid'", "email": "'$user'"}]' /usr/local/etc/xray/config.json > /tmp/config.json
     elif [[ "$prot_opt" == "4" ]]; then
         prot="vmess_grpc"
-        jq '(.inbounds[] | select(.protocol=="vmess") | .settings.clients) += [{"id": "'$uuid'", "alterId": 0, "email": "'$user'"}]' /usr/local/etc/xray/config.json > /tmp/config.json
+        jq '(.inbounds[] | select(.protocol=="vmess" and .port < 10010) | .settings.clients) += [{"id": "'$uuid'", "alterId": 0, "email": "'$user'"}]' /usr/local/etc/xray/config.json > /tmp/config.json
     elif [[ "$prot_opt" == "5" ]]; then
         prot="vless_grpc"
-        jq '(.inbounds[] | select(.protocol=="vless") | .settings.clients) += [{"id": "'$uuid'", "email": "'$user'"}]' /usr/local/etc/xray/config.json > /tmp/config.json
+        jq '(.inbounds[] | select(.protocol=="vless" and .port < 10010) | .settings.clients) += [{"id": "'$uuid'", "email": "'$user'"}]' /usr/local/etc/xray/config.json > /tmp/config.json
     elif [[ "$prot_opt" == "6" ]]; then
         prot="trojan_grpc"
-        jq '(.inbounds[] | select(.protocol=="trojan") | .settings.clients) += [{"password": "'$uuid'", "email": "'$user'"}]' /usr/local/etc/xray/config.json > /tmp/config.json
+        jq '(.inbounds[] | select(.protocol=="trojan" and .port < 10010) | .settings.clients) += [{"password": "'$uuid'", "email": "'$user'"}]' /usr/local/etc/xray/config.json > /tmp/config.json
     else
         echo -e "\n=> Pilihan tidak valid!"; sleep 1; add_trial; return
     fi
@@ -579,6 +582,39 @@ show_detail() {
     prot=$1
     user=$2
     from_menu=$3
+    local is_cf=$(jq -r --arg u "$user" '[.inbounds[] | select(.port >= 10010) | .settings.clients[]? | select(.email==$u)] | length' /usr/local/etc/xray/config.json 2>/dev/null || echo 0)
+    if [ "${is_cf:-0}" -gt 0 ]; then
+        clear
+        local uuid=""
+        if [[ "$prot" == "trojan" ]]; then
+            uuid=$(jq -r --arg u "$user" '.inbounds[] | select(.protocol=="trojan" and .port >= 10010) | .settings.clients[] | select(.email==$u) | .password' /usr/local/etc/xray/config.json 2>/dev/null | head -n1)
+        else
+            uuid=$(jq -r --arg u "$user" --arg p "$prot" '.inbounds[] | select(.protocol==$p and .port >= 10010) | .settings.clients[] | select(.email==$u) | .id' /usr/local/etc/xray/config.json 2>/dev/null | head -n1)
+        fi
+        load_cf_env 2>/dev/null
+        echo "━━━━━━━━━━━━━━━━━━━━"
+        echo "❖ CLOUDFRONT XRAY/${prot^^} DETAILS ❖"
+        echo "━━━━━━━━━━━━━━━━━━━━"
+        echo "Remarks   : ${user}"
+        echo "UUID/Pass : ${uuid}"
+        echo "CF Domain : ${CF_DOMAIN}"
+        echo "Bug CF    : ${CF_BUG}"
+        local lim_q=$(grep "^${user} " /usr/local/etc/xray/limit.txt 2>/dev/null | awk '{print $3}' | head -n1)
+        local lim_q_str="Unlimited"
+        if [[ "$lim_q" =~ ^[0-9]+$ && "$lim_q" -gt 0 ]]; then lim_q_str="${lim_q} GB"; fi
+        echo "Path WS   : /cf-${prot}"
+        echo "gRPC Svc  : cf-${prot}grpc"
+        echo "LimitKuota: ${lim_q_str}"
+        if declare -F print_cf_links_for_xray >/dev/null; then print_cf_links_for_xray "$prot" "$user" "$uuid"; fi
+        echo "━━━━━━━━━━━━━━━━━━━━"
+        exp_date=$(grep "^$user " /usr/local/etc/xray/expiry.txt | cut -d' ' -f2-)
+        if [ -z "$exp_date" ]; then exp_date="Lifetime / No Exp"; else exp_date="$exp_date WIB"; fi
+        echo "Expired On : $exp_date"
+        echo ""
+        pause
+        if [ "$from_menu" == "change_uuid" ]; then menu_change_uuid; else detail_list "$prot"; fi
+        return
+    fi
     clear
     echo "━━━━━━━━━━━━━━━━━━━━"
     echo "❖ XRAY/${prot^^} CONFIG DETAILS ❖"
@@ -758,7 +794,13 @@ change_protocol_uuid() {
             exp_date=$(grep "^$selected_user " /usr/local/etc/xray/expiry.txt | cut -d' ' -f2-)
             if [ -z "$exp_date" ]; then exp_date="Lifetime / No Exp"; else exp_date="$exp_date WIB"; fi
 
-            msg_tg=$(echo -e "Update UUID/Password berhasil\n\n━━━━━━━━━━━━━━━━━━━━\n❖ XRAY/${prot^^} WS (UPDATE) ❖\n━━━━━━━━━━━━━━━━━━━━\nRemarks : \`${selected_user}\`\nIP Address : ${IP_ADD}\nDomain : ${DOMAIN}\nPort TLS : 443\nPort NONE-TLS : 80\nID/Password : \`${new_uuid}\`\nNetwork : Websocket\nWebsocket Path : /${prot}ws\n━━━━━━━━━━━━━━━━━━━━\nLINK WS TLS : \`${link_tls}\`\n━━━━━━━━━━━━━━━━━━━━\nLINK WS NONE-TLS : \`${link_none_tls}\`\n━━━━━━━━━━━━━━━━━━━━\nExpired On : ${exp_date}")
+            local is_cf_chg=$(jq -r --arg u "$selected_user" '[.inbounds[] | select(.port >= 10010) | .settings.clients[]? | select(.email==$u)] | length' /usr/local/etc/xray/config.json 2>/dev/null || echo 0)
+            if [ "${is_cf_chg:-0}" -gt 0 ] && declare -F build_cf_xray_block_tg >/dev/null; then
+                local cf_chg_tg=$(build_cf_xray_block_tg "$prot" "$selected_user" "$new_uuid")
+                msg_tg=$(echo -e "Update UUID/Password berhasil\n\n━━━━━━━━━━━━━━━━━━━━\n❖ CLOUDFRONT XRAY/${prot^^} (UPDATE) ❖\n━━━━━━━━━━━━━━━━━━━━\nRemarks : \`${selected_user}\`\nID/Password : \`${new_uuid}\`\nExpired On : ${exp_date}\n${cf_chg_tg}")
+            else
+                msg_tg=$(echo -e "Update UUID/Password berhasil\n\n━━━━━━━━━━━━━━━━━━━━\n❖ XRAY/${prot^^} WS (UPDATE) ❖\n━━━━━━━━━━━━━━━━━━━━\nRemarks : \`${selected_user}\`\nIP Address : ${IP_ADD}\nDomain : ${DOMAIN}\nPort TLS : 443\nPort NONE-TLS : 80\nID/Password : \`${new_uuid}\`\nNetwork : Websocket\nWebsocket Path : /${prot}ws\n━━━━━━━━━━━━━━━━━━━━\nLINK WS TLS : \`${link_tls}\`\n━━━━━━━━━━━━━━━━━━━━\nLINK WS NONE-TLS : \`${link_none_tls}\`\n━━━━━━━━━━━━━━━━━━━━\nExpired On : ${exp_date}")
+            fi
             send_telegram "$msg_tg"
             
             show_detail "$prot" "$selected_user" "change_uuid"
@@ -873,27 +915,29 @@ menu_xray() {
         echo "╚════════════════════════════════════╝"
         echo " Versi: ${XRAY_VER}"
         echo "======================================"
-        echo " 1. Create XRAY Account"
-        echo " 2. Delete XRAY Account"
-        echo " 3. Renew XRAY Account"
-        echo " 4. List XRAY Account"
-        echo " 5. Detail XRAY Account"
-        echo " 6. Change UUID / Password"
-        echo " 7. List Locked Accounts"
-        echo " 8. Unlock XRAY Account"
+        echo " 1. Create XRAY WS Cloudflare Account"
+        echo " 2. Create XRAY WS CloudFront Account"
+        echo " 3. Delete XRAY Account"
+        echo " 4. Renew XRAY Account"
+        echo " 5. List XRAY Account"
+        echo " 6. Detail XRAY Account"
+        echo " 7. Change UUID / Password"
+        echo " 8. List Locked Accounts"
+        echo " 9. Unlock XRAY Account"
         echo "--------------------------------------"
         echo " 0. Kembali ke Menu Utama"
         echo "======================================"
-        read -p " Pilih opsi [0-8]: " opt
+        read -p " Pilih opsi [0-9]: " opt
         case $opt in
             1) create_xray ;; 
-            2) delete_xray ;; 
-            3) renew_xray ;; 
-            4) list_xray ;;
-            5) detail_xray ;;
-            6) menu_change_uuid ;;
-            7) list_locked_xray ;;
-            8) unlock_xray_user ;;
+            2) create_xray_cloudfront ;; 
+            3) delete_xray ;; 
+            4) renew_xray ;; 
+            5) list_xray ;;
+            6) detail_xray ;;
+            7) menu_change_uuid ;;
+            8) list_locked_xray ;;
+            9) unlock_xray_user ;;
             0) break ;;
             *) echo -e "\n=> Pilihan tidak valid!"; sleep 1 ;;
         esac

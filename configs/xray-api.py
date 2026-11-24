@@ -37,6 +37,73 @@ def get_env(key):
 DOMAIN = get_env("DOMAIN")
 IP_ADD = get_env("IP_ADD")
 
+def get_cf_env():
+    cf_dom = get_env("CF_DOMAIN")
+    cf_bug = get_env("CF_BUG")
+    if cf_dom == "UNKNOWN" or not cf_dom:
+        cf_dom = ""
+    if cf_bug == "UNKNOWN" or not cf_bug:
+        cf_bug = "static.wetvinfo.com"
+    return cf_dom, cf_bug
+
+def get_cf_quota_gb():
+    raw = get_env("CF_QUOTA_GB")
+    try:
+        val = int(raw)
+        return max(0, val)
+    except:
+        return 100
+
+def format_cf_xray_block(protocol, user, uid, is_tg=False, include_ws=True):
+    cf_domain, cf_bug = get_cf_env()
+    if not cf_domain:
+        return ""
+    links = []
+    if include_ws:
+        if protocol == 'vmess':
+            d_ws = {"v":"2","ps":f"{user}_cf_ws","add":cf_domain,"port":"443","id":uid,"aid":"0","net":"ws","type":"none","host":cf_domain,"path":"/vmessws","tls":"tls","sni":cf_domain}
+            b_ws = {"v":"2","ps":f"{user}_cf_bug","add":cf_bug,"port":"443","id":uid,"aid":"0","net":"ws","type":"none","host":cf_domain,"path":"/vmessws","tls":"tls","sni":cf_domain}
+            l_ws_d = "vmess://" + base64.b64encode(json.dumps(d_ws, separators=(',', ':')).encode()).decode()
+            l_ws_b = "vmess://" + base64.b64encode(json.dumps(b_ws, separators=(',', ':')).encode()).decode()
+        elif protocol == 'vless':
+            l_ws_d = f"vless://{uid}@{cf_domain}:443?path=/vlessws&security=tls&encryption=none&host={cf_domain}&type=ws&sni={cf_domain}#{user}_cf_ws"
+            l_ws_b = f"vless://{uid}@{cf_bug}:443?path=/vlessws&security=tls&encryption=none&host={cf_domain}&type=ws&sni={cf_domain}#{user}_cf_bug"
+        else:
+            l_ws_d = f"trojan://{uid}@{cf_domain}:443?path=/trojanws&security=tls&host={cf_domain}&type=ws&sni={cf_domain}#{user}_cf_ws"
+            l_ws_b = f"trojan://{uid}@{cf_bug}:443?path=/trojanws&security=tls&host={cf_domain}&type=ws&sni={cf_domain}#{user}_cf_bug"
+        links.append(("LINK WS CF", l_ws_d))
+        links.append(("LINK WS CF BUG", l_ws_b))
+
+    if protocol == 'vmess':
+        d_gr = {"v":"2","ps":f"{user}_cf_grpc","add":cf_domain,"port":"443","id":uid,"aid":"0","net":"grpc","type":"none","host":cf_domain,"path":"vmessgrpc","tls":"tls","sni":cf_domain}
+        b_gr = {"v":"2","ps":f"{user}_cf_grpc_bug","add":cf_bug,"port":"443","id":uid,"aid":"0","net":"grpc","type":"none","host":cf_domain,"path":"vmessgrpc","tls":"tls","sni":cf_domain}
+        l_gr_d = "vmess://" + base64.b64encode(json.dumps(d_gr, separators=(',', ':')).encode()).decode()
+        l_gr_b = "vmess://" + base64.b64encode(json.dumps(b_gr, separators=(',', ':')).encode()).decode()
+    elif protocol == 'vless':
+        l_gr_d = f"vless://{uid}@{cf_domain}:443?mode=gun&security=tls&encryption=none&host={cf_domain}&type=grpc&serviceName=vlessgrpc&sni={cf_domain}#{user}_cf_grpc"
+        l_gr_b = f"vless://{uid}@{cf_bug}:443?mode=gun&security=tls&encryption=none&host={cf_domain}&type=grpc&serviceName=vlessgrpc&sni={cf_domain}#{user}_cf_grpc_bug"
+    else:
+        l_gr_d = f"trojan://{uid}@{cf_domain}:443?mode=gun&security=tls&host={cf_domain}&type=grpc&serviceName=trojangrpc&sni={cf_domain}#{user}_cf_grpc"
+        l_gr_b = f"trojan://{uid}@{cf_bug}:443?mode=gun&security=tls&host={cf_domain}&type=grpc&serviceName=trojangrpc&sni={cf_domain}#{user}_cf_grpc_bug"
+    links.append(("LINK GRPC CF", l_gr_d))
+    links.append(("LINK GRPC CF BUG", l_gr_b))
+
+    if is_tg:
+        body = "\n".join([f"{lbl} : `{val}`" for lbl, val in links])
+        return f"\n━━━━━━━━━━━━━━━━━━━━\n☁️ CLOUDFRONT : `{cf_domain}`\n🐞 Bug CF : `{cf_bug}`\n{body}"
+    else:
+        body = "\n".join([f"{lbl} : {val}" for lbl, val in links])
+        return f"\n━━━━━━━━━━━━━━━━━━━━\nCLOUDFRONT : {cf_domain} (Bug: {cf_bug})\n{body}"
+
+def format_cf_ssh_block(is_tg=False):
+    cf_domain, cf_bug = get_cf_env()
+    if not cf_domain:
+        return ""
+    payload = f"GET /sshws HTTP/1.1[crlf]Host: {cf_domain}[crlf]Upgrade: websocket[crlf]Connection: Upgrade[crlf]User-Agent: [ua][crlf][crlf]"
+    if is_tg:
+        return f"\n━━━━━━━━━━━━━━━━━━━━\n☁️ Domain CloudFront: `{cf_domain}` (Bug: `{cf_bug}`)\nPayload SSH WS CF: `{payload}`"
+    return f"\n━━━━━━━━━━━━━━━━━━━━\nDomain CloudFront: {cf_domain} (Bug: {cf_bug})\nPayload SSH WS CF: {payload}"
+
 def get_api_key():
     try:
         with open(API_KEY_FILE, 'r') as f: return f.read().strip()
@@ -194,7 +261,30 @@ def list_accounts(protocol):
         cfg = load_json(XRAY_CONF)
         target_users = []
         for ib in cfg.get('inbounds', []):
-            if ib.get('protocol') == protocol:
+            if ib.get('protocol') == protocol and ib.get('port', 0) < 10010:
+                for c in ib['settings'].get('clients', []):
+                    email = c.get('email')
+                    if email and email not in target_users:
+                        target_users.append(email)
+        exp_data = {}
+        if os.path.exists(EXP_FILE):
+            with open(EXP_FILE, 'r') as f:
+                for line in f:
+                    p = line.strip().split()
+                    if len(p) >= 3:
+                        exp_data[p[0]] = f"{p[1]} {p[2]}"
+                    elif len(p) == 2:
+                        exp_data[p[0]] = p[1]
+        for u in target_users:
+            exp = exp_data.get(u, "Lifetime")
+            raw_results.append((u, exp, protocol))
+
+    elif protocol in ['vmesscf', 'vlesscf', 'trojancf']:
+        base_prot = protocol.replace('cf', '')
+        cfg = load_json(XRAY_CONF)
+        target_users = []
+        for ib in cfg.get('inbounds', []):
+            if ib.get('protocol') == base_prot and ib.get('port', 0) >= 10010:
                 for c in ib['settings'].get('clients', []):
                     email = c.get('email')
                     if email and email not in target_users:
@@ -245,7 +335,7 @@ def list_accounts(protocol):
     tg_lines.append(f"📋 *LIST ACCOUNT {protocol.upper()}*")
     tg_lines.append("━━━━━━━━━━━━━━━━━━━━")
     
-    api_ep = protocol + 'ws' if protocol in ['vmess', 'vless', 'trojan'] else protocol
+    api_ep = protocol if protocol in ['vmesscf', 'vlesscf', 'trojancf'] else (protocol + 'ws' if protocol in ['vmess', 'vless', 'trojan'] else protocol)
     
     for u, exp_str, prot in sorted(raw_results, key=lambda x: x[0].lower()):
         exp_text, badge_class, bullet_class = parse_expiry(exp_str)
@@ -265,7 +355,7 @@ def list_accounts(protocol):
         # Add to Telegram list (using backticks so username is tap-to-copy)
         tg_lines.append(f"• `{u}` (Exp: {exp_text})")
         
-    if protocol in ['vmess', 'vless', 'trojan']:
+    if protocol in ['vmess', 'vless', 'trojan', 'vmesscf', 'vlesscf', 'trojancf']:
         icon_class = "fa-bolt text-yellow-400 bg-yellow-500/10 border border-yellow-500/20"
     elif protocol == 'ssh':
         icon_class = "fa-shield-alt text-green-400 bg-green-500/10 border border-green-500/20"
@@ -773,7 +863,6 @@ def generate_account_detail(protocol, user, uid, exp_date_str, is_trial=False, l
         f"LINK WS NONE-TLS : `{link_none}`\n"
         f"━━━━━━━━━━━━━━━━━━━━\nExpired On : {exp_date_str} WIB"
     )
-    
     return msg_cli, msg_tg
 
 @app.route('/srpcom/add-<protocol>ws', methods=['POST'])
@@ -800,7 +889,7 @@ def add_user(protocol):
     dt = datetime.datetime.now() + datetime.timedelta(days=exp)
     cfg = load_json(XRAY_CONF)
     for ib in cfg.get('inbounds', []):
-        if ib.get('protocol') == protocol:
+        if ib.get('protocol') == protocol and ib.get('port', 0) < 10010:
             cls = ib['settings']['clients']
             if protocol == 'trojan': cls.append({'password': uid, 'email': user})
             else:
@@ -830,7 +919,7 @@ def trial_user(protocol):
     dt = datetime.datetime.now() + datetime.timedelta(minutes=exp_min)
     cfg = load_json(XRAY_CONF)
     for ib in cfg.get('inbounds', []):
-        if ib.get('protocol') == protocol:
+        if ib.get('protocol') == protocol and ib.get('port', 0) < 10010:
             cls = ib['settings']['clients']
             if protocol == 'trojan': cls.append({'password': uid, 'email': user})
             else:
@@ -849,27 +938,32 @@ def trial_user(protocol):
 
 @app.route('/srpcom/detail-<protocol>ws', methods=['GET', 'POST'])
 def detail_user(protocol):
-    user = (request.json or {}).get('user')
+    user = (request.json or {}).get('user') or request.args.get('user')
     cfg = load_json(XRAY_CONF)
     uid = None
+    is_cf = False
     
     # Try exact match first
-    for ib in cfg.get('inbounds', []):
+    for ib in sorted(cfg.get('inbounds', []), key=lambda x: x.get('port', 0)):
         if ib.get('protocol') == protocol:
             for c in ib['settings']['clients']:
                 if c.get('email') == user:
                     uid = c.get('id') if protocol != 'trojan' else c.get('password')
+                    is_cf = ib.get('port', 0) >= 10010
                     break
+        if uid:
+            break
                     
     # Flexible matching for Telegram command with replaced special characters
     if not uid and user:
-        for ib in cfg.get('inbounds', []):
+        for ib in sorted(cfg.get('inbounds', []), key=lambda x: x.get('port', 0)):
             if ib.get('protocol') == protocol:
                 for c in ib['settings']['clients']:
                     email = c.get('email')
                     if email and email.replace('-', '_').replace('.', '_').replace(' ', '_') == user.replace('-', '_').replace('.', '_').replace(' ', '_'):
                         user = email
                         uid = c.get('id') if protocol != 'trojan' else c.get('password')
+                        is_cf = ib.get('port', 0) >= 10010
                         break
                 if uid:
                     break
@@ -887,7 +981,7 @@ def detail_user(protocol):
                         p = line.strip().split()
                         if len(p) >= 3: limit_ip, limit_q = int(p[1]), int(p[2]); break
                         
-        msg_cli, msg_tg = generate_account_detail(protocol, user, uid, exp_date_str, False, limit_ip, limit_q)
+        msg_cli, msg_tg = generate_account_detail_cf(protocol, user, uid, exp_date_str, False, limit_ip, limit_q) if is_cf else generate_account_detail(protocol, user, uid, exp_date_str, False, limit_ip, limit_q)
         
         # Hapus Header Pembuatan agar tidak membingungkan di Menu Detail
         msg_cli = msg_cli.replace("Pembuatan akun baru berhasil\n\n", "")
@@ -906,6 +1000,7 @@ def detail_by_uuid():
     cfg = load_json(XRAY_CONF)
     found_user = None
     found_protocol = None
+    found_is_cf = False
     
     for ib in cfg.get('inbounds', []):
         proto = ib.get('protocol')
@@ -914,12 +1009,14 @@ def detail_by_uuid():
                 if c.get('id') == target_uuid:
                     found_user = c.get('email')
                     found_protocol = proto
+                    found_is_cf = ib.get('port', 0) >= 10010
                     break
         elif proto == 'trojan':
             for c in ib.get('settings', {}).get('clients', []):
                 if c.get('password') == target_uuid:
                     found_user = c.get('email')
                     found_protocol = proto
+                    found_is_cf = ib.get('port', 0) >= 10010
                     break
         if found_user:
             break
@@ -941,7 +1038,7 @@ def detail_by_uuid():
                             limit_ip, limit_q = int(p[1]), int(p[2])
                         break
                         
-        msg_cli, msg_tg = generate_account_detail(found_protocol, found_user, target_uuid, exp_date_str, False, limit_ip, limit_q)
+        msg_cli, msg_tg = generate_account_detail_cf(found_protocol, found_user, target_uuid, exp_date_str, False, limit_ip, limit_q) if found_is_cf else generate_account_detail(found_protocol, found_user, target_uuid, exp_date_str, False, limit_ip, limit_q)
         msg_cli = msg_cli.replace("Pembuatan akun baru berhasil\n\n", "")
         msg_tg = msg_tg.replace("Pembuatan akun baru berhasil\n\n", "")
         return jsonify({"success": True, "user": found_user, "protocol": found_protocol, "stdout": msg_cli, "stdout_tg": msg_tg})
@@ -1050,7 +1147,6 @@ def generate_account_detail_grpc(protocol, user, uid, exp_date_str, is_trial=Fal
         f"LINK GRPC NONE-TLS : `{link_none}`\n"
         f"━━━━━━━━━━━━━━━━━━━━\nExpired On : {exp_date_str} WIB"
     )
-    
     return msg_cli, msg_tg
 
 
@@ -1078,7 +1174,7 @@ def add_user_grpc(protocol):
     dt = datetime.datetime.now() + datetime.timedelta(days=exp)
     cfg = load_json(XRAY_CONF)
     for ib in cfg.get('inbounds', []):
-        if ib.get('protocol') == protocol:
+        if ib.get('protocol') == protocol and ib.get('port', 0) < 10010:
             cls = ib['settings']['clients']
             if protocol == 'trojan': cls.append({'password': uid, 'email': user})
             else:
@@ -1109,7 +1205,7 @@ def trial_user_grpc(protocol):
     dt = datetime.datetime.now() + datetime.timedelta(minutes=exp_min)
     cfg = load_json(XRAY_CONF)
     for ib in cfg.get('inbounds', []):
-        if ib.get('protocol') == protocol:
+        if ib.get('protocol') == protocol and ib.get('port', 0) < 10010:
             cls = ib['settings']['clients']
             if protocol == 'trojan': cls.append({'password': uid, 'email': user})
             else:
@@ -1129,27 +1225,32 @@ def trial_user_grpc(protocol):
 
 @app.route('/srpcom/detail-<protocol>grpc', methods=['GET', 'POST'])
 def detail_user_grpc(protocol):
-    user = (request.json or {}).get('user')
+    user = (request.json or {}).get('user') or request.args.get('user')
     cfg = load_json(XRAY_CONF)
     uid = None
+    is_cf = False
     
     # Try exact match first
-    for ib in cfg.get('inbounds', []):
+    for ib in sorted(cfg.get('inbounds', []), key=lambda x: x.get('port', 0)):
         if ib.get('protocol') == protocol:
             for c in ib['settings']['clients']:
                 if c.get('email') == user:
                     uid = c.get('id') if protocol != 'trojan' else c.get('password')
+                    is_cf = ib.get('port', 0) >= 10010
                     break
+        if uid:
+            break
                     
     # Flexible matching for Telegram command with replaced special characters
     if not uid and user:
-        for ib in cfg.get('inbounds', []):
+        for ib in sorted(cfg.get('inbounds', []), key=lambda x: x.get('port', 0)):
             if ib.get('protocol') == protocol:
                 for c in ib['settings']['clients']:
                     email = c.get('email')
                     if email and email.replace('-', '_').replace('.', '_').replace(' ', '_') == user.replace('-', '_').replace('.', '_').replace(' ', '_'):
                         user = email
                         uid = c.get('id') if protocol != 'trojan' else c.get('password')
+                        is_cf = ib.get('port', 0) >= 10010
                         break
                 if uid:
                     break
@@ -1167,7 +1268,7 @@ def detail_user_grpc(protocol):
                         p = line.strip().split()
                         if len(p) >= 3: limit_ip, limit_q = int(p[1]), int(p[2]); break
                         
-        msg_cli, msg_tg = generate_account_detail_grpc(protocol, user, uid, exp_date_str, False, limit_ip, limit_q)
+        msg_cli, msg_tg = generate_account_detail_cf(protocol, user, uid, exp_date_str, False, limit_ip, limit_q) if is_cf else generate_account_detail_grpc(protocol, user, uid, exp_date_str, False, limit_ip, limit_q)
         
         # Hapus Header Pembuatan agar tidak membingungkan di Menu Detail
         msg_cli = msg_cli.replace("Pembuatan akun baru berhasil\n\n", "")
@@ -1243,6 +1344,296 @@ def renew_user_grpc(protocol):
 
 
 # ==========================================
+# ISOLATED CLOUDFRONT XRAY ENDPOINTS (/cf-*)
+# ==========================================
+def generate_account_detail_cf(protocol, user, uid, exp_date_str, is_trial=False, limit_ip=0, limit_quota=0):
+    trial_txt = " TRIAL" if is_trial else ""
+    header_txt = "Pembuatan akun trial CloudFront berhasil" if is_trial else "Pembuatan akun CloudFront baru berhasil"
+    lim_ip_str = f"{limit_ip} IP" if limit_ip > 0 else "Unlimited"
+    lim_q_str = f"{limit_quota} GB" if limit_quota > 0 else "Unlimited"
+
+    cf_domain, cf_bug = get_cf_env()
+    if not cf_domain:
+        cf_domain = DOMAIN
+
+    ws_path = f"/cf-{protocol}"
+    grpc_svc = f"cf-{protocol}grpc"
+
+    if protocol == 'vmess':
+        ws_d = {"v": "2", "ps": f"{user}_cf_ws", "add": cf_domain, "port": "443", "id": uid, "aid": "0", "net": "ws", "type": "none", "host": cf_domain, "path": ws_path, "tls": "tls", "sni": cf_domain}
+        ws_b = {"v": "2", "ps": f"{user}_cf_bug", "add": cf_bug, "port": "443", "id": uid, "aid": "0", "net": "ws", "type": "none", "host": cf_domain, "path": ws_path, "tls": "tls", "sni": cf_domain}
+        gr_d = {"v": "2", "ps": f"{user}_cf_grpc", "add": cf_domain, "port": "443", "id": uid, "aid": "0", "net": "grpc", "type": "none", "host": cf_domain, "path": grpc_svc, "tls": "tls", "sni": cf_domain}
+        gr_b = {"v": "2", "ps": f"{user}_cf_grpc_bug", "add": cf_bug, "port": "443", "id": uid, "aid": "0", "net": "grpc", "type": "none", "host": cf_domain, "path": grpc_svc, "tls": "tls", "sni": cf_domain}
+        l_ws_d = "vmess://" + base64.b64encode(json.dumps(ws_d, separators=(',', ':')).encode('utf-8')).decode('utf-8')
+        l_ws_b = "vmess://" + base64.b64encode(json.dumps(ws_b, separators=(',', ':')).encode('utf-8')).decode('utf-8')
+        l_gr_d = "vmess://" + base64.b64encode(json.dumps(gr_d, separators=(',', ':')).encode('utf-8')).decode('utf-8')
+        l_gr_b = "vmess://" + base64.b64encode(json.dumps(gr_b, separators=(',', ':')).encode('utf-8')).decode('utf-8')
+    elif protocol == 'vless':
+        l_ws_d = f"vless://{uid}@{cf_domain}:443?path={ws_path}&security=tls&encryption=none&host={cf_domain}&type=ws&sni={cf_domain}#{user}_cf_ws"
+        l_ws_b = f"vless://{uid}@{cf_bug}:443?path={ws_path}&security=tls&encryption=none&host={cf_domain}&type=ws&sni={cf_domain}#{user}_cf_bug"
+        l_gr_d = f"vless://{uid}@{cf_domain}:443?mode=gun&security=tls&encryption=none&host={cf_domain}&type=grpc&serviceName={grpc_svc}&sni={cf_domain}#{user}_cf_grpc"
+        l_gr_b = f"vless://{uid}@{cf_bug}:443?mode=gun&security=tls&encryption=none&host={cf_domain}&type=grpc&serviceName={grpc_svc}&sni={cf_domain}#{user}_cf_grpc_bug"
+    else:
+        l_ws_d = f"trojan://{uid}@{cf_domain}:443?path={ws_path}&security=tls&host={cf_domain}&type=ws&sni={cf_domain}#{user}_cf_ws"
+        l_ws_b = f"trojan://{uid}@{cf_bug}:443?path={ws_path}&security=tls&host={cf_domain}&type=ws&sni={cf_domain}#{user}_cf_bug"
+        l_gr_d = f"trojan://{uid}@{cf_domain}:443?mode=gun&security=tls&host={cf_domain}&type=grpc&serviceName={grpc_svc}&sni={cf_domain}#{user}_cf_grpc"
+        l_gr_b = f"trojan://{uid}@{cf_bug}:443?mode=gun&security=tls&host={cf_domain}&type=grpc&serviceName={grpc_svc}&sni={cf_domain}#{user}_cf_grpc_bug"
+
+    cred_label = 'Password' if protocol == 'trojan' else 'ID'
+    msg_cli = (
+        f"{header_txt}\n\n━━━━━━━━━━━━━━━━━━━━\n❖ XRAY/{protocol.upper()} CLOUDFRONT{trial_txt} ❖\n━━━━━━━━━━━━━━━━━━━━\n"
+        f"Remarks : {user}\nOrigin : {DOMAIN} ({IP_ADD})\nCF Domain : {cf_domain}\nBug Host : {cf_bug}\n"
+        f"Port TLS : 443\n{cred_label} : {uid}\n"
+        f"WS Path : {ws_path}\ngRPC Service : {grpc_svc}\n━━━━━━━━━━━━━━━━━━━━\n"
+        f"Limit IP : {lim_ip_str}\nLimit Kuota : {lim_q_str}\n━━━━━━━━━━━━━━━━━━━━\n"
+        f"LINK WS CF (Direct) : {l_ws_d}\n━━━━━━━━━━━━━━━━━━━━\n"
+        f"LINK WS CF (Bug) : {l_ws_b}\n━━━━━━━━━━━━━━━━━━━━\n"
+        f"LINK GRPC CF (Direct) : {l_gr_d}\n━━━━━━━━━━━━━━━━━━━━\n"
+        f"LINK GRPC CF (Bug) : {l_gr_b}\n"
+        f"━━━━━━━━━━━━━━━━━━━━\nExpired On : {exp_date_str} WIB"
+    )
+    msg_tg = (
+        f"{header_txt}\n\n━━━━━━━━━━━━━━━━━━━━\n❖ XRAY/{protocol.upper()} CLOUDFRONT{trial_txt} ❖\n━━━━━━━━━━━━━━━━━━━━\n"
+        f"Remarks : `{user}`\nOrigin : `{DOMAIN}` (`{IP_ADD}`)\nCF Domain : `{cf_domain}`\nBug Host : `{cf_bug}`\n"
+        f"Port TLS : 443\n{cred_label} : `{uid}`\n"
+        f"WS Path : `{ws_path}`\ngRPC Service : `{grpc_svc}`\n━━━━━━━━━━━━━━━━━━━━\n"
+        f"Limit IP : {lim_ip_str}\nLimit Kuota : {lim_q_str}\n━━━━━━━━━━━━━━━━━━━━\n"
+        f"LINK WS CF (Direct) : `{l_ws_d}`\n━━━━━━━━━━━━━━━━━━━━\n"
+        f"LINK WS CF (Bug) : `{l_ws_b}`\n━━━━━━━━━━━━━━━━━━━━\n"
+        f"LINK GRPC CF (Direct) : `{l_gr_d}`\n━━━━━━━━━━━━━━━━━━━━\n"
+        f"LINK GRPC CF (Bug) : `{l_gr_b}`\n"
+        f"━━━━━━━━━━━━━━━━━━━━\nExpired On : {exp_date_str} WIB"
+    )
+    return msg_cli, msg_tg
+
+
+@app.route('/srpcom/add-<protocol>cf', methods=['POST'])
+def add_user_cf(protocol):
+    if protocol not in ['vmess', 'vless', 'trojan']:
+        return jsonify({"stdout": "Error: Invalid protocol"}), 400
+    data = request.json or {}
+    user, exp = data.get('user'), int(data.get('exp', 30))
+    limit_ip = int(data.get('limit_ip', 0))
+    limit_quota = get_cf_quota_gb()  # Fixed quota CF enforced from env.conf
+    if not user:
+        return jsonify({"stdout": "Error: User required"}), 400
+
+    original_user = user
+    counter = 2
+    def is_xray_user(u):
+        cfg = load_json(XRAY_CONF)
+        for ib in cfg.get('inbounds', []):
+            for c in ib.get('settings', {}).get('clients', []):
+                if c.get('email') == u:
+                    return True
+        return False
+
+    while is_xray_user(user):
+        user = f"{original_user}{counter}"
+        counter += 1
+
+    uid = str(uuid.uuid4())
+    dt = datetime.datetime.now() + datetime.timedelta(days=exp)
+    cfg = load_json(XRAY_CONF)
+    inserted = False
+    for ib in cfg.get('inbounds', []):
+        if ib.get('protocol') == protocol and ib.get('port', 0) >= 10010:
+            cls = ib['settings']['clients']
+            if protocol == 'trojan':
+                cls.append({'password': uid, 'email': user})
+            else:
+                c = {'id': uid, 'email': user}
+                if protocol == 'vmess':
+                    c['alterId'] = 0
+                cls.append(c)
+            inserted = True
+    if not inserted:
+        return jsonify({"stdout": "Error: Isolated CloudFront inbound not found in config.json!"}), 500
+
+    save_json(XRAY_CONF, cfg)
+    dt_str = dt.strftime('%Y-%m-%d %H:%M:%S')
+    with open(EXP_FILE, 'a') as f:
+        f.write(f"{user} {dt_str}\n")
+    with open(LIMIT_FILE, 'a') as f:
+        f.write(f"{user} {limit_ip} {limit_quota}\n")
+    restart_xray()
+
+    msg_cli, msg_tg = generate_account_detail_cf(protocol, user, uid, dt_str, False, limit_ip, limit_quota)
+    send_telegram(msg_tg)
+    return jsonify({"stdout": msg_cli, "stdout_tg": msg_tg})
+
+
+@app.route('/srpcom/trial-<protocol>cf', methods=['POST'])
+def trial_user_cf(protocol):
+    if protocol not in ['vmess', 'vless', 'trojan']:
+        return jsonify({"stdout": "Error: Invalid protocol"}), 400
+    data = request.json or {}
+    exp_min = 60
+    limit_ip = int(data.get('limit_ip', 1))
+
+    rand_char = random.choice(string.ascii_lowercase)
+    user = f"trialcf-{datetime.datetime.now().strftime('%H%M%S')}{rand_char}"
+
+    uid = str(uuid.uuid4())
+    dt = datetime.datetime.now() + datetime.timedelta(minutes=exp_min)
+    cfg = load_json(XRAY_CONF)
+    inserted = False
+    for ib in cfg.get('inbounds', []):
+        if ib.get('protocol') == protocol and ib.get('port', 0) >= 10010:
+            cls = ib['settings']['clients']
+            if protocol == 'trojan':
+                cls.append({'password': uid, 'email': user})
+            else:
+                c = {'id': uid, 'email': user}
+                if protocol == 'vmess':
+                    c['alterId'] = 0
+                cls.append(c)
+            inserted = True
+    if not inserted:
+        return jsonify({"stdout": "Error: Isolated CloudFront inbound not found in config.json!"}), 500
+
+    save_json(XRAY_CONF, cfg)
+    dt_str = dt.strftime('%Y-%m-%d %H:%M:%S')
+    with open(EXP_FILE, 'a') as f:
+        f.write(f"{user} {dt_str}\n")
+    with open(LIMIT_FILE, 'a') as f:
+        f.write(f"{user} {limit_ip} 1\n")
+    restart_xray()
+
+    msg_cli, msg_tg = generate_account_detail_cf(protocol, user, uid, dt_str, True, limit_ip, 1)
+    send_telegram(msg_tg)
+    return jsonify({"stdout": msg_cli, "stdout_tg": msg_tg})
+
+
+@app.route('/srpcom/detail-<protocol>cf', methods=['GET', 'POST'])
+@app.route('/srpcom/detail-<protocol>cf/<path:username>', methods=['GET'])
+def detail_user_cf(protocol, username=None):
+    if protocol not in ['vmess', 'vless', 'trojan']:
+        return jsonify({"stdout": "Error: Invalid protocol"}), 400
+    user = username or (request.json or {}).get('user') or request.args.get('user')
+    cfg = load_json(XRAY_CONF)
+    uid = None
+
+    for ib in cfg.get('inbounds', []):
+        if ib.get('protocol') == protocol and ib.get('port', 0) >= 10010:
+            for c in ib['settings']['clients']:
+                if c.get('email') == user:
+                    uid = c.get('id') if protocol != 'trojan' else c.get('password')
+                    break
+        if uid:
+            break
+
+    if not uid and user:
+        for ib in cfg.get('inbounds', []):
+            if ib.get('protocol') == protocol and ib.get('port', 0) >= 10010:
+                for c in ib['settings']['clients']:
+                    email = c.get('email')
+                    if email and email.replace('-', '_').replace('.', '_').replace(' ', '_') == user.replace('-', '_').replace('.', '_').replace(' ', '_'):
+                        user = email
+                        uid = c.get('id') if protocol != 'trojan' else c.get('password')
+                        break
+                if uid:
+                    break
+
+    if uid:
+        exp_date_str, limit_ip, limit_q = "Lifetime", 0, 0
+        if os.path.exists(EXP_FILE):
+            with open(EXP_FILE, 'r') as f:
+                for line in f:
+                    if line.startswith(user + ' '):
+                        exp_date_str = line.strip().split(' ', 1)[1]
+                        break
+        if os.path.exists(LIMIT_FILE):
+            with open(LIMIT_FILE, 'r') as f:
+                for line in f:
+                    if line.startswith(user + ' '):
+                        p = line.strip().split()
+                        if len(p) >= 3:
+                            limit_ip, limit_q = int(p[1]), int(p[2])
+                        break
+
+        msg_cli, msg_tg = generate_account_detail_cf(protocol, user, uid, exp_date_str, False, limit_ip, limit_q)
+        msg_cli = msg_cli.replace("Pembuatan akun CloudFront baru berhasil\n\n", "")
+        msg_tg = msg_tg.replace("Pembuatan akun CloudFront baru berhasil\n\n", "")
+        return jsonify({"stdout": msg_cli, "stdout_tg": msg_tg})
+    return jsonify({"stdout": f"Error: User CloudFront `{user}` tidak ditemukan!"})
+
+
+@app.route('/srpcom/del-<protocol>cf', methods=['DELETE', 'POST'])
+def del_user_cf(protocol):
+    if protocol not in ['vmess', 'vless', 'trojan']:
+        return jsonify({"stdout": "Error: Invalid protocol"}), 400
+    user = (request.json or {}).get('user')
+    if not user:
+        return jsonify({"stdout": "Error: User required"}), 400
+    cfg = load_json(XRAY_CONF)
+    found = False
+    for ib in cfg.get('inbounds', []):
+        if ib.get('protocol') == protocol and ib.get('port', 0) >= 10010:
+            cls = ib['settings'].get('clients', [])
+            ib['settings']['clients'] = [c for c in cls if c.get('email') != user]
+            if len(cls) != len(ib['settings']['clients']):
+                found = True
+    if found:
+        save_json(XRAY_CONF, cfg)
+        remove_from_txt(EXP_FILE, user)
+        remove_from_txt(LIMIT_FILE, user)
+        restart_xray()
+        return jsonify({"stdout": f"✅ Akun CloudFront '{user}' berhasil dihapus!"})
+    return jsonify({"stdout": f"❌ Gagal: Akun CloudFront '{user}' tidak ditemukan."})
+
+
+@app.route('/srpcom/renew-<protocol>cf', methods=['POST'])
+def renew_user_cf(protocol):
+    if protocol not in ['vmess', 'vless', 'trojan']:
+        return jsonify({"stdout": "Error: Invalid protocol"}), 400
+    user, exp = (request.json or {}).get('user'), int((request.json or {}).get('exp', 30))
+    if not user:
+        return jsonify({"stdout": "Error: User required"}), 400
+
+    cfg = load_json(XRAY_CONF)
+    in_cf = any(
+        ib.get('protocol') == protocol and ib.get('port', 0) >= 10010 and any(c.get('email') == user for c in ib.get('settings', {}).get('clients', []))
+        for ib in cfg.get('inbounds', [])
+    )
+    if not in_cf:
+        return jsonify({"stdout": f"❌ Gagal: Akun CloudFront '{user}' tidak ditemukan."})
+
+    dt_str = "Error"
+    found = False
+    if os.path.exists(EXP_FILE):
+        with open(EXP_FILE, "r") as f:
+            lines = f.readlines()
+        with open(EXP_FILE, "w") as f:
+            for line in lines:
+                if line.startswith(user + " "):
+                    try:
+                        curr_dt_str = line.strip().split(' ', 1)[1]
+                        curr_dt = datetime.datetime.strptime(curr_dt_str, '%Y-%m-%d %H:%M:%S')
+                        now = datetime.datetime.now()
+                        dt = (curr_dt if curr_dt > now else now) + datetime.timedelta(days=exp)
+                    except:
+                        dt = datetime.datetime.now() + datetime.timedelta(days=exp)
+                    dt_str = dt.strftime('%Y-%m-%d %H:%M:%S')
+                    f.write(f"{user} {dt_str}\n")
+                    found = True
+                else:
+                    f.write(line)
+    if found:
+        msg_tg = (
+            f"🕑 Akun CloudFront Diperpanjang\n\n"
+            f"💻 Server: {DOMAIN}\n"
+            f"Type : {protocol.upper()} CLOUDFRONT\n"
+            f"🔑 Akun: `{user}`\n"
+            f"⏳ Durasi: +{exp} hari\n"
+            f"📅 Expired Baru: {dt_str} WIB"
+        )
+        send_telegram(msg_tg)
+        return jsonify({"stdout": f"✅ Akun CloudFront '{user}' berhasil diperpanjang!\nExpired baru: {dt_str} WIB", "stdout_tg": msg_tg})
+    return jsonify({"stdout": f"❌ Gagal: Data expired akun CloudFront '{user}' tidak ditemukan."})
+
+
+# ==========================================
 # SSH ENDPOINTS
 # ==========================================
 @app.route('/srpcom/add-ssh', methods=['POST'])
@@ -1276,7 +1667,7 @@ def add_ssh():
         f"OPENVPN TCP (1194): http://{DOMAIN}/ovpn/tcp.ovpn\nOPENVPN UDP (2200): http://{DOMAIN}/ovpn/udp.ovpn\n━━━━━━━━━━━━━━━━━━━━\n"
         f"Payload SSH WS: GET /sshws HTTP/1.1[crlf]Host: {DOMAIN}[crlf]Upgrade: websocket[crlf]Connection: Upgrade[crlf]User-Agent: [ua][crlf][crlf]\n━━━━━━━━━━━━━━━━━━━━\n"
         f"Payload WS ENHANCED: GET /sshws HTTP/1.1[crlf]Host: ISI_BUG_DISINI[crlf]Upgrade: websocket[crlf]Connection: Upgrade[crlf]User-Agent: [ua][crlf][crlf]\n━━━━━━━━━━━━━━━━━━━━\n"
-        f"Expired on: {exp_date} {exp_time} WIB ({exp} Hari)"
+        f"Expired on: {exp_date} {exp_time} WIB ({exp} Hari)" + format_cf_ssh_block(False)
     )
     
     msg_tg = (
@@ -1286,7 +1677,7 @@ def add_ssh():
         f"OPENVPN TCP (1194): `http://{DOMAIN}/ovpn/tcp.ovpn`\nOPENVPN UDP (2200): `http://{DOMAIN}/ovpn/udp.ovpn`\n━━━━━━━━━━━━━━━━━━━━\n"
         f"Payload SSH WS: `GET /sshws HTTP/1.1[crlf]Host: {DOMAIN}[crlf]Upgrade: websocket[crlf]Connection: Upgrade[crlf]User-Agent: [ua][crlf][crlf]`\n━━━━━━━━━━━━━━━━━━━━\n"
         f"Payload WS ENHANCED: `GET /sshws HTTP/1.1[crlf]Host: ISI_BUG_DISINI[crlf]Upgrade: websocket[crlf]Connection: Upgrade[crlf]User-Agent: [ua][crlf][crlf]`\n━━━━━━━━━━━━━━━━━━━━\n"
-        f"Expired on: {exp_date} {exp_time} WIB ({exp} Hari)"
+        f"Expired on: {exp_date} {exp_time} WIB ({exp} Hari)" + format_cf_ssh_block(True)
     )
     send_telegram(msg_tg)
     return jsonify({"stdout": msg_cli, "stdout_tg": msg_tg})
@@ -1384,7 +1775,7 @@ def detail_ssh():
                         f"OPENVPN TCP (1194): http://{DOMAIN}/ovpn/tcp.ovpn\nOPENVPN UDP (2200): http://{DOMAIN}/ovpn/udp.ovpn\n━━━━━━━━━━━━━━━━━━━━\n"
                         f"Payload SSH WS: GET /sshws HTTP/1.1[crlf]Host: {DOMAIN}[crlf]Upgrade: websocket[crlf]Connection: Upgrade[crlf]User-Agent: [ua][crlf][crlf]\n━━━━━━━━━━━━━━━━━━━━\n"
                         f"Payload WS ENHANCED: GET /sshws HTTP/1.1[crlf]Host: ISI_BUG_DISINI[crlf]Upgrade: websocket[crlf]Connection: Upgrade[crlf]User-Agent: [ua][crlf][crlf]\n━━━━━━━━━━━━━━━━━━━━\n"
-                        f"Expired on: {dt_str} WIB"
+                        f"Expired on: {dt_str} WIB" + format_cf_ssh_block(False)
                     )
                     
                     msg_tg = (
@@ -1394,7 +1785,7 @@ def detail_ssh():
                         f"OPENVPN TCP (1194): `http://{DOMAIN}/ovpn/tcp.ovpn`\nOPENVPN UDP (2200): `http://{DOMAIN}/ovpn/udp.ovpn`\n━━━━━━━━━━━━━━━━━━━━\n"
                         f"Payload SSH WS: `GET /sshws HTTP/1.1[crlf]Host: {DOMAIN}[crlf]Upgrade: websocket[crlf]Connection: Upgrade[crlf]User-Agent: [ua][crlf][crlf]`\n━━━━━━━━━━━━━━━━━━━━\n"
                         f"Payload WS ENHANCED: `GET /sshws HTTP/1.1[crlf]Host: ISI_BUG_DISINI[crlf]Upgrade: websocket[crlf]Connection: Upgrade[crlf]User-Agent: [ua][crlf][crlf]`\n━━━━━━━━━━━━━━━━━━━━\n"
-                        f"Expired on: {dt_str} WIB"
+                        f"Expired on: {dt_str} WIB" + format_cf_ssh_block(True)
                     )
                     found = True
                     break
@@ -1426,7 +1817,7 @@ def trial_ssh():
         f"OPENVPN TCP (1194): http://{DOMAIN}/ovpn/tcp.ovpn\nOPENVPN UDP (2200): http://{DOMAIN}/ovpn/udp.ovpn\n━━━━━━━━━━━━━━━━━━━━\n"
         f"Payload SSH WS: GET /sshws HTTP/1.1[crlf]Host: {DOMAIN}[crlf]Upgrade: websocket[crlf]Connection: Upgrade[crlf]User-Agent: [ua][crlf][crlf]\n━━━━━━━━━━━━━━━━━━━━\n"
         f"Payload WS ENHANCED: GET /sshws HTTP/1.1[crlf]Host: ISI_BUG_DISINI[crlf]Upgrade: websocket[crlf]Connection: Upgrade[crlf]User-Agent: [ua][crlf][crlf]\n━━━━━━━━━━━━━━━━━━━━\n"
-        f"Expired on: {exp_date} {exp_time} WIB (60 Menit)"
+        f"Expired on: {exp_date} {exp_time} WIB (60 Menit)" + format_cf_ssh_block(False)
     )
     
     msg_tg = (
@@ -1436,7 +1827,7 @@ def trial_ssh():
         f"OPENVPN TCP (1194): `http://{DOMAIN}/ovpn/tcp.ovpn`\nOPENVPN UDP (2200): `http://{DOMAIN}/ovpn/udp.ovpn`\n━━━━━━━━━━━━━━━━━━━━\n"
         f"Payload SSH WS: `GET /sshws HTTP/1.1[crlf]Host: {DOMAIN}[crlf]Upgrade: websocket[crlf]Connection: Upgrade[crlf]User-Agent: [ua][crlf][crlf]`\n━━━━━━━━━━━━━━━━━━━━\n"
         f"Payload WS ENHANCED: `GET /sshws HTTP/1.1[crlf]Host: ISI_BUG_DISINI[crlf]Upgrade: websocket[crlf]Connection: Upgrade[crlf]User-Agent: [ua][crlf][crlf]`\n━━━━━━━━━━━━━━━━━━━━\n"
-        f"Expired on: {exp_date} {exp_time} WIB (60 Menit)"
+        f"Expired on: {exp_date} {exp_time} WIB (60 Menit)" + format_cf_ssh_block(True)
     )
     send_telegram(msg_tg)
     return jsonify({"stdout": msg_cli, "stdout_tg": msg_tg})
@@ -1702,6 +2093,7 @@ def change_uuid():
     found = False
     target_user = None
     target_protocol = None
+    target_is_cf = False
     
     for ib in cfg.get('inbounds', []):
         if ib.get('protocol') in ['vmess', 'vless']:
@@ -1710,6 +2102,8 @@ def change_uuid():
                     c['id'] = new_uuid
                     target_user = c.get('email')
                     target_protocol = ib.get('protocol')
+                    if ib.get('port', 0) >= 10010:
+                        target_is_cf = True
                     found = True
         elif ib.get('protocol') == 'trojan':
             for c in ib['settings'].get('clients', []):
@@ -1717,6 +2111,8 @@ def change_uuid():
                     c['password'] = new_uuid
                     target_user = c.get('email')
                     target_protocol = ib.get('protocol')
+                    if ib.get('port', 0) >= 10010:
+                        target_is_cf = True
                     found = True
                     
     if found:
@@ -1741,10 +2137,12 @@ def change_uuid():
                             limit_ip, limit_quota = int(p[1]), int(p[2])
                         break
                         
-        msg_cli, msg_tg = generate_account_detail(target_protocol, target_user, new_uuid, exp_date_str, False, limit_ip, limit_quota)
+        msg_cli, msg_tg = generate_account_detail_cf(target_protocol, target_user, new_uuid, exp_date_str, False, limit_ip, limit_quota) if target_is_cf else generate_account_detail(target_protocol, target_user, new_uuid, exp_date_str, False, limit_ip, limit_quota)
         
         # Ganti Judul
+        msg_tg = msg_tg.replace("Pembuatan akun CloudFront baru berhasil", "Update UUID/Password CloudFront berhasil")
         msg_tg = msg_tg.replace("Pembuatan akun baru berhasil", "Update UUID/Password berhasil")
+        msg_tg = msg_tg.replace(f"❖ XRAY/{target_protocol.upper()} CLOUDFRONT ❖", f"❖ XRAY/{target_protocol.upper()} CLOUDFRONT (UPDATE) ❖")
         msg_tg = msg_tg.replace(f"❖ XRAY/{target_protocol.upper()} WS ❖", f"❖ XRAY/{target_protocol.upper()} WS (UPDATE) ❖")
         
         send_telegram(msg_tg)
@@ -1755,6 +2153,93 @@ def change_uuid():
         })
         
     return jsonify({"stdout": f"❌ UUID lama '{old_uuid}' tidak ditemukan di sistem."})
+
+@app.route('/srpcom/cf-quota', methods=['GET'])
+def cf_get_quota():
+    q = get_cf_quota_gb()
+    q_str = f"{q} GB (Fixed)" if q > 0 else "Unlimited (0)"
+    return jsonify({
+        "quota_gb": q,
+        "stdout": f"Fixed Kuota CloudFront saat ini: {q_str}",
+        "stdout_tg": f"💾 *Fixed Kuota CloudFront:* `{q_str}`"
+    })
+
+@app.route('/srpcom/cf-set-quota', methods=['POST'])
+def cf_set_quota():
+    data = request.json or {}
+    if 'quota_gb' not in data:
+        return jsonify({"stdout": "Error: quota_gb required"}), 400
+    try:
+        quota_gb = int(data.get('quota_gb'))
+    except:
+        return jsonify({"stdout": "Error: quota_gb harus berupa angka bulat >= 0"}), 400
+    if quota_gb < 0:
+        return jsonify({"stdout": "Error: quota_gb harus >= 0"}), 400
+
+    lines = []
+    found = False
+    if os.path.exists(ENV_FILE):
+        with open(ENV_FILE, 'r') as f:
+            for line in f:
+                if line.startswith('CF_QUOTA_GB='):
+                    lines.append(f'CF_QUOTA_GB="{quota_gb}"\n')
+                    found = True
+                else:
+                    lines.append(line if line.endswith('\n') else line + '\n')
+    if not found:
+        lines.append(f'CF_QUOTA_GB="{quota_gb}"\n')
+    with open(ENV_FILE, 'w') as f:
+        f.writelines(lines)
+
+    q_str = f"{quota_gb} GB (Fixed)" if quota_gb > 0 else "Unlimited (0)"
+    return jsonify({
+        "quota_gb": quota_gb,
+        "stdout": f"✅ Fixed Kuota CloudFront berhasil diatur ke {q_str}.",
+        "stdout_tg": f"✅ *Fixed Kuota CloudFront diperbarui:* `{q_str}`\nSemua akun CloudFront baru otomatis menggunakan kuota ini."
+    })
+
+@app.route('/srpcom/cf-info', methods=['GET'])
+def cf_info():
+    cf_domain, cf_bug = get_cf_env()
+    cf_quota = get_cf_quota_gb()
+    cf_quota_str = f"{cf_quota} GB (Fixed)" if cf_quota > 0 else "Unlimited"
+    svc_status = {}
+    for s in ('caddy', 'xray', 'ssh-ws'):
+        try:
+            r = subprocess.run(['systemctl', 'is-active', s], capture_output=True, text=True, timeout=3)
+            svc_status[s] = r.stdout.strip() or 'inactive'
+        except:
+            svc_status[s] = 'unknown'
+
+    txt_cli = (
+        f"☁️ CLOUDFRONT ISOLATED INFO — {DOMAIN}\n"
+        f"Origin Domain : {DOMAIN} ({IP_ADD})\n"
+        f"CF Domain     : {cf_domain or 'Belum diset'}\n"
+        f"Bug Default   : {cf_bug}\n"
+        f"Fixed Kuota   : {cf_quota_str}\n"
+        f"Services      : caddy={svc_status['caddy']}, xray={svc_status['xray']}, ssh-ws={svc_status['ssh-ws']}\n"
+        f"CF Ports      : 10011-10016 (Terisolasi dari port Cloudflare 10001-10007)\n"
+        f"CF WS Path    : /cf-vmess, /cf-vless, /cf-trojan (SSH WS: /sshws)\n"
+        f"CF gRPC Svc   : cf-vmessgrpc, cf-vlessgrpc, cf-trojangrpc\n"
+        f"Anti-Leak     : Path standar /vmessws, /vlessws, /trojanws memblokir CloudFront (403)"
+    )
+    txt_tg = (
+        f"☁️ *CLOUDFRONT ISOLATED INFO (OPSI B)*\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"💻 *Origin Server:* `{DOMAIN}` (`{IP_ADD}`)\n"
+        f"🌐 *CloudFront Domain:* `{cf_domain or 'Belum diset'}`\n"
+        f"🐞 *Bug Default:* `{cf_bug}`\n"
+        f"💾 *Fixed Kuota CF:* `{cf_quota_str}`\n"
+        f"⚙️ *Services:* Caddy `{svc_status['caddy']}` | Xray `{svc_status['xray']}` | SSH-WS `{svc_status['ssh-ws']}`\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"📌 *Isolated CloudFront Path (Port 10011-10016):*\n"
+        f"• WS CF: `/cf-vmess`, `/cf-vless`, `/cf-trojan`\n"
+        f"• gRPC CF: `cf-vmessgrpc`, `cf-vlessgrpc`, `cf-trojangrpc`\n"
+        f"• SSH WS: `/sshws`\n"
+        f"🛡️ *Anti-Leak:* Header CloudFront (`X-Amz-Cf-Id`) di path standar diblokir HTTP `403`.\n\n"
+        f"💡 _Gunakan menu *☁️ XRAY CLOUDFRONT* di bot untuk mengelola akun khusus CloudFront!_"
+    )
+    return jsonify({"stdout": txt_cli, "stdout_tg": txt_tg})
 
 if __name__ == '__main__':
     app.run(host='127.0.0.1', port=5000)
