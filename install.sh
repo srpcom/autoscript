@@ -860,27 +860,42 @@ ufw allow 2200/udp
 ufw allow 7100/udp
 ufw allow 7200/udp
 ufw allow 7300/udp
+if [ -f /etc/default/ufw ]; then
+    sed -i 's/DEFAULT_FORWARD_POLICY=.*/DEFAULT_FORWARD_POLICY="ACCEPT"/' /etc/default/ufw
+fi
 ufw --force enable
 
 
 ETH=$(ip route ls | grep default | awk '{print $5}' | head -n 1)
 cat > /etc/systemd/system/vpn-nat.service << EOF
 [Unit]
-Description=VPN NAT IPTables Rules (L2TP & OVPN)
+Description=VPN NAT IPTables Rules (L2TP, WireGuard, OVPN)
 After=network.target ufw.service
+Wants=network.target
 [Service]
 Type=oneshot
-ExecStart=/sbin/iptables -t nat -A POSTROUTING -s 192.168.42.0/24 -o $ETH -j MASQUERADE
-ExecStart=/sbin/iptables -t nat -A POSTROUTING -s 10.8.0.0/24 -o $ETH -j MASQUERADE
-ExecStart=/sbin/iptables -t nat -A POSTROUTING -s 10.9.0.0/24 -o $ETH -j MASQUERADE
 RemainAfterExit=yes
+ExecStart=/bin/bash -c '\
+    NIC=\$(ip route show default 2>/dev/null | awk "{print \\\\\$5}" | head -n1); \
+    [ -z "\$NIC" ] && NIC=\$(ip link | awk -F: "\\\\\$0 !~ \\\\\\"lo|vir|wl|^[^0-9]\\\\\\"{print \\\\\$2;getline}" | head -n1 | tr -d " "); \
+    iptables -t nat -C POSTROUTING -s 192.168.42.0/24 -o "\$NIC" -j MASQUERADE 2>/dev/null || iptables -t nat -A POSTROUTING -s 192.168.42.0/24 -o "\$NIC" -j MASQUERADE; \
+    iptables -t nat -C POSTROUTING -s 10.8.0.0/24 -o "\$NIC" -j MASQUERADE 2>/dev/null || iptables -t nat -A POSTROUTING -s 10.8.0.0/24 -o "\$NIC" -j MASQUERADE; \
+    iptables -t nat -C POSTROUTING -s 10.9.0.0/24 -o "\$NIC" -j MASQUERADE 2>/dev/null || iptables -t nat -A POSTROUTING -s 10.9.0.0/24 -o "\$NIC" -j MASQUERADE; \
+    iptables -C FORWARD -i ppp+ -j ACCEPT 2>/dev/null || iptables -I FORWARD 1 -i ppp+ -j ACCEPT; \
+    iptables -C FORWARD -o ppp+ -j ACCEPT 2>/dev/null || iptables -I FORWARD 1 -o ppp+ -j ACCEPT; \
+    iptables -t mangle -C FORWARD -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu 2>/dev/null || iptables -t mangle -I FORWARD 1 -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu; \
+'
 [Install]
 WantedBy=multi-user.target
 EOF
 systemctl daemon-reload
 systemctl enable vpn-nat
-systemctl start vpn-nat
+systemctl restart vpn-nat
+iptables -C FORWARD -i ppp+ -j ACCEPT 2>/dev/null || iptables -I FORWARD 1 -i ppp+ -j ACCEPT
+iptables -C FORWARD -o ppp+ -j ACCEPT 2>/dev/null || iptables -I FORWARD 1 -o ppp+ -j ACCEPT
+iptables -t mangle -C FORWARD -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu 2>/dev/null || iptables -t mangle -I FORWARD 1 -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu
 sed -i '/net.ipv4.ip_forward/s/^#//g' /etc/sysctl.conf
+grep -q '^net.ipv4.ip_forward=1' /etc/sysctl.conf || echo 'net.ipv4.ip_forward=1' >> /etc/sysctl.conf
 sysctl -p
 
 
