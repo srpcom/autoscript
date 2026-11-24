@@ -232,6 +232,7 @@ migrate_cloudfront_backend() {
     grep -q '^CF_DOMAIN=' /usr/local/etc/srpcom/env.conf || echo 'CF_DOMAIN=""' >> /usr/local/etc/srpcom/env.conf
     grep -q '^CF_BUG=' /usr/local/etc/srpcom/env.conf || echo 'CF_BUG="static.wetvinfo.com"' >> /usr/local/etc/srpcom/env.conf
     grep -q '^CF_QUOTA_GB=' /usr/local/etc/srpcom/env.conf || echo 'CF_QUOTA_GB="100"' >> /usr/local/etc/srpcom/env.conf
+    if declare -F auto_detect_cf_domain >/dev/null; then auto_detect_cf_domain 0; fi
 
     if [ -f "/usr/local/etc/xray/config.json" ]; then
         local added
@@ -486,11 +487,12 @@ menu_update() {
                 sed -i 's/\r$//' /usr/local/bin/srpcom/utils.sh 2>/dev/null
                 echo -e "\e[32m[SUCCESS]\e[0m Modul Utilitas diperbarui!"; sleep 1.5 ;;
             3) 
-                echo -e "\n=> Mengunduh xray.sh & cloudfront.sh..."
+                echo -e "\n=> Mengunduh xray.sh, cloudfront.sh & cf_map.conf..."
                 download_file /usr/local/bin/srpcom/xray.sh core/xray.sh
                 download_file /usr/local/bin/srpcom/cloudfront.sh core/cloudfront.sh
+                download_file /usr/local/etc/srpcom/cf_map.conf core/cf_map.conf
                 chmod +x /usr/local/bin/srpcom/xray.sh /usr/local/bin/srpcom/cloudfront.sh
-                sed -i 's/\r$//' /usr/local/bin/srpcom/xray.sh /usr/local/bin/srpcom/cloudfront.sh 2>/dev/null
+                sed -i 's/\r$//' /usr/local/bin/srpcom/xray.sh /usr/local/bin/srpcom/cloudfront.sh /usr/local/etc/srpcom/cf_map.conf 2>/dev/null
                 echo -e "\e[32m[SUCCESS]\e[0m Modul Xray & CloudFront diperbarui!"; sleep 1.5 ;;
             4) 
                 echo -e "\n=> Mengunduh ssh.sh..."
@@ -547,6 +549,7 @@ menu_update() {
                 download_file /usr/local/bin/srpcom/telegram.sh core/telegram.sh
                 download_file /usr/local/bin/srpcom/xray.sh core/xray.sh
                 download_file /usr/local/bin/srpcom/cloudfront.sh core/cloudfront.sh
+                download_file /usr/local/etc/srpcom/cf_map.conf core/cf_map.conf
                 download_file /usr/local/bin/srpcom/l2tp.sh core/l2tp.sh
                 download_file /usr/local/bin/srpcom/ssh.sh core/ssh.sh
                 download_file /usr/local/bin/srpcom/monitor.sh core/monitor.sh
@@ -561,7 +564,7 @@ menu_update() {
                 download_file /usr/local/etc/srpcom/panel/api-docs.html core/api-docs.html
                 
                 chmod +x /usr/local/bin/srpcom/*.sh /usr/local/bin/xray-api.py /usr/local/bin/bot-admin.py
-                sed -i 's/\r$//' /usr/local/bin/srpcom/*.sh /usr/local/bin/xray-api.py /usr/local/bin/bot-admin.py /usr/local/etc/srpcom/panel/*.html 2>/dev/null
+                sed -i 's/\r$//' /usr/local/bin/srpcom/*.sh /usr/local/bin/xray-api.py /usr/local/bin/bot-admin.py /usr/local/etc/srpcom/panel/*.html /usr/local/etc/srpcom/cf_map.conf 2>/dev/null
                 
                 # Jalankan migrasi data lama ke SQLite terpusat
                 /usr/local/bin/srpcom/db_helper.sh db_import_from_txt 2>/dev/null
@@ -861,6 +864,7 @@ change_domain() {
     echo -e "\n=> Memperbarui konfigurasi..."
     sed -i "s/^DOMAIN=.*/DOMAIN=\"$new_domain\"/g" /usr/local/etc/srpcom/env.conf
     source /usr/local/etc/srpcom/env.conf
+    if declare -F auto_detect_cf_domain >/dev/null; then auto_detect_cf_domain 1 "$new_domain"; fi
     rebuild_caddyfile
 
     CA_CERT=$(cat /etc/openvpn/server/keys/ca.crt 2>/dev/null)

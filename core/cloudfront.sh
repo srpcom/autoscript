@@ -19,6 +19,25 @@ save_cf_env() {
     systemctl restart xray-api srpcom-bot 2>/dev/null
 }
 
+auto_detect_cf_domain() {
+    local force="${1:-0}"
+    local target_dom="${2:-}"
+    load_cf_env
+    [ -z "$target_dom" ] && target_dom="$DOMAIN"
+    target_dom=$(echo "$target_dom" | tr '[:upper:]' '[:lower:]' | xargs)
+    local map_file="/usr/local/etc/srpcom/cf_map.conf"
+    if [ -z "$target_dom" ] || [ ! -f "$map_file" ]; then return 0; fi
+    local mapped_cf
+    mapped_cf=$(grep -i "^${target_dom}=" "$map_file" 2>/dev/null | head -n1 | cut -d'=' -f2- | tr -d '\r' | xargs)
+    if [ -n "$mapped_cf" ]; then
+        if [ "$force" == "1" ] || [ -z "$CF_DOMAIN" ]; then
+            CF_DOMAIN="$mapped_cf"
+            save_cf_env
+            echo -e "\e[32m[AUTO-CF]\e[0m Domain CloudFront otomatis diset: ${target_dom} -> ${CF_DOMAIN}"
+        fi
+    fi
+}
+
 _cf_vmess_b64() {
     local ps="$1" add="$2" host="$3" net="$4" path="$5" uuid="$6"
     local j="{\"v\":\"2\",\"ps\":\"${ps}\",\"add\":\"${add}\",\"port\":\"443\",\"id\":\"${uuid}\",\"aid\":\"0\",\"scy\":\"auto\",\"net\":\"${net}\",\"type\":\"none\",\"host\":\"${host}\",\"path\":\"${path}\",\"tls\":\"tls\",\"sni\":\"${host}\"}"

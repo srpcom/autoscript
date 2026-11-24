@@ -787,6 +787,7 @@ download_file /usr/local/bin/srpcom/utils.sh core/utils.sh
 download_file /usr/local/bin/srpcom/telegram.sh core/telegram.sh
 download_file /usr/local/bin/srpcom/xray.sh core/xray.sh
 download_file /usr/local/bin/srpcom/cloudfront.sh core/cloudfront.sh
+download_file /usr/local/etc/srpcom/cf_map.conf core/cf_map.conf
 download_file /usr/local/bin/srpcom/l2tp.sh core/l2tp.sh
 download_file /usr/local/bin/srpcom/ssh.sh core/ssh.sh
 download_file /usr/local/bin/srpcom/monitor.sh core/monitor.sh
@@ -799,7 +800,7 @@ download_file /usr/local/bin/bot-admin.py configs/bot-admin.py
 
 
 # FIX: Hapus karakter DOS (Carriage Return / \r) akibat edit file di Windows
-sed -i 's/\r$//' /usr/local/bin/srpcom/*.sh 2>/dev/null
+sed -i 's/\r$//' /usr/local/bin/srpcom/*.sh /usr/local/etc/srpcom/cf_map.conf 2>/dev/null
 sed -i 's/\r$//' /usr/local/bin/xray-api.py 2>/dev/null
 sed -i 's/\r$//' /usr/local/bin/bot-admin.py 2>/dev/null
 
@@ -1095,6 +1096,7 @@ chmod +x /usr/local/bin/srpcom/db_helper.sh
 /usr/local/bin/srpcom/db_helper.sh db_import_from_txt 2>/dev/null
 source /usr/local/bin/srpcom/menu.sh
 rebuild_shortcuts
+if declare -F auto_detect_cf_domain >/dev/null; then auto_detect_cf_domain 1; fi
 rebuild_caddyfile
 # ==========================================
 
