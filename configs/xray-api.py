@@ -4,7 +4,7 @@
 # MODULE: PYTHON API BACKEND (MULTI-NODE SUPPORT)
 # ==========================================
 
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, has_request_context
 import json, os, subprocess, uuid, datetime, base64, random, string
 import urllib.request
 
@@ -206,6 +206,22 @@ def after_request_callback(response):
     return response
 
 def send_telegram(text):
+    final_text = text
+    if has_request_context():
+        try:
+            req_data = request.get_json(silent=True) or {}
+            src = str(req_data.get('source') or '').replace('`', "'").strip()[:80]
+            req_by = str(req_data.get('requested_by') or req_data.get('user_info') or req_data.get('customer') or '').replace('`', "'").strip()[:120]
+            extra_lines = []
+            if src:
+                extra_lines.append(f"📡 Sumber : `{src}`")
+            if req_by:
+                extra_lines.append(f"👤 Pembuat : `{req_by}`")
+            if extra_lines:
+                final_text = f"{text}\n━━━━━━━━━━━━━━━━━━━━\n" + "\n".join(extra_lines)
+        except Exception:
+            pass
+
     def _send():
         try:
             bot_token, notif_chat_id, autosend = "", "", "OFF"
@@ -225,9 +241,15 @@ def send_telegram(text):
 
             if autosend == "ON" and bot_token and notif_chat_id:
                 url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
-                payload = {"chat_id": notif_chat_id, "text": text, "parse_mode": "Markdown"}
+                payload = {"chat_id": notif_chat_id, "text": final_text, "parse_mode": "Markdown"}
                 req = urllib.request.Request(url, data=json.dumps(payload).encode('utf-8'), headers={'Content-Type': 'application/json'})
-                urllib.request.urlopen(req, timeout=5)
+                try:
+                    urllib.request.urlopen(req, timeout=5)
+                except Exception:
+                    # Fallback plain text jika parse_mode Markdown gagal
+                    plain_payload = {"chat_id": notif_chat_id, "text": final_text.replace('`', '')}
+                    req_fb = urllib.request.Request(url, data=json.dumps(plain_payload).encode('utf-8'), headers={'Content-Type': 'application/json'})
+                    urllib.request.urlopen(req_fb, timeout=5)
         except: pass
     threading.Thread(target=_send, daemon=True).start()
 
