@@ -160,15 +160,30 @@ def save_json(p, d):
 
 import threading
 
+_xray_restart_timer = None
+_l2tp_restart_timer = None
+_restart_lock = threading.Lock()
+
 def restart_xray():
+    global _xray_restart_timer
     def run():
         subprocess.run(['systemctl', 'restart', 'xray'])
-    threading.Thread(target=run).start()
+    # Delay restart slightly so the HTTP API response finishes returning before active VPN tunnels drop.
+    with _restart_lock:
+        if _xray_restart_timer is not None:
+            _xray_restart_timer.cancel()
+        _xray_restart_timer = threading.Timer(2.5, run)
+        _xray_restart_timer.start()
 
 def restart_l2tp():
+    global _l2tp_restart_timer
     def run():
         subprocess.run(['systemctl', 'restart', 'ipsec', 'xl2tpd'])
-    threading.Thread(target=run).start()
+    with _restart_lock:
+        if _l2tp_restart_timer is not None:
+            _l2tp_restart_timer.cancel()
+        _l2tp_restart_timer = threading.Timer(2.5, run)
+        _l2tp_restart_timer.start()
 
 def sync_to_db():
     def run():
@@ -191,28 +206,30 @@ def after_request_callback(response):
     return response
 
 def send_telegram(text):
-    try:
-        bot_token, notif_chat_id, autosend = "", "", "OFF"
-        
-        if os.path.exists('/usr/local/etc/xray/bot_notif.conf'):
-            with open('/usr/local/etc/xray/bot_notif.conf', 'r') as f:
-                for line in f:
-                    line = line.strip()
-                    if line.startswith('NOTIF_BOT_TOKEN='): bot_token = line.split('=', 1)[1].strip('"').strip("'")
-                    elif line.startswith('NOTIF_CHAT_ID='): notif_chat_id = line.split('=', 1)[1].strip('"').strip("'")
-        
-        if os.path.exists(BOT_CONF):
-            with open(BOT_CONF, 'r') as f:
-                for line in f:
-                    line = line.strip()
-                    if line.startswith('AUTOSEND_STATUS='): autosend = line.split('=', 1)[1].strip('"').strip("'")
+    def _send():
+        try:
+            bot_token, notif_chat_id, autosend = "", "", "OFF"
+            
+            if os.path.exists('/usr/local/etc/xray/bot_notif.conf'):
+                with open('/usr/local/etc/xray/bot_notif.conf', 'r') as f:
+                    for line in f:
+                        line = line.strip()
+                        if line.startswith('NOTIF_BOT_TOKEN='): bot_token = line.split('=', 1)[1].strip('"').strip("'")
+                        elif line.startswith('NOTIF_CHAT_ID='): notif_chat_id = line.split('=', 1)[1].strip('"').strip("'")
+            
+            if os.path.exists(BOT_CONF):
+                with open(BOT_CONF, 'r') as f:
+                    for line in f:
+                        line = line.strip()
+                        if line.startswith('AUTOSEND_STATUS='): autosend = line.split('=', 1)[1].strip('"').strip("'")
 
-        if autosend == "ON" and bot_token and notif_chat_id:
-            url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
-            payload = {"chat_id": notif_chat_id, "text": text, "parse_mode": "Markdown"}
-            req = urllib.request.Request(url, data=json.dumps(payload).encode('utf-8'), headers={'Content-Type': 'application/json'})
-            urllib.request.urlopen(req, timeout=5)
-    except: pass
+            if autosend == "ON" and bot_token and notif_chat_id:
+                url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
+                payload = {"chat_id": notif_chat_id, "text": text, "parse_mode": "Markdown"}
+                req = urllib.request.Request(url, data=json.dumps(payload).encode('utf-8'), headers={'Content-Type': 'application/json'})
+                urllib.request.urlopen(req, timeout=5)
+        except: pass
+    threading.Thread(target=_send, daemon=True).start()
 
 def remove_from_txt(filepath, user):
     if not os.path.exists(filepath): return
